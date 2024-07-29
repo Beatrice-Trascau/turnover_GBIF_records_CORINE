@@ -82,18 +82,28 @@ cells_with_more_than_3_species <- species_count |>
   filter(species_count > 3) |>
   pull(cell)
 
-# Filter original data for the specific cells
+# Filter original data for the specific cells and convert to long format
 filtered_occurrences <- clean_occurrences_for_turnover |>
   filter(cell %in% cells_with_more_than_3_species) |>
   st_drop_geometry() |>
   select(period, species, cell) |>
   na.omit()
 
-
-# Convert to long format
-occurrences_long <- clean_occurrences_for_turnover |>
-  st_drop_geometry() |>
-  select(period, species, cell) %>%
-  na.omit()
+# Convert to long format for codyn
+occurrences_long <- filtered_occurrences |>
+  gather(key = "attribute", value = "value", -period, -cell, -species)
 
 # 3. CALCULATE TURNOVER --------------------------------------------------------
+
+# Calculate turnover between the time periods using the codyn package
+turnover_result <- codyn::turnover(
+  data = occurrences_long, 
+  time.var = "period", 
+  species.var = "species", 
+  abundance.var = NULL,
+  replicate.var = "cell", 
+  metric = "total")
+
+
+
+
