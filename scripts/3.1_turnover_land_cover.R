@@ -65,3 +65,6 @@ clean_occurrences_sf <- occurrences_sf_reprojected |>
   filter(!is.na(period))
 
 ## 2.3. Assign species to land cover cells -------------------------------------
+clean_occurrences_for_turnover <- clean_occurrences_sf |>
+  mutate(cell = terra::extract(land_cover_id, 
+                               as.matrix(st_coordinates(clean_occurrences_sf))))
