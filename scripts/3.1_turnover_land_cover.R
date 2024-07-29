@@ -48,5 +48,20 @@ occurrences_sf <- st_as_sf(occurrences_norway,
                            coords = c("decimalLongitude", "decimalLatitude"),
                            crs = 4326)
 # Re-project 
-clean_occurrences_sf <- st_transform(clean_occurrences_sf, 
-                                     st_crs(norway_corine[[1]]))
+occurrences_sf_reprojected <- st_transform(occurrences_sf, 
+                                     st_crs(norway_corine_status_modified_stack[[1]]))
+
+# Define periods 
+clean_occurrences_sf <- occurrences_sf_reprojected |>
+  mutate(period = case_when(
+    year %in% c(1997:2000) ~ "before_1",
+    year %in% c(2006:2009) ~ "after_1",
+    year %in% c(2003:2006) ~ "before_2",
+    year %in% c(2012:2015) ~ "after_2",
+    year %in% c(2009:2012) ~ "before_3",
+    year %in% c(2015:2018) ~ "after_3",
+    TRUE ~ NA_character_
+  )) %>% 
+  filter(!is.na(period))
+
+## 2.3. Assign species to land cover cells -------------------------------------
