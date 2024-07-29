@@ -23,7 +23,7 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
                  "plotly", "lme4", "DHARMa", "glmmTMB", "mgcv",
                  "tidyterra", "ggspatial", "htmlwidgets",
                  "htmltools", "patchwork", "webshot2",
-                 "rgbif", "CoordinateCleaner") # specify packages
+                 "rgbif", "CoordinateCleaner", "codyn") # specify packages
 
 # Execute the function
 sapply(package_vec, install_load_package)
