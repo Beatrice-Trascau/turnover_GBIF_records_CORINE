@@ -67,15 +67,19 @@ clean_occurrences_sf <- occurrences_sf_reprojected |>
 ## 2.3. Assign species to land cover cells -------------------------------------
 
 # Extract land cover cell ID for each occurrence record
-clean_occurrences_for_turnover <- clean_occurrences_sf |>
-  mutate(cell = terra::extract(land_cover_id, 
-                               as.matrix(st_coordinates(clean_occurrences_sf))))
+coords <- st_coordinates(clean_occurrences_sf)
+cell_ids <- terra::extract(land_cover_id, coords)[, 1]
+
+# Ensure we have the correct number of cell IDs
+stopifnot(length(cell_ids) == nrow(clean_occurrences_sf))
+clean_occurrences_for_turnover <- clean_occurrences_sf %>%
+  mutate(cell = cell_ids)
 
 # Filter cells with more than 3 species
 species_count <- clean_occurrences_for_turnover |>
   st_drop_geometry() |>
   group_by(cell, period) |>
-  summarise(species_count = n_distinct(species))
+  summarise(species_count = n_distinct(species), .groups = 'drop')
 
 # Get cells with more than 3 species 
 cells_with_more_than_3_species <- species_count |>
@@ -89,21 +93,43 @@ filtered_occurrences <- clean_occurrences_for_turnover |>
   select(period, species, cell) |>
   na.omit()
 
-# Convert to long format for codyn
-occurrences_long <- filtered_occurrences |>
-  gather(key = "attribute", value = "value", -period, -cell, -species)
+# Ensure the lengths of all columns are the same
+stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$period))
+stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$species))
+stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$cell))
 
 # 3. CALCULATE TURNOVER --------------------------------------------------------
 
-# Calculate turnover between the time periods using the codyn package
-turnover_result <- codyn::turnover(
-  data = occurrences_long, 
-  time.var = "period", 
-  species.var = "species", 
-  abundance.var = NULL,
-  replicate.var = "cell", 
-  metric = "total")
+# Calculating turnover for each period to help with memory issues
 
+# Define periods to subset the data
+periods <- c("before_1", "after_1", "before_2", "after_2", "before_3", "after_3")
+
+# Create an empty list to store results
+turnover_results_list <- list()
+
+# Loop over each period to calculate turnover separately
+for (period in periods) {
+  period_data <- filtered_occurrences %>% filter(period == period)
+  
+  # Calculate turnover for the current period
+  turnover_result <- codyn::turnover(
+    df = period_data, 
+    time.var = "period", 
+    species.var = "species", 
+    abundance.var = NULL,
+    replicate.var = "cell"
+  )
+  
+  # Add period information to the results
+  turnover_result <- turnover_result %>% mutate(period = period)
+  
+  # Store the result in the list
+  turnover_results_list[[period]] <- turnover_result
+}
+
+# Combine all period results into one data frame
+turnover_results_combined <- bind_rows(turnover_results_list)
 
 
 
