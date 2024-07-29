@@ -65,6 +65,35 @@ clean_occurrences_sf <- occurrences_sf_reprojected |>
   filter(!is.na(period))
 
 ## 2.3. Assign species to land cover cells -------------------------------------
+
+# Extract land cover cell ID for each occurrence record
 clean_occurrences_for_turnover <- clean_occurrences_sf |>
   mutate(cell = terra::extract(land_cover_id, 
                                as.matrix(st_coordinates(clean_occurrences_sf))))
+
+# Filter cells with more than 3 species
+species_count <- clean_occurrences_for_turnover |>
+  st_drop_geometry() |>
+  group_by(cell, period) |>
+  summarise(species_count = n_distinct(species))
+
+# Get cells with more than 3 species 
+cells_with_more_than_3_species <- species_count |>
+  filter(species_count > 3) |>
+  pull(cell)
+
+# Filter original data for the specific cells
+filtered_occurrences <- clean_occurrences_for_turnover |>
+  filter(cell %in% cells_with_more_than_3_species) |>
+  st_drop_geometry() |>
+  select(period, species, cell) |>
+  na.omit()
+
+
+# Convert to long format
+occurrences_long <- clean_occurrences_for_turnover |>
+  st_drop_geometry() |>
+  select(period, species, cell) %>%
+  na.omit()
+
+# 3. CALCULATE TURNOVER --------------------------------------------------------
