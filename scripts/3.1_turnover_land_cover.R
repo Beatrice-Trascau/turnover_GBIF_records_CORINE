@@ -98,6 +98,24 @@ stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$period))
 stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$species))
 stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$cell))
 
+# Function to calculate turnover in smaller chunks
+calculate_turnover_in_chunks <- function(df, chunk_size = 100000) {
+  n <- nrow(df)
+  chunks <- split(df, rep(1:ceiling(n / chunk_size), each = chunk_size, length.out = n))
+  
+  results <- lapply(chunks, function(chunk) {
+    codyn::turnover(
+      df = chunk, 
+      time.var = "period", 
+      species.var = "species", 
+      abundance.var = NULL,
+      replicate.var = "cell"
+    )
+  })
+  
+  bind_rows(results)
+}
+
 # 3. CALCULATE TURNOVER --------------------------------------------------------
 
 # Calculating turnover for each period to help with memory issues
@@ -112,14 +130,8 @@ turnover_results_list <- list()
 for (period in periods) {
   period_data <- filtered_occurrences %>% filter(period == period)
   
-  # Calculate turnover for the current period
-  turnover_result <- codyn::turnover(
-    df = period_data, 
-    time.var = "period", 
-    species.var = "species", 
-    abundance.var = NULL,
-    replicate.var = "cell"
-  )
+  # Calculate turnover for the current period in chunks
+  turnover_result <- calculate_turnover_in_chunks(period_data)
   
   # Add period information to the results
   turnover_result <- turnover_result %>% mutate(period = period)
@@ -127,6 +139,14 @@ for (period in periods) {
   # Store the result in the list
   turnover_results_list[[period]] <- turnover_result
 }
+
+# Combine all period results into one data frame
+turnover_results_combined <- bind_rows(turnover_results_list)
+
+
+# Combine all period results into one data frame
+turnover_results_combined <- bind_rows(turnover_results_list)
+
 
 # Combine all period results into one data frame
 turnover_results_combined <- bind_rows(turnover_results_list)
