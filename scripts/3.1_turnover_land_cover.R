@@ -54,34 +54,37 @@ occurrences_sf_reprojected <- st_transform(occurrences_sf,
 # Define periods 
 clean_occurrences_sf <- occurrences_sf_reprojected |>
   mutate(period = case_when(
-    year %in% c(1997:2000) ~ "before_1",
-    year %in% c(2006:2009) ~ "after_1",
-    year %in% c(2003:2006) ~ "before_2",
-    year %in% c(2012:2015) ~ "after_2",
-    year %in% c(2009:2012) ~ "before_3",
-    year %in% c(2015:2018) ~ "after_3",
-    TRUE ~ NA_character_
-  )) %>% 
+    year %in% c(1997:2000) ~ "1997-2000",
+    year %in% c(2006:2009) ~ "2006-2009",
+    year %in% c(2003:2006) ~ "2003-2006",
+    year %in% c(2012:2015) ~ "2012-2015",
+    year %in% c(2009:2012) ~ "2009-2012",
+    year %in% c(2015:2018) ~ "2015-2018",
+    TRUE ~ NA_character_)) |>
   filter(!is.na(period))
 
 ## 2.3. Assign species to land cover cells -------------------------------------
 
-# Extract land cover cell ID for each occurrence record
+# Extract coordinates from the occurrence records
 coords <- st_coordinates(clean_occurrences_sf)
+
+# Extract land cover cell ID for each occurrence record
 cell_ids <- terra::extract(land_cover_id, coords)[, 1]
 
 # Ensure we have the correct number of cell IDs
 stopifnot(length(cell_ids) == nrow(clean_occurrences_sf))
-clean_occurrences_for_turnover <- clean_occurrences_sf %>%
+
+# Add cell_ids in occurrence df in new column
+clean_occurrences_for_turnover <- clean_occurrences_sf |>
   mutate(cell = cell_ids)
 
-# Filter cells with more than 3 species
+# Find the cells that have more than 3 species
 species_count <- clean_occurrences_for_turnover |>
   st_drop_geometry() |>
   group_by(cell, period) |>
   summarise(species_count = n_distinct(species), .groups = 'drop')
 
-# Get cells with more than 3 species 
+# Get the cells that have more than 3 species
 cells_with_more_than_3_species <- species_count |>
   filter(species_count > 3) |>
   pull(cell)
@@ -93,63 +96,28 @@ filtered_occurrences <- clean_occurrences_for_turnover |>
   select(period, species, cell) |>
   na.omit()
 
-# Ensure the lengths of all columns are the same
-stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$period))
-stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$species))
-stopifnot(nrow(filtered_occurrences) == length(filtered_occurrences$cell))
+# Aggregate to ensure unique species records per cell and period
+unique_occurrences <- filtered_occurrences |>
+  distinct(cell, species, period, .keep_all = TRUE)
 
-# Function to calculate turnover in smaller chunks
-calculate_turnover_in_chunks <- function(df, chunk_size = 100000) {
-  n <- nrow(df)
-  chunks <- split(df, rep(1:ceiling(n / chunk_size), each = chunk_size, length.out = n))
-  
-  results <- lapply(chunks, function(chunk) {
-    codyn::turnover(
-      df = chunk, 
-      time.var = "period", 
-      species.var = "species", 
-      abundance.var = NULL,
-      replicate.var = "cell"
-    )
-  })
-  
-  bind_rows(results)
-}
+# 3. CALUCATE TEMPORAL TURNOVER FOR EACH PAIR OF CHANGE PERIODS ----------------
 
-# 3. CALCULATE TURNOVER --------------------------------------------------------
+# Define pairs of periods
+period_combinations <- list(
+  c("1997-2000", "2006-2009"),
+  c("2003-2006", "2012-2015"),
+  c("2009-2012", "2015-2018")
+)
 
-# Calculating turnover for each period to help with memory issues
+# Apply (custom) function to calculate Jaccard's dissimilarity index between the
+# two periods in a pair
+jaccard_index_list <- lapply(period_combinations, function(periods) {
+  calculate_jaccard_for_periods(unique_occurrences, periods[1], periods[2])})
 
-# Define periods to subset the data
-periods <- c("before_1", "after_1", "before_2", "after_2", "before_3", "after_3")
+# Combine all results into one df
+jaccard_results_combined <- bind_rows(jaccard_results_list)
 
-# Create an empty list to store results
-turnover_results_list <- list()
-
-# Loop over each period to calculate turnover separately
-for (period in periods) {
-  period_data <- filtered_occurrences %>% filter(period == period)
-  
-  # Calculate turnover for the current period in chunks
-  turnover_result <- calculate_turnover_in_chunks(period_data)
-  
-  # Add period information to the results
-  turnover_result <- turnover_result %>% mutate(period = period)
-  
-  # Store the result in the list
-  turnover_results_list[[period]] <- turnover_result
-}
-
-# Combine all period results into one data frame
-turnover_results_combined <- bind_rows(turnover_results_list)
-
-
-# Combine all period results into one data frame
-turnover_results_combined <- bind_rows(turnover_results_list)
-
-
-# Combine all period results into one data frame
-turnover_results_combined <- bind_rows(turnover_results_list)
-
-
+# Write df to file
+saveRDS(jaccard_results_combined, here("data", "derived_data",
+                                       "jaccard_temporal_turnover_with_land_cover.rds"))
 
