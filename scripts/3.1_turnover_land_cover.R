@@ -119,23 +119,35 @@ temporal_turnover <- bind_rows(jaccard_index_list)
 
 # 4. ADD SSB IDS ---------------------------------------------------------------
 
-# Convert occurrences back to sf (for spatial join)
-unique_occurrences_sf <- st_as_sf(unique_occurrences, coords = c("cell"), 
-                                  crs = st_crs(ssb_grids))
+## 4.1. Extract cell centroids from norway_corine_status_modified_stack
 
-# Check that SSB ids and occurrences have the same CRS
-unique_occurrences_transformed <- st_transform(unique_occurrences_sf, crs = 
-                                                 st_crs(ssb_grids))
+# Extract xy coordinates
+xy_coords <- xyFromCell(land_cover_id, 1:ncell(land_cover_id))
 
-# Spatial join to get SSB ID for each cell
-ssbid_data <- st_join(unique_occurrences_transformed, ssb_grids, 
-                      join = st_within)
+# Create df of the xy coordinates
+centroids_df <- data.frame(cell = 1:ncell(land_cover_id), 
+                           x = xy_coords[,1], y = xy_coords[,2])
 
-# Extract SSB ID and cell columns and convert to df
-ssbid_df <- as.data.frame(ssbid_data) |>
+# Convert to spatial dataframe
+centroids_sf <- st_as_sf(centroids_df, coords = c("x", "y"), 
+                         crs = st_crs(norway_corine_status_modified_stack))
+
+## 4.2. Extract SSB ID for centroids -------------------------------------------
+
+# Convert ssb_grids SpatVector to sf
+ssb_grids_sf <- st_as_sf(ssb_grids)
+
+# Ensure SSB ID and centroids_sf have the same CRS
+centroids_sf <- st_transform(centroids_sf, crs = st_crs(ssb_grids_sf))
+
+# Spatial join to get SSB ID for for each centroid
+ssbid_data <- st_join(centroids_sf, ssb_grids_sf, join = st_within)
+
+# Extract SSB ID and cell columns and convert to data frame
+ssbid_df <- as.data.frame(ssbid_data) |> 
   select(cell, SSBID)
 
-# Merge SSB ID data with the temporal turnover df
+# Merge SSBID data with jaccard_results_combined
 temporal_turnover_ssb <- left_join(temporal_turnover, ssbid_df, by = "cell")
 
 # Replace land cover values with specified categories 
