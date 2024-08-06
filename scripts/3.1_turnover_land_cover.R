@@ -115,9 +115,42 @@ jaccard_index_list <- lapply(period_combinations, function(periods) {
   calculate_jaccard_for_periods(unique_occurrences, periods[1], periods[2])})
 
 # Combine all results into one df
-jaccard_results_combined <- bind_rows(jaccard_results_list)
+temporal_turnover <- bind_rows(jaccard_index_list)
 
 # Write df to file
-saveRDS(jaccard_results_combined, here("data", "derived_data",
+saveRDS(temporal_turnover, here("data", "derived_data",
                                        "jaccard_temporal_turnover_with_land_cover.rds"))
 
+# 4. PLOT RESULTS --------------------------------------------------------------
+
+# Replace land cover values with specified categories 
+temporal_turnover_for_plot <- temporal_turnover |>
+  mutate(land_cover_start = case_when(
+    is.na(land_cover_start) ~ "other",
+    land_cover_start == 1 ~ "urban_fabric",
+    land_cover_start == 80 ~ "complex_agriculture",
+    land_cover_start == 103 ~ "agriculture_and_vegetation",
+    land_cover_start == 250 ~ "forests",
+    land_cover_start == 380 ~ "moors_heath_grass",
+    land_cover_start == 590 ~ "transitional_woodland",
+    land_cover_start == 711 ~ "sparse_vegetation",
+    TRUE ~ as.character(land_cover_start)))
+
+# Plot violins
+ggplot(temporal_turnover_for_plot, 
+       aes(x = land_cover_start, y = jaccard_dissimilarity, 
+           fill = land_cover_start)) +
+  geom_violin() +
+  facet_wrap(~ start_period, ncol = 1) +
+  theme_classic() +
+  labs(x = "Land Cover Category", y = "Jaccard Dissimilarity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Land Cover"))
+
+# Save plot as .png
+ggsave(here("figures", "temporal_turnove_Figure1.png"),
+       width=20, height=13)
+
+# Save plot as .pdf
+ggsave(here("figures", "temporal_turnove_Figure1.pdf"),
+       width=20, height=13)
