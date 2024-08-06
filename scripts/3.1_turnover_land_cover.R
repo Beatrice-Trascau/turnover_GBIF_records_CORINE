@@ -117,14 +117,29 @@ jaccard_index_list <- lapply(period_combinations, function(periods) {
 # Combine all results into one df
 temporal_turnover <- bind_rows(jaccard_index_list)
 
-# Write df to file
-saveRDS(temporal_turnover, here("data", "derived_data",
-                                       "jaccard_temporal_turnover_with_land_cover.rds"))
+# 4. ADD SSB IDS ---------------------------------------------------------------
 
-# 4. PLOT RESULTS --------------------------------------------------------------
+# Convert occurrences back to sf (for spatial join)
+unique_occurrences_sf <- st_as_sf(unique_occurrences, coords = c("cell"), 
+                                  crs = st_crs(ssb_grids))
+
+# Check that SSB ids and occurrences have the same CRS
+unique_occurrences_transformed <- st_transform(unique_occurrences_sf, crs = 
+                                                 st_crs(ssb_grids))
+
+# Spatial join to get SSB ID for each cell
+ssbid_data <- st_join(unique_occurrences_transformed, ssb_grids, 
+                      join = st_within)
+
+# Extract SSB ID and cell columns and convert to df
+ssbid_df <- as.data.frame(ssbid_data) |>
+  select(cell, SSBID)
+
+# Merge SSB ID data with the temporal turnover df
+temporal_turnover_ssb <- left_join(temporal_turnover, ssbid_df, by = "cell")
 
 # Replace land cover values with specified categories 
-temporal_turnover_for_plot <- temporal_turnover |>
+temporal_turnover_ssb <- temporal_turnover_ssb |>
   mutate(land_cover_start = case_when(
     is.na(land_cover_start) ~ "other",
     land_cover_start == 1 ~ "urban_fabric",
@@ -135,6 +150,12 @@ temporal_turnover_for_plot <- temporal_turnover |>
     land_cover_start == 590 ~ "transitional_woodland",
     land_cover_start == 711 ~ "sparse_vegetation",
     TRUE ~ as.character(land_cover_start)))
+
+# Write df to file
+saveRDS(temporal_turnover, here("data", "derived_data",
+                                "jaccard_temporal_turnover_with_land_cover.rds"))
+
+# 4. PLOT RESULTS --------------------------------------------------------------
 
 # Plot violins
 ggplot(temporal_turnover_for_plot, 
@@ -154,3 +175,5 @@ ggsave(here("figures", "temporal_turnove_Figure1.png"),
 # Save plot as .pdf
 ggsave(here("figures", "temporal_turnove_Figure1.pdf"),
        width=20, height=13)
+
+# END OF SCRIPT ----------------------------------------------------------------
