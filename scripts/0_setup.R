@@ -79,4 +79,46 @@ modify_class_values <- function(raster_stack, class_modifications) {
   return(modified_stack)
 }
 
+# 6. FUNCTION TO EXTRACT LAND COVER FOR GIVEN PERIOD ---------------------------
+
+extract_land_cover <- function(cell_ids, period) {
+  if (period == "1997-2000") {
+    land_cover <- terra::extract(norway_corine[[1]], cell_ids)[, 1]
+  } else if (period == "2003-2006") {
+    land_cover <- terra::extract(norway_corine[[2]], cell_ids)[, 1]
+  } else if (period == "2009-2012") {
+    land_cover <- terra::extract(norway_corine[[3]], cell_ids)[, 1]
+  } else {
+    land_cover <- NA
+  }
+  return(land_cover)
+}
+
+# 7. FUNCTION TO CALCULATE JACCARD DISSIMILARITY INDEX FOR PERIODS -------------
+
+calculate_jaccard_for_periods <- function(df, start_period, end_period) {
+  start_data <- df %>% filter(period == start_period)
+  end_data <- df %>% filter(period == end_period)
+  
+  combined_data <- start_data %>%
+    full_join(end_data, by = "cell", suffix = c("_start", "_end"))
+  
+  # Extract land cover for start period
+  combined_data <- combined_data %>%
+    mutate(land_cover_start = extract_land_cover(cell, start_period))
+  
+  jaccard_results <- combined_data %>%
+    group_by(cell) %>%
+    summarize(
+      species_start = list(unique(species_start)),
+      species_end = list(unique(species_end)),
+      jaccard_dissimilarity = 1 - length(intersect(species_start[[1]], species_end[[1]])) / length(union(species_start[[1]], species_end[[1]])),
+      land_cover_start = first(land_cover_start)
+    ) %>%
+    mutate(start_period = start_period, end_period = end_period)
+  
+  return(jaccard_results)
+}
+
+
 # END OF SCRIPT ----------------------------------------------------------------
