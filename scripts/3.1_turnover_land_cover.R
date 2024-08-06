@@ -155,7 +155,7 @@ temporal_turnover_ssb <- temporal_turnover_ssb |>
 saveRDS(temporal_turnover, here("data", "derived_data",
                                 "jaccard_temporal_turnover_with_land_cover.rds"))
 
-# 4. PLOT RESULTS --------------------------------------------------------------
+# 5. PLOT RESULTS --------------------------------------------------------------
 
 # Plot violins
 ggplot(temporal_turnover_for_plot, 
