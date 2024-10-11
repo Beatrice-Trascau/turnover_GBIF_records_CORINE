@@ -63,6 +63,7 @@ clean_occurrences_sf <- occurrences_sf_reprojected |>
     TRUE ~ NA_character_)) |>
   filter(!is.na(period))
 
+
 ## 2.3. Assign species to land cover cells -------------------------------------
 
 # Extract coordinates from the occurrence records
@@ -77,6 +78,23 @@ stopifnot(length(cell_ids) == nrow(clean_occurrences_sf))
 # Add cell_ids in occurrence df in new column
 clean_occurrences_for_turnover <- clean_occurrences_sf |>
   mutate(cell = cell_ids)
+
+# Extract land cover values
+lc2000_values <- terra::extract(norway_corine_status_modified_stack[[1]], 
+                                coords)[, 1]
+lc2006_values <- terra::extract(norway_corine_status_modified_stack[[2]], 
+                                coords)[, 1]
+lc2012_values <- terra::extract(norway_corine_status_modified_stack[[3]], 
+                                coords)[, 1]
+lc2018_values <- terra::extract(norway_corine_status_modified_stack[[4]], 
+                                coords)[, 1]
+
+#Add land cover values to clean
+clean_occurrences_for_turnover <- clean_occurrences_for_turnover |>
+  mutate(LC2000 = lc2000_values,
+         LC2006 = lc2006_values,
+         LC2012 = lc2012_values,
+         LC2018 = lc2018_values)
 
 # Find the cells that have more than 3 species
 species_count <- clean_occurrences_for_turnover |>
