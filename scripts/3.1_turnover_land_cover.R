@@ -79,23 +79,6 @@ stopifnot(length(cell_ids) == nrow(clean_occurrences_sf))
 clean_occurrences_for_turnover <- clean_occurrences_sf |>
   mutate(cell = cell_ids)
 
-# Extract land cover values
-lc2000_values <- terra::extract(norway_corine_status_modified_stack[[1]], 
-                                coords)[, 1]
-lc2006_values <- terra::extract(norway_corine_status_modified_stack[[2]], 
-                                coords)[, 1]
-lc2012_values <- terra::extract(norway_corine_status_modified_stack[[3]], 
-                                coords)[, 1]
-lc2018_values <- terra::extract(norway_corine_status_modified_stack[[4]], 
-                                coords)[, 1]
-
-#Add land cover values to clean
-clean_occurrences_for_turnover <- clean_occurrences_for_turnover |>
-  mutate(LC2000 = lc2000_values,
-         LC2006 = lc2006_values,
-         LC2012 = lc2012_values,
-         LC2018 = lc2018_values)
-
 # Find the cells that have more than 3 species
 species_count <- clean_occurrences_for_turnover |>
   st_drop_geometry() |>
@@ -168,8 +151,31 @@ ssbid_df <- as.data.frame(ssbid_data) |>
 # Merge SSBID data with jaccard_results_combined
 temporal_turnover_ssb <- left_join(temporal_turnover, ssbid_df, by = "cell")
 
+# 5. ADD LAND COVER VALUES -----------------------------------------------------
+
+# Extract land cover values for each period
+lc2000_values <- terra::extract(norway_corine_status_modified_stack[[1]], 
+                                coords)[, 1]
+lc2006_values <- terra::extract(norway_corine_status_modified_stack[[2]], 
+                                coords)[, 1]
+lc2012_values <- terra::extract(norway_corine_status_modified_stack[[3]], 
+                                coords)[, 1]
+lc2018_values <- terra::extract(norway_corine_status_modified_stack[[4]], 
+                                coords)[, 1]
+
+# Create a df with land cover values and cell IDs
+land_cover_df <- data.frame(cell = 1:ncell(land_cover_id),
+                            LC2000 = lc2000_values,
+                            LC2006 = lc2006_values,
+                            LC2012 = lc2012_values,
+                            LC2018 = lc2018_values)
+
+# Join land cover df with temporal turnover df
+temporal_turnover_lc <- left_join(temporal_turnover_ssb, 
+                                   land_cover_df, by = "cell")
+
 # Replace land cover values with specified categories 
-temporal_turnover_ssb <- temporal_turnover_ssb |>
+temporal_turnover_lc <- temporal_turnover_lc |>
   mutate(land_cover_start = case_when(
     is.na(land_cover_start) ~ "other",
     land_cover_start == 1 ~ "urban_fabric",
@@ -182,7 +188,7 @@ temporal_turnover_ssb <- temporal_turnover_ssb |>
     TRUE ~ as.character(land_cover_start)))
 
 # Write df to file
-saveRDS(temporal_turnover, here("data", "derived_data",
+saveRDS(temporal_turnover_lc, here("data", "derived_data",
                                 "jaccard_temporal_turnover_with_land_cover.rds"))
 
 # 5. PLOT RESULTS --------------------------------------------------------------
