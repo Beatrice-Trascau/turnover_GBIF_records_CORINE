@@ -187,7 +187,33 @@ temporal_turnover_lc <- temporal_turnover_ssb |>
 saveRDS(temporal_turnover_lc, here("data", "derived_data",
                                 "jaccard_temporal_turnover_with_land_cover.rds"))
 
-  # 6. PLOT RESULTS --------------------------------------------------------------
+# Add land cover change columns
+temporal_turnover_lc <- temporal_turnover_lc |>
+  mutate(LC2000_2006_change = ifelse(LC2000 != LC2006, "Y", "N"),
+         LC2006_2012_change = ifelse(LC2006 != LC2012, "Y", "N"),
+         LC2012_2018_change = ifelse(LC2012 != LC2018, "Y", "N"))
+
+# 6. PLOT RESULTS --------------------------------------------------------------
+
+df_long <- temporal_turnover_lc %>%
+  pivot_longer(cols = c("LC2000_2006_change", "LC2006_2012_change", "LC2012_2018_change"),
+               names_to = "change_period", values_to = "LC_change") %>%
+  # Match change_period to start_period
+  mutate(start_period = case_when(
+    change_period == "LC2000_2006_change" ~ "1997-2000",
+    change_period == "LC2006_2012_change" ~ "2003-2006",
+    change_period == "LC2012_2018_change" ~ "2009-2012",
+    TRUE ~ as.character(start_period)  # Keep the existing values if any don't match
+  ))
+
+# Create the violin plot
+ggplot(df_long, aes(x = LC_change, y = jaccard_dissimilarity, fill = LC_change)) +
+  geom_violin() +
+  facet_wrap(~ start_period) +  # Facet by start period
+  scale_fill_manual(values = c("Y" = "blue", "N" = "red")) +  # Define colors for Y and N
+  theme_classic() +
+  labs(x = "Land Cover Change", y = "Jaccard Dissimilarity", fill = "LC Change") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Plot violins
 ggplot(temporal_turnover_for_plot, 
