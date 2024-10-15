@@ -64,7 +64,7 @@ clean_occurrences_sf <- occurrences_sf_reprojected |>
   filter(!is.na(period))
 
 
-## 2.3. Assign species to land cover cells -------------------------------------
+# 2.3. Assign species to land cover cells -------------------------------------
 
 # Extract coordinates from the occurrence records
 coords <- st_coordinates(clean_occurrences_sf)
@@ -153,45 +153,41 @@ temporal_turnover_ssb <- left_join(temporal_turnover, ssbid_df, by = "cell")
 
 # 5. ADD LAND COVER VALUES -----------------------------------------------------
 
-# Extract land cover values for each period
-lc2000_values <- terra::extract(norway_corine_status_modified_stack[[1]], 
-                                coords)[, 1]
-lc2006_values <- terra::extract(norway_corine_status_modified_stack[[2]], 
-                                coords)[, 1]
-lc2012_values <- terra::extract(norway_corine_status_modified_stack[[3]], 
-                                coords)[, 1]
-lc2018_values <- terra::extract(norway_corine_status_modified_stack[[4]], 
-                                coords)[, 1]
-
 # Create a df with land cover values and cell IDs
-land_cover_df <- data.frame(cell = 1:ncell(land_cover_id),
-                            LC2000 = lc2000_values,
-                            LC2006 = lc2006_values,
-                            LC2012 = lc2012_values,
-                            LC2018 = lc2018_values)
+land_cover_df <- data.frame(
+  cell = 1:ncell(land_cover_id),
+  LC2000 = values(norway_corine_status_modified_stack[[1]]),
+  LC2006 = values(norway_corine_status_modified_stack[[2]]),
+  LC2012 = values(norway_corine_status_modified_stack[[3]]),
+  LC2018 = values(norway_corine_status_modified_stack[[4]]))
 
 # Join land cover df with temporal turnover df
-temporal_turnover_lc <- left_join(temporal_turnover_ssb, 
-                                   land_cover_df, by = "cell")
+temporal_turnover_lc <- temporal_turnover_ssb |>
+  mutate(
+    LC2000 = land_cover_df$LC2000[match(cell, land_cover_df$cell)],
+    LC2006 = land_cover_df$LC2006[match(cell, land_cover_df$cell)],
+    LC2012 = land_cover_df$LC2012[match(cell, land_cover_df$cell)],
+    LC2018 = land_cover_df$LC2018[match(cell, land_cover_df$cell)]
+  )
 
 # Replace land cover values with specified categories 
-temporal_turnover_lc <- temporal_turnover_lc |>
-  mutate(land_cover_start = case_when(
-    is.na(land_cover_start) ~ "other",
-    land_cover_start == 1 ~ "urban_fabric",
-    land_cover_start == 80 ~ "complex_agriculture",
-    land_cover_start == 103 ~ "agriculture_and_vegetation",
-    land_cover_start == 250 ~ "forests",
-    land_cover_start == 380 ~ "moors_heath_grass",
-    land_cover_start == 590 ~ "transitional_woodland",
-    land_cover_start == 711 ~ "sparse_vegetation",
-    TRUE ~ as.character(land_cover_start)))
+# temporal_turnover_lc <- temporal_turnover_lc |>
+#   mutate(land_cover_start = case_when(
+#     is.na(land_cover_start) ~ "other",
+#     land_cover_start == 1 ~ "urban_fabric",
+#     land_cover_start == 80 ~ "complex_agriculture",
+#     land_cover_start == 103 ~ "agriculture_and_vegetation",
+#     land_cover_start == 250 ~ "forests",
+#     land_cover_start == 380 ~ "moors_heath_grass",
+#     land_cover_start == 590 ~ "transitional_woodland",
+#     land_cover_start == 711 ~ "sparse_vegetation",
+#     TRUE ~ as.character(land_cover_start)))
 
 # Write df to file
 saveRDS(temporal_turnover_lc, here("data", "derived_data",
                                 "jaccard_temporal_turnover_with_land_cover.rds"))
 
-# 5. PLOT RESULTS --------------------------------------------------------------
+  # 6. PLOT RESULTS --------------------------------------------------------------
 
 # Plot violins
 ggplot(temporal_turnover_for_plot, 
