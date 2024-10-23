@@ -23,7 +23,8 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
                  "plotly", "lme4", "DHARMa", "glmmTMB", "mgcv",
                  "tidyterra", "ggspatial", "htmlwidgets",
                  "htmltools", "patchwork", "webshot2",
-                 "rgbif", "CoordinateCleaner", "codyn") # specify packages
+                 "rgbif", "CoordinateCleaner", "codyn",
+                 "gratia", "lattice", "car") # specify packages
 
 # Execute the function
 sapply(package_vec, install_load_package)
@@ -79,7 +80,20 @@ modify_class_values <- function(raster_stack, class_modifications) {
   return(modified_stack)
 }
 
-# 6. FUNCTION TO EXTRACT LAND COVER FOR GIVEN PERIOD ---------------------------
+# 6. FUNCTION TO COUNT THE NUMBER OF SMALL PIXELS WITH CERTAIN VALUES ----------
+
+calculate_counts <- function(x) {
+  # remove NA values before counting
+  x <- na.omit(x)
+  
+  # count occurrences of each land cover category value
+  counts <- table(factor(x, levels = c(1, 80, 103, 250, 380, 590, 711)))
+  
+  # return the counts as a numeric vector
+  return(as.numeric(counts))
+}
+
+# 7. FUNCTION TO EXTRACT LAND COVER FOR GIVEN PERIOD ---------------------------
 
 extract_land_cover <- function(cell_ids, period) {
   if (period == "1997-2000") {
@@ -94,7 +108,7 @@ extract_land_cover <- function(cell_ids, period) {
   return(land_cover)
 }
 
-# 7. FUNCTION TO CALCULATE JACCARD DISSIMILARITY INDEX FOR PERIODS -------------
+# 8. FUNCTION TO CALCULATE JACCARD DISSIMILARITY INDEX FOR PERIODS -------------
 
 calculate_jaccard_for_periods <- function(df, start_period, end_period) {
   start_data <- df |>
