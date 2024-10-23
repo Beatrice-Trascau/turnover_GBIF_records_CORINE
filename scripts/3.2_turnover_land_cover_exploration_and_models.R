@@ -11,7 +11,7 @@
 turnover <- readRDS(here("data", "derived_data", 
                          "jaccard_temporal_turnover_with_land_cover.rds"))
 
-## 1.2. Prepare df for analyisi ------------------------------------------------
+## 1.2. Prepare df for analyis -------------------------------------------------
 
 # Add land cover change columns
 turnover1 <- turnover |>
@@ -66,12 +66,25 @@ turnover_lc <- turnover_long |>
                             LC2018 == NA ~ "other"))
 
 # Change values to run beta model with the formula
-#  ( Y * (N - 1) + 0.5 ) / N
-# Y = response variable, N = sample size
+#  ( Y * (N - 1) + 0.5 ) / N, Y = response variable, N = sample size
 N <- nrow(turnover_lc)
 
 turnover_model <- turnover_lc |>
-  mutate(jaccard_dissimilarity_beta = ( jaccard_dissimilarity * (N - 1) + 0.5 ) / N)
+  mutate(jaccard_dissimilarity_beta = (jaccard_dissimilarity * (N - 1) + 0.5 ) / N)
+
+# Save df used for modeling to file
+saveRDS(turnover_model, here("data", "derived_data", "turnover_model_df.rds"))
+
+## 2.3. Plot relationships -----------------------------------------------------
+turnover_model |>
+  ggplot(aes(x = start_period, y = jaccard_dissimilarity)) +
+  geom_point() +
+  facet_wrap(~LC_change) +
+  theme_classic()
+
+# 2. MODELS --------------------------------------------------------------------
+
+## 2.1. Beta GLMM --------------------------------------------------------------
 
 # Set up model
 model1.1_SSB <- glmmTMB(jaccard_dissimilarity_beta ~ LC_change * start_period + (1 | SSBID),
@@ -81,10 +94,17 @@ model1.1_SSB <- glmmTMB(jaccard_dissimilarity_beta ~ LC_change * start_period + 
 # Save model output to file to save time next time
 save(model1.1_SSB, file = here::here("data", "models", "model1.1_SSB.RData"))
 
-# Beta GAM
+
+## 2.1. Beta GAM ---------------------------------------------------------------
+
+# Set up model
 model1.2 <- gam(jaccard_dissimilarity_beta ~ LC_change * start_period, 
              family = betar(link = "logit"), 
              data = turnover_model)
 
 # Save model output to file to save time next time
 save(model1.2, file = here::here("data", "models", "model1.2.RData"))
+
+# Plot model
+gam.check(model1.2)
+appraise(model1.2)
