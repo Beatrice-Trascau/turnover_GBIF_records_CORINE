@@ -137,4 +137,30 @@ calculate_jaccard_for_periods <- function(df, start_period, end_period) {
   return(jaccard_results)
 }
 
+# 8. FUNCTION TO FILTER CELLS WITH MORE THAN 3 SPECIES -------------------------
+
+# Filter cells with more than 3 species (1km, 5km, 15km)
+filter_cells_with_species <- function(occurrences_df) {
+  species_count <- occurrences_df |>
+    st_drop_geometry() |>
+    group_by(cell, period) |>
+    summarise(species_count = n_distinct(species), .groups = 'drop')
+  
+  cells_with_more_than_3_species <- species_count |>
+    filter(species_count > 3) |>
+    pull(cell)
+  
+  filtered_occurrences <- occurrences_df |>
+    filter(cell %in% cells_with_more_than_3_species) |>
+    st_drop_geometry() |>
+    select(period, species, cell) |>
+    na.omit()
+  
+  # Aggregate to ensure unique species records per cell and period
+  unique_occurrences <- filtered_occurrences |>
+    distinct(cell, species, period, .keep_all = TRUE)
+  
+  return(unique_occurrences)
+}
+
 # END OF SCRIPT ----------------------------------------------------------------
