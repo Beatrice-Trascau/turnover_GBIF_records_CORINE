@@ -92,3 +92,42 @@ clean_occurrences_5km <- clean_occurrences_sf |>
 clean_occurrences_15km <- clean_occurrences_sf |>
   mutate(cell = cell_ids_15km)
 
+# 4. EXCLUDE CELLS WITH LESS THAN 3 SPECIES ------------------------------------
+
+# Using custom function, see script 0_setup.R
+
+# 1km
+unique_occurrences_1km <- filter_cells_with_species(clean_occurrences_1km)
+
+# 5km
+unique_occurrences_5km <- filter_cells_with_species(clean_occurrences_5km)
+
+# 15km
+unique_occurrences_15km <- filter_cells_with_species(clean_occurrences_15km)
+
+# 5. CALCULATE TEMPORAL TURNOVER -----------------------------------------------
+
+# Using custom function, see script 0_setup.R
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
