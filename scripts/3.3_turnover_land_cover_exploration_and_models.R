@@ -1,6 +1,6 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 3.2_turnover_land_cover_exploration_and_models
+# 3.3_turnover_land_cover_exploration_and_models
 # This script contains code which plots and models the relationship between
 # turnover and land cover changes
 ##----------------------------------------------------------------------------##
