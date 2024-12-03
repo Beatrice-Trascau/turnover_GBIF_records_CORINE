@@ -179,7 +179,7 @@ calculate_turnover_for_resolutions <- function(unique_occurrences_df) {
 # 10. FUNCTION TO ADD CELL COORDS AND LAND COVER CATEGORY ----------------------
 
 # Function to add cell coordinates and land cover change values for each resolution
-add_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover_id_raster, land_cover_df) {
+aadd_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover_id_raster, land_cover_df) {
   # Extract xy coordinates
   xy_coords <- xyFromCell(land_cover_id_raster, 1:ncell(land_cover_id_raster))
   
