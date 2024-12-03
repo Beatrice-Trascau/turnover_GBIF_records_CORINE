@@ -163,4 +163,37 @@ filter_cells_with_species <- function(occurrences_df) {
   return(unique_occurrences)
 }
 
+# 9. FUNCTION TO CALCULATE JACCARDS' INDEX FOR EACH AGGREGATION AND PEROIOD ----
+
+calculate_turnover_for_resolutions <- function(unique_occurrences_df) {
+  # defined function to calculate Jaccard's dissimilarity index for each specified
+  # period combination for the given data frame of unique occurrences
+  jaccard_index_list <- lapply(period_combinations, function(periods) {
+    # apply function to each pair of periods in the list "period_combinations"
+    calculate_jaccard_for_periods(unique_occurrences_df, periods[1], periods[2])
+    # use custom function to calculate the index between the two periods
+  })
+  return(bind_rows(jaccard_index_list))
+}
+
+# 10. FUNCTION TO ADD CELL COORDS AND LAND COVER CATEGORY ----------------------
+
+# Function to add cell coordinates and land cover change values for each resolution
+add_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover_id_raster, land_cover_df) {
+  # Extract xy coordinates
+  xy_coords <- xyFromCell(land_cover_id_raster, 1:ncell(land_cover_id_raster))
+  
+  # Create df of the xy coordinates
+  centroids_df <- data.frame(cell = 1:ncell(land_cover_id_raster), 
+                             x = xy_coords[,1], y = xy_coords[,2])
+  
+  # Merge coordinates with temporal turnover data
+  temporal_turnover_coords <- left_join(temporal_turnover_df, centroids_df, by = "cell")
+  
+  # Merge land cover change data with temporal turnover data
+  temporal_turnover_with_lc <- left_join(temporal_turnover_coords, land_cover_df, by = "cell")
+  
+  return(temporal_turnover_with_lc)
+}
+
 # END OF SCRIPT ----------------------------------------------------------------
