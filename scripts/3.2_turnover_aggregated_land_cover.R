@@ -5,24 +5,17 @@
 # records in the aggregate CORINE land cover layers (1km, 5km and 15km)
 ##----------------------------------------------------------------------------##
 
-# # 1. LOAD DATA -----------------------------------------------------------------
+source(here("scripts", "0_setup.R"))
 
-## 1.1. Download files if neccessary -------------------------------------------
-
-# SSB Grid
-# download_files("https://ntnu.box.com/shared/static/pjb2qr9aptugu7awlqmomx2o9d40sdhp.zip", 
-#                "data/raw_data/norway_corine_change_modified_stack.tif")
-
-## 1.2. Read in data -----------------------------------------------------------
+# 1. LOAD DATA -----------------------------------------------------------------
 
 # CORINE Aggregated Layers
+norway_corine_status_modified_stack <- rast(here("data",
+                                                 "derived_data",
+                                                 "norway_corine_status_modified_stack.tif"))
 corine_1km <- rast(here("data", "derived_data", "corine_1km.tif"))
 corine_5km <- rast(here("data", "derived_data", "corine_5km.tif"))
 corine_15km <- rast(here("data", "derived_data", "corine_15km.tif"))
-
-# SSB Grid
-ssb_grids <- vect(here("data", "raw_data",
-                       "SSB050KM", "ssb50km.shp"))
 
 # Cleaned occurrence records
 occurrences_norway <- fread(here("data", "derived_data", 
@@ -109,25 +102,126 @@ unique_occurrences_15km <- filter_cells_with_species(clean_occurrences_15km)
 
 # Using custom function, see script 0_setup.R
 
+# Define period combinations 
+period_combinations <- list(
+  c("1997-2000", "2006-2009"),
+  c("2003-2006", "2012-2015"),
+  c("2009-2012", "2015-2018"))
 
+# Calculate Jaccard's dissimilarity for each aggregation
+temporal_turnover_1km <- calculate_turnover_for_resolutions(unique_occurrences_1km)
+temporal_turnover_5km <- calculate_turnover_for_resolutions(unique_occurrences_5km)
+temporal_turnover_15km <- calculate_turnover_for_resolutions(unique_occurrences_15km)
 
+# 6. ADD CELL COORDINATES FOR AGGREGATED CELLS ---------------------------------
 
+# 6.1. Create df with % changes for aggregated rasters -------------------------
 
+# 1km
+corine_1km_df <- as.data.frame(corine_1km, xy = TRUE) |>
+  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+         complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
+         agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
+         forest_change2000.2006 = (forest2006 - forest2000)/100,
+         moors_change2000.2006 = (moors2006 - moors2000)/100,
+         woodland_change2000.2006 = (woodland2006 - woodland2000)/100,
+         sparse_veg_change2000.2006 = (sparse_veg2006 - sparse_veg2000)/100,
+         urban_change2006.2012 = (urban2012 - urban2006)/100,
+         complex_agri_change2006.2012 = (complex_agri2012 - complex_agri2006)/100,
+         agri_sig_veg_change2006.2012 = (agri_sig_veg2012 - agri_sig_veg2006)/100,
+         forest_change2006.2012 = (forest2012 - forest2006)/100,
+         moors_change2006.2012 = (moors2012 - moors2006)/100,
+         woodland_change2006.2012 = (woodland2012 - woodland2006)/100,
+         sparse_veg_change2006.2012 = (sparse_veg2012 - sparse_veg2006)/100,
+         urban_change2012.2018 = (urban2018 - urban2012)/100,
+         complex_agri_change2012.2018 = (complex_agri2018 - complex_agri2012)/100,
+         agri_sig_veg_change2012.2018 = (agri_sig_veg2018 - agri_sig_veg2012)/100,
+         forest_change2012.2018 = (forest2018 - forest2012)/100,
+         moors_change2012.2018 = (moors2018 - moors2012)/100,
+         woodland_change2012.2018 = (woodland2018 - woodland2012)/100,
+         sparse_veg_change2012.2018 = (sparse_veg2018 - sparse_veg2012)/100) |>
+  select(cell, starts_with("urban_change"), starts_with("complex_agri_change"),
+         starts_with("agri_sig_veg_change"), starts_with("forest_change"),
+         starts_with("moors_change"), starts_with("woodland_change"),
+         starts_with("sparse_veg_change"))
 
+# 5km
+corine_5km_df <- as.data.frame(corine_5km, xy = TRUE) |>
+  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+         complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
+         agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
+         forest_change2000.2006 = (forest2006 - forest2000)/100,
+         moors_change2000.2006 = (moors2006 - moors2000)/100,
+         woodland_change2000.2006 = (woodland2006 - woodland2000)/100,
+         sparse_veg_change2000.2006 = (sparse_veg2006 - sparse_veg2000)/100,
+         urban_change2006.2012 = (urban2012 - urban2006)/100,
+         complex_agri_change2006.2012 = (complex_agri2012 - complex_agri2006)/100,
+         agri_sig_veg_change2006.2012 = (agri_sig_veg2012 - agri_sig_veg2006)/100,
+         forest_change2006.2012 = (forest2012 - forest2006)/100,
+         moors_change2006.2012 = (moors2012 - moors2006)/100,
+         woodland_change2006.2012 = (woodland2012 - woodland2006)/100,
+         sparse_veg_change2006.2012 = (sparse_veg2012 - sparse_veg2006)/100,
+         urban_change2012.2018 = (urban2018 - urban2012)/100,
+         complex_agri_change2012.2018 = (complex_agri2018 - complex_agri2012)/100,
+         agri_sig_veg_change2012.2018 = (agri_sig_veg2018 - agri_sig_veg2012)/100,
+         forest_change2012.2018 = (forest2018 - forest2012)/100,
+         moors_change2012.2018 = (moors2018 - moors2012)/100,
+         woodland_change2012.2018 = (woodland2018 - woodland2012)/100,
+         sparse_veg_change2012.2018 = (sparse_veg2018 - sparse_veg2012)/100) |>
+  select(cell, starts_with("urban_change"), starts_with("complex_agri_change"),
+         starts_with("agri_sig_veg_change"), starts_with("forest_change"),
+         starts_with("moors_change"), starts_with("woodland_change"),
+         starts_with("sparse_veg_change"))
 
+# 15 km
+corine_15km_df <- as.data.frame(corine_15km, xy = TRUE) |>
+  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+         complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
+         agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
+         forest_change2000.2006 = (forest2006 - forest2000)/100,
+         moors_change2000.2006 = (moors2006 - moors2000)/100,
+         woodland_change2000.2006 = (woodland2006 - woodland2000)/100,
+         sparse_veg_change2000.2006 = (sparse_veg2006 - sparse_veg2000)/100,
+         urban_change2006.2012 = (urban2012 - urban2006)/100,
+         complex_agri_change2006.2012 = (complex_agri2012 - complex_agri2006)/100,
+         agri_sig_veg_change2006.2012 = (agri_sig_veg2012 - agri_sig_veg2006)/100,
+         forest_change2006.2012 = (forest2012 - forest2006)/100,
+         moors_change2006.2012 = (moors2012 - moors2006)/100,
+         woodland_change2006.2012 = (woodland2012 - woodland2006)/100,
+         sparse_veg_change2006.2012 = (sparse_veg2012 - sparse_veg2006)/100,
+         urban_change2012.2018 = (urban2018 - urban2012)/100,
+         complex_agri_change2012.2018 = (complex_agri2018 - complex_agri2012)/100,
+         agri_sig_veg_change2012.2018 = (agri_sig_veg2018 - agri_sig_veg2012)/100,
+         forest_change2012.2018 = (forest2018 - forest2012)/100,
+         moors_change2012.2018 = (moors2018 - moors2012)/100,
+         woodland_change2012.2018 = (woodland2018 - woodland2012)/100,
+         sparse_veg_change2012.2018 = (sparse_veg2018 - sparse_veg2012)/100) |>
+  select(cell, starts_with("urban_change"), starts_with("complex_agri_change"),
+         starts_with("agri_sig_veg_change"), starts_with("forest_change"),
+         starts_with("moors_change"), starts_with("woodland_change"),
+         starts_with("sparse_veg_change"))
 
+# 6.2. Add cell coordinates and LC values to temporal turnover dfs -------------
+# Using custom function, see script 0_setup.R
 
+# Add cell coordinates for aggregated CORINE cells
+temporal_turnover_1km <- add_cell_coordinates_and_land_cover(temporal_turnover_1km,
+                                                             land_cover_id_1km,
+                                                             corine_1km_df)
 
+temporal_turnover_5km <- add_cell_coordinates_and_land_cover(temporal_turnover_5km,
+                                                             land_cover_id_5km,
+                                                             corine_5km_df)
 
+temporal_turnover_15km <- add_cell_coordinates_and_land_cover(temporal_turnover_15km,
+                                                             land_cover_id_15km,
+                                                             corine_15km_df)
+# Write results to file
+saveRDS(temporal_turnover_1km, here("data", "derived_data", 
+                                    "jaccard_temporal_turnover_1km.rds"))
+saveRDS(temporal_turnover_5km, here("data", "derived_data", 
+                                    "jaccard_temporal_turnover_5km.rds"))
+saveRDS(temporal_turnover_15km, here("data", "derived_data", 
+                                     "jaccard_temporal_turnover_15km.rds"))
 
-
-
-
-
-
-
-
-
-
-
-
+# END OF SCRIPT ----------------------------------------------------------------
