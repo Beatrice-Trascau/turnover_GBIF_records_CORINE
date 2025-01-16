@@ -139,19 +139,24 @@ calculate_jaccard_for_periods <- function(df, start_period, end_period) {
 
 # 8. FUNCTION TO FILTER CELLS WITH MORE THAN 3 SPECIES -------------------------
 
-# Filter cells with more than 3 species (1km, 5km, 15km)
-filter_cells_with_species <- function(occurrences_df) {
+# Filter cells with more than 3 species in every period (1km, 5km, 15km)
+filter_cells_with_species_each_period <- function(occurrences_df) {
+  # Count species per cell and period
   species_count <- occurrences_df |>
     st_drop_geometry() |>
     group_by(cell, period) |>
     summarise(species_count = n_distinct(species), .groups = 'drop')
   
-  cells_with_more_than_3_species <- species_count |>
-    filter(species_count > 3) |>
-    pull(cell)
+  # Identify cells that have more than 3 species in every period
+  cells_with_more_than_3_species_each_period <- species_count |>
+    group_by(cell) |>
+    filter(all(species_count > 3)) |>
+    pull(cell) |>
+    unique()
   
+  # Filter occurrences for cells with more than 3 species in every period
   filtered_occurrences <- occurrences_df |>
-    filter(cell %in% cells_with_more_than_3_species) |>
+    filter(cell %in% cells_with_more_than_3_species_each_period) |>
     st_drop_geometry() |>
     select(period, species, cell) |>
     na.omit()
@@ -179,9 +184,9 @@ calculate_turnover_for_resolutions <- function(unique_occurrences_df) {
 # 10. FUNCTION TO ADD CELL COORDS AND LAND COVER CATEGORY ----------------------
 
 # Function to add cell coordinates and land cover change values for each resolution
-aadd_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover_id_raster, land_cover_df) {
+add_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover_id_raster, land_cover_df) {
   # Extract xy coordinates
-  xy_coords <- xyFromCell(land_cover_id_raster, 1:ncell(land_cover_id_raster))
+  xy_coords <- terra::xyFromCell(land_cover_id_raster, 1:ncell(land_cover_id_raster))
   
   # Create df of the xy coordinates
   centroids_df <- data.frame(cell = 1:ncell(land_cover_id_raster), 
