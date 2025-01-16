@@ -85,10 +85,12 @@ species_count <- clean_occurrences_for_turnover |>
   group_by(cell, period) |>
   summarise(species_count = n_distinct(species), .groups = 'drop')
 
-# Get the cells that have more than 3 species
+# Get the cells that have more than 3 species in every period
 cells_with_more_than_3_species <- species_count |>
-  filter(species_count > 3) |>
-  pull(cell)
+  group_by(cell) |>
+  filter(min(species_count) > 3) |>
+  pull(cell) |>
+  unique()
 
 # Filter original data for the specific cells and convert to long format
 filtered_occurrences <- clean_occurrences_for_turnover |>
