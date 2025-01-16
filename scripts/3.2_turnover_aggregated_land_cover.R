@@ -90,13 +90,13 @@ clean_occurrences_15km <- clean_occurrences_sf |>
 # Using custom function, see script 0_setup.R
 
 # 1km
-unique_occurrences_1km <- filter_cells_with_species(clean_occurrences_1km)
+unique_occurrences_1km <- filter_cells_with_species_each_period(clean_occurrences_1km)
 
 # 5km
-unique_occurrences_5km <- filter_cells_with_species(clean_occurrences_5km)
+unique_occurrences_5km <- filter_cells_with_species_each_period(clean_occurrences_5km)
 
 # 15km
-unique_occurrences_15km <- filter_cells_with_species(clean_occurrences_15km)
+unique_occurrences_15km <- filter_cells_with_species_each_period(clean_occurrences_15km)
 
 # 5. CALCULATE TEMPORAL TURNOVER -----------------------------------------------
 
@@ -119,7 +119,8 @@ temporal_turnover_15km <- calculate_turnover_for_resolutions(unique_occurrences_
 
 # 1km
 corine_1km_df <- as.data.frame(corine_1km, xy = TRUE) |>
-  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+  mutate(cell = row_number(),
+         urban_change2000.2006 = (urban2006 - urban2000)/100,
          complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
          agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
          forest_change2000.2006 = (forest2006 - forest2000)/100,
@@ -147,7 +148,8 @@ corine_1km_df <- as.data.frame(corine_1km, xy = TRUE) |>
 
 # 5km
 corine_5km_df <- as.data.frame(corine_5km, xy = TRUE) |>
-  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+  mutate(cell = row_number(),
+         urban_change2000.2006 = (urban2006 - urban2000)/100,
          complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
          agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
          forest_change2000.2006 = (forest2006 - forest2000)/100,
@@ -175,7 +177,8 @@ corine_5km_df <- as.data.frame(corine_5km, xy = TRUE) |>
 
 # 15 km
 corine_15km_df <- as.data.frame(corine_15km, xy = TRUE) |>
-  mutate(urban_change2000.2006 = (urban2006 - urban2000)/100,
+  mutate(cell = row_number(),
+         urban_change2000.2006 = (urban2006 - urban2000)/100,
          complex_agri_change2000.2006 = (complex_agri2006 - complex_agri2000)/100,
          agri_sig_veg_change2000.2006 = (agri_sig_veg2006 - agri_sig_veg2000)/100,
          forest_change2000.2006 = (forest2006 - forest2000)/100,
