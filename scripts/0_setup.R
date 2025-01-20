@@ -268,31 +268,46 @@ analyse_tws_transition <- function(rast_t1, rast_t2) {
 
 # 13. FUNCTION TO CALCULATE ALLL -> URBAN TRANSITIONS IN RASTERS ---------------
 
-# Function to analyze transitions to urban between two time periods
-analyse_urban_transition <- function(rast_t1, rast_t2) {
+analyse_urban_conversion <- function(rast_t1, rast_t2) {
   # Create transition raster
-  # 0 = non-TWS in t1
-  # 1 = TWS remained TWS
-  # 2 = TWS converted to forest
-  # 3 = other TWS conversion
+  # 0 = already urban in t1
+  # 1 = forest to urban
+  # 2 = shrubland to urban
+  # 3 = complex agriculture to urban
+  # 4 = agriculture & vegetation to urban
+  # 5 = moors, heathland & grassland to urban
+  # 6 = sparse vegetation to urban
+  # 7 = no conversion to urban
   
   # Create "dummy" raster with matching spatial characteristics
   transition <- rast_t1
   
-  # Give it 0 values to show non-forested areas
-  transition[] <- 0
+  # Give it values = 7 = no conversion to urban
+  transition[] <- 7
   
-  # Identify TWS cells in initial layer
-  tws_t1 <- rast_t1 == 590
+  # Mark existing urban areas as 0
+  urban_t1 <- rast_t1 == 1
+  transition[urban_t1] <- 0
   
-  # For TWS cells in initial layer, categorize changes:
-  transition[tws_t1] <- case_when(
-    # TWS remained TWS
-    rast_t2[tws_t1] == 590 ~ 1,
-    # TWS converted to Forest
-    rast_t2[tws_t1] == 250 ~ 2,
-    # TWS converted to something else
-    TRUE ~ 3
+  # Identify cells that became urban in t2
+  urban_t2 <- rast_t2 == 1
+  
+  # For cells that became urban, categorize their original land cover
+  transition[urban_t2 & !urban_t1] <- case_when(
+    # Forest to urban
+    rast_t1[urban_t2 & !urban_t1] == 250 ~ 1,
+    # Shrubland to urban
+    rast_t1[urban_t2 & !urban_t1] == 590 ~ 2,
+    # Complex agriculture to urban
+    rast_t1[urban_t2 & !urban_t1] == 80 ~ 3,
+    # Agriculture & vegetation to urban
+    rast_t1[urban_t2 & !urban_t1] == 103 ~ 4,
+    # Moors, heathland & grassland to urban
+    rast_t1[urban_t2 & !urban_t1] == 380 ~ 5,
+    # Sparse vegetation to urban
+    rast_t1[urban_t2 & !urban_t1] == 711 ~ 6,
+    # This TRUE case should never be reached as we've covered all classes
+    TRUE ~ 7
   )
   
   return(transition)
