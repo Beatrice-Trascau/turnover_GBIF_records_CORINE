@@ -42,20 +42,10 @@ coordinate_flags <- clean_coordinates(x = clean_occurrences4,
 # Get a summary of the records
 summary(coordinate_flags) # no flagged records
 
-# 2.5. Remove records with specific coordinate uncertainty ---------------------
-
-# Calculate diagonal of 100m x 100m grid cell
-sqrt(100*100)
-
-# Remove records with coord uncertainty >100m
-clean_occurrences5 <- clean_occurrences4 |>
-  filter(coordinateUncertaintyInMeters < 100 |
-           is.na(coordinateUncertaintyInMeters))
-
 # 3. PREP DF FOR ANALYSIS ------------------------------------------------------
 
 # Remove unnecessary columns and add 1 more column
-clean_occurrences <- clean_occurrences5 |>
+clean_occurrences <- clean_occurrences4 |>
   select(gbifID, identifiedBy, basisOfRecord, occurrenceStatus,
          eventDate, year, countryCode, stateProvince, county, municipality,
          locality, decimalLatitude, decimalLongitude, 
@@ -66,8 +56,50 @@ clean_occurrences <- clean_occurrences5 |>
                             year %in% c(2006:2011) ~ "2006.2011",
                             year %in% c(2012:2018) ~ "2012.2018"))
 
+# 4. REMOVE RECORDS BASED ON COORDINATE UNCERTAINTY ----------------------------
+
+## 4.1. < 100m uncertainty -----------------------------------------------------
+
+# Remove records with coord uncertainty >100m
+clean_occurrences_100m <- clean_occurrences |>
+  filter(coordinateUncertaintyInMeters < 100 &
+           !is.na(coordinateUncertaintyInMeters))
+
 # Save cleaned occurrences
-write.csv(clean_occurrences,
-          here("data", "derived_data", "cleaned_occurrences_july24.txt"))
+write.csv(clean_occurrences_100m,
+          here("data", "derived_data", "clean_occurrences_100m.txt"))
+
+## 4.2. < 1km uncertainty ------------------------------------------------------
+
+# Remove records with coord uncertainty >1000m
+clean_occurrences_1km <- clean_occurrences |>
+  filter(coordinateUncertaintyInMeters < 1000 &
+           !is.na(coordinateUncertaintyInMeters))
+
+# Save cleaned occurrences
+write.csv(clean_occurrences_1km,
+          here("data", "derived_data", "clean_occurrences_1km.txt"))
+
+## 4.3. < 5km uncertainty ------------------------------------------------------
+
+# Remove records with coord uncertainty >5000m
+clean_occurrences_5km <- clean_occurrences |>
+  filter(coordinateUncertaintyInMeters < 5000 &
+           !is.na(coordinateUncertaintyInMeters))
+
+# Save cleaned occurrences
+write.csv(clean_occurrences_5km,
+          here("data", "derived_data", "clean_occurrences_5km.txt"))
+
+## 4.4. < 15km uncertainty ------------------------------------------------------
+
+# Remove records with coord uncertainty >15000m
+clean_occurrences_15km <- clean_occurrences |>
+  filter(coordinateUncertaintyInMeters < 15000 &
+           !is.na(coordinateUncertaintyInMeters))
+
+# Save cleaned occurrences
+write.csv(clean_occurrences_15km,
+          here("data", "derived_data", "clean_occurrences_15km.txt"))
 
 # END OF SCRIPT ----------------------------------------------------------------
