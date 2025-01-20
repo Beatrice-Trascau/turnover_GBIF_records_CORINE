@@ -201,4 +201,37 @@ add_cell_coordinates_and_land_cover <- function(temporal_turnover_df, land_cover
   return(temporal_turnover_with_lc)
 }
 
+# 11. FUNCTION TO CALCULATE FOREST -> TWS TRANSITIONS IN RASTERS ---------------
+
+# Function to analyze forest transitions between two time periods
+analyze_forest_transition <- function(rast_t1, rast_t2) {
+  # Create transition raster
+  # 0 = non-forest in t1
+  # 1 = forest remained forest
+  # 2 = forest converted to TWS
+  # 3 = other forest conversion
+  
+  # Create "dummy" raster with matching spatial characteristics
+  transition <- rast_t1
+  
+  # Give it 0 values to show non-forested areas
+  transition[] <- 0
+  
+  # Identify forest cells in initial layer
+  forest_t1 <- rast_t1 == 250
+  
+  # For forest cells in initial layer, categorize changes:
+  transition[forest_t1] <- case_when(
+    # Forest remained forest
+    rast_t2[forest_t1] == 250 ~ 1,
+    # Forest converted to shrubland
+    rast_t2[forest_t1] == 590 ~ 2,
+    # Forest converted to something else
+    TRUE ~ 3
+  )
+  
+  return(transition)
+}
+
+
 # END OF SCRIPT ----------------------------------------------------------------
