@@ -50,7 +50,7 @@ terra::writeRaster(clc_100m_forest_tws,
                         "clc_status_100m_forest_tws.tif"), 
                    overwrite = TRUE)
 
-## 2.3. TWS -> Forest ----------------------------------------------------------
+## 2.2. TWS -> Forest ----------------------------------------------------------
 
 # 2000-2006
 tws_2000_2006 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2000",
@@ -80,4 +80,43 @@ levels(clc_100m_tws_forest) <- categories_tws
 terra::writeRaster(clc_100m_tws_forest, 
                    here("data", "derived_data", 
                         "clc_status_100m_tws_forest.tif"), 
+                   overwrite = TRUE)
+
+## 2.3. All -> Urban -----------------------------------------------------------
+
+# Calculate cells where land covers (any of them) are converted to urban areas
+# 2000-2006
+urban_2000_2006 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2000",
+                                            norway_corine_status_modified_stack$"lc2006")
+
+# 2006-2012
+urban_2006_2012 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2006",
+                                          norway_corine_status_modified_stack$"lc2012")
+
+# 2012-2018
+urban_2012_2018 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2012",
+                                          norway_corine_status_modified_stack$"lc2018")
+
+# Combine into single raster
+clc_100m_all_urban <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
+
+# Set categories for layers (so that you know what each value represents)
+categories_urban <- data.frame(
+  value = 0:7,
+  class = c("Urban no change",
+            "Forest to urban",
+            "TWS to urban", 
+            "Complex agriculture to urban",
+            "Agriculture & vegetation to urban",
+            "Moors, heathland & grassland to urban",
+            "Sparse vegetation to urban",
+            "No urban conversion"))
+
+# Change categories
+levels(clc_100m_all_urban) <- categories_urban
+
+# Write raster to file
+terra::writeRaster(clc_100m_all_urban, 
+                   here("data", "derived_data", 
+                        "clc_status_100m_all_urban.tif"), 
                    overwrite = TRUE)
