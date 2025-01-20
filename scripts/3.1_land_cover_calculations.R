@@ -20,15 +20,15 @@ names(norway_corine_status_modified_stack) <- c("lc2000", "lc2006",
 ## 2.1. Forest -> TWS ----------------------------------------------------------
 
 # 2000-2006
-transitions_2000_2006 <- analyze_forest_transition(norway_corine_status_modified_stack$"lc2000", 
+transitions_2000_2006 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2000", 
                                                    norway_corine_status_modified_stack$"lc2006")
 
 # 2006-2012
-transitions_2006_2012 <- analyze_forest_transition(norway_corine_status_modified_stack$"lc2006", 
+transitions_2006_2012 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2006", 
                                                    norway_corine_status_modified_stack$"lc2012")
 
 # 2012-2018
-transitions_2012_2018 <- analyze_forest_transition(norway_corine_status_modified_stack$"lc2012", 
+transitions_2012_2018 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2012", 
                                                    norway_corine_status_modified_stack$"lc2018")
 
 # Combine into single raster
@@ -36,16 +36,48 @@ clc_100m_forest_tws <- c(transitions_2000_2006, transitions_2006_2012,
                          transitions_2012_2018)
 
 # Set categories for layers (so that you know what each value represents)
-categories <- data.frame(
+categories_forest <- data.frame(
   value = 0:3,
-  class = c("Non-forest", "Forest stable", 
-            "Forest to shrubland", "Other forest conversion"))
+  class = c("Non-forest", "Forest no change", 
+            "Forest to TWS", "Other forest conversion"))
 
 # Change categories
-levels(clc_100m_forest_tws) <- categories
+levels(clc_100m_forest_tws) <- categories_forest
 
 # Write raster to file
 terra::writeRaster(clc_100m_forest_tws, 
                    here("data", "derived_data", 
                         "clc_status_100m_forest_tws.tif"), 
+                   overwrite = TRUE)
+
+## 2.3. TWS -> Forest ----------------------------------------------------------
+
+# 2000-2006
+tws_2000_2006 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2000",
+                                        norway_corine_status_modified_stack$"lc2006")
+
+# 2006-2012
+tws_2006_2012 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2006",
+                                        norway_corine_status_modified_stack$"lc2012")
+
+# 2012-2018
+tws_2012_2018 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2012",
+                                        norway_corine_status_modified_stack$"lc2018")
+
+# Combine into single raster
+clc_100m_tws_forest <- c(tws_2000_2006, tws_2006_2012, tws_2012_2018)
+
+# Set categories for layers (so that you know what each value represents)
+categories_tws <- data.frame(
+  value = 0:3,
+  class = c("Non-TWS", "TWS no change", 
+            "TWS to Forest", "Other TWS conversion"))
+
+# Change categories
+levels(clc_100m_tws_forest) <- categories_tws
+
+# Write raster to file
+terra::writeRaster(clc_100m_tws_forest, 
+                   here("data", "derived_data", 
+                        "clc_status_100m_tws_forest.tif"), 
                    overwrite = TRUE)
