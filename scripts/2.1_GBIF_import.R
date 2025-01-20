@@ -9,7 +9,7 @@
 # Download key: "0016426-240626123714530"
 
 # Import
-occurrence_a <- occ_download_get("0016426-240626123714530") %>%
+occurrence_a <- occ_download_get("0016426-240626123714530") |>
   occ_download_import()
 
 # 2. SAVE TO FILE --------------------------------------------------------------
