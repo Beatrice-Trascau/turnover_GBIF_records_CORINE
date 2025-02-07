@@ -1,68 +1,171 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
 # 1.2_CORINE_aggregation
-# This script contains code which aggregates CORINE land cover pixels to higher
-# pixel sizes
+# This script contains code which calculates the land cover transitions in the
+# original rasters and the aggregations (1km, 5km, 15km)
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
-
-## 1.1. Download files if neccessary -------------------------------------------
-
-# CORINE Status Layers
-download_files("https://ntnu.box.com/shared/static/97g9x4839ij4lnlldji2wh8e0e2lm5bf.tif", 
-               "data/derived_data/norway_corine_change_modified_stack.tif")
-
-## 1.2. Read in data -----------------------------------------------------------
 
 # CORINE Status Layers
 norway_corine_status_modified_stack <- rast(here("data", "derived_data",
                                                  "norway_corine_status_modified_stack.tif"))
 
-# 2. AGGREGATE CORINE TO HIGHER CELL SIZES -------------------------------------
+# 2. CALCULATE LC CHANGES FOR 100M RESOLUTION ----------------------------------
 
-## 2.1. Aggregate rasters ------------------------------------------------------
+# Change name of layers 
+names(norway_corine_status_modified_stack) <- c("lc2000", "lc2006", 
+                                                "lc2012", "lc2018")
 
-# Aggregate raster to 1km x 1km
-corine_1km <- aggregate(norway_corine_status_modified_stack, 
-                        fact = 10, fun = calculate_counts, cores = 2)
+## 2.1. Forest -> TWS ----------------------------------------------------------
 
-# Aggregate to 5km x 5km
-corine_5km <- aggregate(norway_corine_status_modified_stack, 
-                        fact = 50, fun = calculate_counts, cores = 2)
+# 2000-2006
+transitions_2000_2006 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2000", 
+                                                   norway_corine_status_modified_stack$"lc2006")
 
-# Aggregate to 15km x 15km
-corine_15km <- aggregate(norway_corine_status_modified_stack, 
-                        fact = 150, fun = calculate_counts, cores = 2)
+# 2006-2012
+transitions_2006_2012 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2006", 
+                                                   norway_corine_status_modified_stack$"lc2012")
 
-## 2.2. Change layer names -----------------------------------------------------
+# 2012-2018
+transitions_2012_2018 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2012", 
+                                                   norway_corine_status_modified_stack$"lc2018")
 
-# Define the list of rasters
-corine_list <- list(corine_1km, corine_5km, corine_15km)
+# Combine into single raster
+clc_100m_forest_tws <- c(transitions_2000_2006, transitions_2006_2012,
+                         transitions_2012_2018)
 
-# Define the new names for the layers
-new_names <- c("urban2000", "complex_agri2000", "agri_sig_veg2000", "forest2000",
-               "moors2000", "woodland2000", "sparse_veg2000", "urban2006", 
-               "complex_agri2006", "agri_sig_veg2006", "forest2006",
-               "moors2006", "woodland2006", "sparse_veg2006", "urban2012", 
-               "complex_agri2012", "agri_sig_veg2012", "forest2012",
-               "moors2012", "woodland2012", "sparse_veg2012", "urban2018", 
-               "complex_agri2018", "agri_sig_veg2018", "forest2018",
-               "moors2018", "woodland2018", "sparse_veg2018")
+# Set categories for layers (so that you know what each value represents)
+categories_forest <- data.frame(
+  value = 0:3,
+  class = c("Non-forest", "Forest no change", 
+            "Forest to TWS", "Other forest conversion"))
 
-# Loop through the list and rename the layers
-for (i in seq_along(corine_list)) {
-  names(corine_list[[i]]) <- new_names
-}
+# Change categories
+levels(clc_100m_forest_tws) <- categories_forest
 
-# Re-assign the modified rasters back to the original variables
-corine_1km <- corine_list[[1]]
-corine_5km <- corine_list[[2]]
-corine_15km <- corine_list[[3]]
+# Write raster to file
+terra::writeRaster(clc_100m_forest_tws, 
+                   here("data", "derived_data", 
+                        "clc_status_100m_forest_tws.tif"), 
+                   overwrite = TRUE)
 
-# Write new rasters to file
-terra::writeRaster(corine_1km, here("data", "derived_data", "corine_1km.tif"))
-terra::writeRaster(corine_5km, here("data", "derived_data", "corine_5km.tif"))
-terra::writeRaster(corine_15km, here("data", "derived_data", "corine_15km.tif"))
+## 2.2. TWS -> Forest ----------------------------------------------------------
+
+# 2000-2006
+tws_2000_2006 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2000",
+                                        norway_corine_status_modified_stack$"lc2006")
+
+# 2006-2012
+tws_2006_2012 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2006",
+                                        norway_corine_status_modified_stack$"lc2012")
+
+# 2012-2018
+tws_2012_2018 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2012",
+                                        norway_corine_status_modified_stack$"lc2018")
+
+# Combine into single raster
+clc_100m_tws_forest <- c(tws_2000_2006, tws_2006_2012, tws_2012_2018)
+
+# Set categories for layers (so that you know what each value represents)
+categories_tws <- data.frame(
+  value = 0:3,
+  class = c("Non-TWS", "TWS no change", 
+            "TWS to Forest", "Other TWS conversion"))
+
+# Change categories
+levels(clc_100m_tws_forest) <- categories_tws
+
+# Write raster to file
+terra::writeRaster(clc_100m_tws_forest, 
+                   here("data", "derived_data", 
+                        "clc_status_100m_tws_forest.tif"), 
+                   overwrite = TRUE)
+
+## 2.3. All -> Urban -----------------------------------------------------------
+
+# Calculate cells where land covers (any of them) are converted to urban areas
+# 2000-2006
+urban_2000_2006 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2000",
+                                            norway_corine_status_modified_stack$"lc2006")
+
+# 2006-2012
+urban_2006_2012 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2006",
+                                            norway_corine_status_modified_stack$"lc2012")
+
+# 2012-2018
+urban_2012_2018 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2012",
+                                            norway_corine_status_modified_stack$"lc2018")
+
+# Combine into single raster
+clc_100m_all_urban <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
+
+# Set categories for layers (so that you know what each value represents)
+categories_urban <- data.frame(
+  value = 0:7,
+  class = c("Urban no change",
+            "Forest to urban",
+            "TWS to urban", 
+            "Complex agriculture to urban",
+            "Agriculture & vegetation to urban",
+            "Moors, heathland & grassland to urban",
+            "Sparse vegetation to urban",
+            "No urban conversion"))
+
+# Change categories
+levels(clc_100m_all_urban) <- categories_urban
+
+# Write raster to file
+terra::writeRaster(clc_100m_all_urban, 
+                   here("data", "derived_data", 
+                        "clc_status_100m_all_urban.tif"), 
+                   overwrite = TRUE)
+
+# 3. CALCULATE LC CHANGES FOR HIGHER RESOLUTIONS -------------------------------
+
+## 3.1. Forest -> TWS ----------------------------------------------------------
+
+# Aggregate to 1km, 5km, 15km
+forest_tws_1km <- aggregate_transitions(clc_100m_forest_tws, 10)
+forest_tws_5km <- aggregate_transitions(clc_100m_forest_tws, 50)
+forest_tws_15km <- aggregate_transitions(clc_100m_forest_tws, 150)
+
+# Save aggregated layers
+writeRaster(forest_tws_1km,
+            here("data", "derived_data", "clc_status_1km_forest_tws.tif"))
+writeRaster(forest_tws_5km,
+            here("data", "derived_data", "clc_status_5km_forest_tws.tif"))
+writeRaster(forest_tws_15km,
+            here("data", "derived_data", "clc_status_15km_forest_tws.tif"))
+
+## 3.2. TWS -> Forest ----------------------------------------------------------
+
+# Aggregate to 1km, 5km, 15km
+tws_forest_1km <- aggregate_transitions(clc_100m_tws_forest, 10)
+tws_forest_5km <- aggregate_transitions(clc_100m_tws_forest, 50)
+tws_forest_15km <- aggregate_transitions(clc_100m_tws_forest, 150)
+
+# Save aggregated layers
+writeRaster(tws_forest_1km,
+            here("data", "derived_data", "clc_status_1km_tws_forest.tif"))
+writeRaster(tws_forest_5km,
+            here("data", "derived_data", "clc_status_5km_tws_forest.tif"))
+writeRaster(tws_forest_15km,
+            here("data", "derived_data", "clc_status_15km_tws_forest.tif"))
+
+## 3.3. All -> Urban -----------------------------------------------------------
+
+# Aggregate to 1km, 5km, 15km
+all_urban_1km <- aggregate_transitions(clc_100m_all_urban, 10)
+all_urban_5km <- aggregate_transitions(clc_100m_all_urban, 50)
+all_urban_15km <- aggregate_transitions(clc_100m_all_urban, 150)
+
+# Save aggregated layers
+writeRaster(all_urban_1km,
+            here("data", "derived_data", "clc_status_1km_all_urban.tif"))
+writeRaster(all_urban_5km,
+            here("data", "derived_data", "clc_status_5km_all_urban.tif"))
+writeRaster(all_urban_15km,
+            here("data", "derived_data", "clc_status_15km_all_urban.tif"))
 
 # END OF SCRIPT ----------------------------------------------------------------
