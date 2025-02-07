@@ -56,15 +56,8 @@ read_rasters <- function(filenames, dir = here("data/raw_data")) {
 
 # 4. FUNCTION TO CROP AND MASK RASTERS TO NORWAY -------------------------------
 
-modify_class_values <- function(raster_stack, class_modifications) {
-  modified_stack <- raster_stack
-  for (mod in class_modifications) {
-    modified_stack <- app(modified_stack, fun = function(x) {
-      x[x %in% mod$from] <- mod$to
-      return(x)
-    })
-  }
-  return(modified_stack)
+crop_mask_to_norway <- function(raster_stack, norway_shape) {
+  return(crop(raster_stack, norway_shape, mask = TRUE))
 }
 
 # 5. FUNCTION TO MODIFY CLASSES IN RASTERS -------------------------------------
@@ -311,6 +304,47 @@ analyse_urban_conversion <- function(rast_t1, rast_t2) {
   )
   
   return(transition)
+}
+
+# 14. FUNCTION TO AGGREGATE TRANSITIONS RASTERS TO HIGHER GRID SIZES -----------
+
+# This function aggregates the transition rasters (created with the functions above) to larger grid sizes
+
+# Function to aggregate transition rasters and count occurrences
+aggregate_transitions <- function(transition_raster, factor) {
+  # Create empty list to store aggregated count rasters
+  agg_counts <- list()
+  
+  # Get the levels to know what we're counting
+  cats <- levels(transition_raster)[[1]]
+  
+  # For each layer in the transition raster
+  for(layer in 1:nlyr(transition_raster)) {
+    # Create empty list for this time period
+    layer_counts <- list()
+    
+    # For each transition category (except "no change" and "no conversion")
+    for(val in cats$value) {
+      # Create binary raster for this transition
+      binary <- transition_raster[[layer]] == val
+      
+      # Aggregate and sum the occurrences
+      count_rast <- terra::aggregate(binary, fact=factor, fun="sum")
+      
+      # Name the raster based on the category
+      names(count_rast) <- paste0(names(transition_raster)[layer], "_",
+                                  cats$class[cats$value == val])
+      
+      # Add to list
+      layer_counts[[length(layer_counts) + 1]] <- count_rast
+    }
+    
+    # Combine all counts for this time period
+    agg_counts[[layer]] <- rast(layer_counts)
+  }
+  
+  # Combine all time periods
+  return(rast(agg_counts))
 }
 
 # END OF SCRIPT ----------------------------------------------------------------
