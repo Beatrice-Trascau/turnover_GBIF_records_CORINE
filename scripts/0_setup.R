@@ -242,20 +242,29 @@ aggregate_transitions <- function(transition_raster, factor) {
 
 # Function to create summary tables of land cover transitions
 create_summary_table <- function(raster, cell_size, transition_type) {
-  # Get cell counts for each category and time period
-  freq_df <- as.data.frame(freq(raster))
+  # Initialize empty list to store frequencies for each layer
+  freq_list <- list()
+  
+  # Process each layer separately
+  for(i in 1:nlyr(raster)) {
+    # Get frequencies for this layer
+    layer_freq <- as.data.frame(freq(raster[[i]]))
+    
+    # Add time period
+    layer_freq$time_period <- c("2000-2006", "2006-2012", "2012-2018")[i]
+    
+    # Store in list
+    freq_list[[i]] <- layer_freq
+  }
+  
+  # Combine all frequencies
+  freq_df <- do.call(rbind, freq_list)
   
   # Calculate area in km2
   freq_df$area_km2 <- freq_df$count * (cell_size/1000)^2
   
-  # Add time period (based on layer names)
-  time_periods <- c("2000-2006", "2006-2012", "2012-2018")
-  freq_df$time_period <- rep(time_periods, each = nrow(freq_df)/3)
-  
-  # Add transition type
+  # Add transition type and resolution
   freq_df$transition_type <- transition_type
-  
-  # Add resolution
   freq_df$resolution <- paste0(cell_size, "m")
   
   return(freq_df)
