@@ -31,18 +31,23 @@ transitions_2006_2012 <- analyse_forest_transition(norway_corine_status_modified
 transitions_2012_2018 <- analyse_forest_transition(norway_corine_status_modified_stack$"lc2012", 
                                                    norway_corine_status_modified_stack$"lc2018")
 
-# Combine into single raster
-clc_100m_forest_tws <- c(transitions_2000_2006, transitions_2006_2012,
-                         transitions_2012_2018)
-
 # Set categories for layers (so that you know what each value represents)
 categories_forest <- data.frame(
   value = 0:3,
   class = c("Non-forest", "Forest no change", 
             "Forest to TWS", "Other forest conversion"))
 
+# Combine into single raster
+clc_100m_forest_tws <- c(transitions_2000_2006, transitions_2006_2012,
+                         transitions_2012_2018)
+
 # Change categories
-levels(clc_100m_forest_tws) <- categories_forest
+for(i in 1:nlyr(clc_100m_forest_tws)) {
+  levels(clc_100m_forest_tws[[i]]) <- categories_forest
+}
+
+# Set names for layers
+names(clc_100m_forest_tws) <- c("2000-2006", "2006-2012", "2012-2018")
 
 # Write raster to file
 terra::writeRaster(clc_100m_forest_tws, 
@@ -64,17 +69,22 @@ tws_2006_2012 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2
 tws_2012_2018 <- analyse_tws_transition(norway_corine_status_modified_stack$"lc2012",
                                         norway_corine_status_modified_stack$"lc2018")
 
-# Combine into single raster
-clc_100m_tws_forest <- c(tws_2000_2006, tws_2006_2012, tws_2012_2018)
-
 # Set categories for layers (so that you know what each value represents)
 categories_tws <- data.frame(
   value = 0:3,
   class = c("Non-TWS", "TWS no change", 
             "TWS to Forest", "Other TWS conversion"))
 
+# Combine into single raster
+clc_100m_tws_forest <- c(tws_2000_2006, tws_2006_2012, tws_2012_2018)
+
 # Change categories
-levels(clc_100m_tws_forest) <- categories_tws
+for(i in 1:nlyr(clc_100m_tws_forest)) {
+  levels(clc_100m_tws_forest[[i]]) <- categories_tws
+}
+
+# Set names for layers
+names(clc_100m_tws_forest) <- c("2000-2006", "2006-2012", "2012-2018")
 
 # Write raster to file
 terra::writeRaster(clc_100m_tws_forest, 
@@ -97,9 +107,6 @@ urban_2006_2012 <- analyse_urban_conversion(norway_corine_status_modified_stack$
 urban_2012_2018 <- analyse_urban_conversion(norway_corine_status_modified_stack$"lc2012",
                                             norway_corine_status_modified_stack$"lc2018")
 
-# Combine into single raster
-clc_100m_all_urban <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
-
 # Set categories for layers (so that you know what each value represents)
 categories_urban <- data.frame(
   value = 0:7,
@@ -112,8 +119,16 @@ categories_urban <- data.frame(
             "Sparse vegetation to urban",
             "No urban conversion"))
 
+# Combine into single raster
+clc_100m_all_urban <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
+
 # Change categories
-levels(clc_100m_all_urban) <- categories_urban
+for(i in 1:nlyr(clc_100m_all_urban)) {
+  levels(clc_100m_all_urban[[i]]) <- categories_urban
+}
+
+# Set names for layers
+names(clc_100m_all_urban) <- c("2000-2006", "2006-2012", "2012-2018")
 
 # Write raster to file
 terra::writeRaster(clc_100m_all_urban, 
