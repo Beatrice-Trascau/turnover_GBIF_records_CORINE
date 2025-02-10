@@ -16,6 +16,8 @@ editor: visual
 
 -   1.2_CORINE_aggregation.R: aggregate original rasters to 1km, 5km and 15km
 
+-   1.3_CORINE_exploration.R: get summary statistics for land cover changes
+
 -   2.1_GBIF_import.R: import and download GBIF occurrences
 
 -   2.2_GBIF_data_cleaning.R: clean the downloaded occurrences
