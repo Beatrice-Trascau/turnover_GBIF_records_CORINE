@@ -147,11 +147,14 @@ forest_tws_15km <- aggregate_transitions(clc_100m_forest_tws, 150)
 
 # Save aggregated layers
 writeRaster(forest_tws_1km,
-            here("data", "derived_data", "clc_status_1km_forest_tws.tif"))
+            here("data", "derived_data", "clc_status_1km_forest_tws.tif"),
+            overwrite = TRUE)
 writeRaster(forest_tws_5km,
-            here("data", "derived_data", "clc_status_5km_forest_tws.tif"))
+            here("data", "derived_data", "clc_status_5km_forest_tws.tif"),
+            overwrite = TRUE)
 writeRaster(forest_tws_15km,
-            here("data", "derived_data", "clc_status_15km_forest_tws.tif"))
+            here("data", "derived_data", "clc_status_15km_forest_tws.tif"),
+            overwrite = TRUE)
 
 ## 3.2. TWS -> Forest ----------------------------------------------------------
 
@@ -162,11 +165,14 @@ tws_forest_15km <- aggregate_transitions(clc_100m_tws_forest, 150)
 
 # Save aggregated layers
 writeRaster(tws_forest_1km,
-            here("data", "derived_data", "clc_status_1km_tws_forest.tif"))
+            here("data", "derived_data", "clc_status_1km_tws_forest.tif"),
+            overwrite = TRUE)
 writeRaster(tws_forest_5km,
-            here("data", "derived_data", "clc_status_5km_tws_forest.tif"))
+            here("data", "derived_data", "clc_status_5km_tws_forest.tif"),
+            overwrite = TRUE)
 writeRaster(tws_forest_15km,
-            here("data", "derived_data", "clc_status_15km_tws_forest.tif"))
+            here("data", "derived_data", "clc_status_15km_tws_forest.tif"),
+            overwrite = TRUE)
 
 ## 3.3. All -> Urban -----------------------------------------------------------
 
@@ -177,10 +183,13 @@ all_urban_15km <- aggregate_transitions(clc_100m_all_urban, 150)
 
 # Save aggregated layers
 writeRaster(all_urban_1km,
-            here("data", "derived_data", "clc_status_1km_all_urban.tif"))
+            here("data", "derived_data", "clc_status_1km_all_urban.tif"),
+            overwrite = TRUE)
 writeRaster(all_urban_5km,
-            here("data", "derived_data", "clc_status_5km_all_urban.tif"))
+            here("data", "derived_data", "clc_status_5km_all_urban.tif"),
+            overwrite = TRUE)
 writeRaster(all_urban_15km,
-            here("data", "derived_data", "clc_status_15km_all_urban.tif"))
+            here("data", "derived_data", "clc_status_15km_all_urban.tif"),
+            overwrite = TRUE)
 
 # END OF SCRIPT ----------------------------------------------------------------
