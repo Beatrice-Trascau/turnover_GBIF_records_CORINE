@@ -240,35 +240,69 @@ aggregate_transitions <- function(transition_raster, factor) {
 
 # 10. RASTER SUMMARY TABLE -----------------------------------------------------
 
-# Function to create summary tables of land cover transitions
-create_summary_table <- function(raster, cell_size, transition_type) {
-  # Initialize empty list to store frequencies for each layer
-  freq_list <- list()
+# Function to create summary tables of land cover transitions of interest
+create_summary_table_aggregated <- function(raster, cell_size, transition_type) {
+  # Get all layer names
+  layer_names <- names(raster)
   
-  # Process each layer separately
-  for(i in 1:nlyr(raster)) {
-    # Get frequencies for this layer
-    layer_freq <- as.data.frame(freq(raster[[i]]))
+  # Identify time periods
+  time_periods <- unique(gsub("_.*$", "", layer_names))
+  time_periods <- time_periods[time_periods != "class"]
+  
+  # Define transitions of interest based on transition type
+  transitions_of_interest <- switch(transition_type,
+                                    "Forest to TWS" = c("Forest no change", "Forest to TWS"),
+                                    "TWS to Forest" = c("TWS no change", "TWS to Forest"),
+                                    "All to Urban" = names(raster)  # Keep all for urban transitions
+  )
+  
+  # Initialize list to store results
+  result_list <- list()
+  
+  # Process each time period
+  for(period in time_periods) {
+    # Get layers for this time period
+    period_layers <- layer_names[grepl(paste0("^", period), layer_names)]
     
-    # Add time period
-    layer_freq$time_period <- c("2000-2006", "2006-2012", "2012-2018")[i]
+    # Filter for transitions of interest
+    period_layers <- period_layers[sapply(period_layers, function(x) 
+      any(sapply(transitions_of_interest, function(t) 
+        grepl(t, x, fixed = TRUE))))]
     
-    # Store in list
-    freq_list[[i]] <- layer_freq
+    # Extract categories from layer names
+    categories <- gsub(paste0(period, "_"), "", period_layers)
+    
+    # Create data frame for this period
+    period_df <- data.frame(
+      time_period = case_when(
+        period == "lc2006" ~ "2000-2006",
+        period == "lc2012" ~ "2006-2012",
+        period == "lc2018" ~ "2012-2018"
+      ),
+      category = categories,
+      count = sapply(period_layers, function(l) sum(values(raster[[l]]), na.rm = TRUE))
+    )
+    
+    result_list[[period]] <- period_df
   }
   
-  # Combine all frequencies
-  freq_df <- do.call(rbind, freq_list)
+  # Combine all periods
+  freq_df <- do.call(rbind, result_list)
   
-  # Calculate area in km2
-  freq_df$area_km2 <- freq_df$count * (cell_size/1000)^2
+  # Calculate area (note: count is already number of cells in original resolution)
+  freq_df$area_km2 <- freq_df$count * (0.1 * 0.1) # convert from 100m x 100m to km2
   
-  # Add transition type and resolution
+  # Add metadata
   freq_df$transition_type <- transition_type
   freq_df$resolution <- paste0(cell_size, "m")
   
+  # Reorder columns
+  freq_df <- freq_df %>%
+    select(time_period, category, count, area_km2, resolution, transition_type)
+  
   return(freq_df)
 }
+
 
 
 # END OF SCRIPT ----------------------------------------------------------------
