@@ -95,7 +95,7 @@ Used an individual function for each of the three major land cover transitions a
 
 ## Current Challenges
 
-1.   Change function that calculates turnover
+1.  Change function that calculates turnover
 
 ## Planned Improvements
 
