@@ -71,18 +71,32 @@ norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
 
 ## 2.1. 100m resolution --------------------------------------------------------
 
-# Forest -> TWS
-forest_tws_100m_summary <- create_summary_table(forest_tws_100m, 100, 
-                                                "Forest to TWS")
+# Extract frequency tables
+forest_tws_100m_freq <- freq(forest_tws_100m)
+tws_forest_100m_freq <- freq(tws_forest_100m)
+all_urban_100m_freq <- freq(all_urban_100m)
 
-# TWS -> Forest
-tws_forest_100m_summary <- create_summary_table(tws_forest_100m, 100, 
-                                                "TWS to Forest")
+# Add column to distinguish transition types
+forest_tws_100m_freq$transition <- "Forest to TWS"
+tws_forest_100m_freq$transition <- "TWS to Forest"
+all_urban_100m_freq$transition <- "All to Urban"
 
-# All -> Urban
-all_urban_100m_summary <- create_summary_table(all_urban_100m, 100, 
-                                               "All to Urban")
+# Bind all 3 into single df
+summary_df_100m <- rbind(forest_tws_100m_freq,
+                    tws_forest_100m_freq,
+                    all_urban_100m_freq)
+# Clean it up 
+summary_df_100m_clean <- summary_df_100m |>
+  mutate(layer = case_when(layer == 1 ~ "2000-2006",
+                           layer == 2 ~ "2006-2012",
+                           layer == 3 ~ "2012-2018"),
+         area = count * 0.01)
 
+# Create table from the data
+summary_df_100m_clean |>
+  kable(col.names = c("layer", "value", "count", "transition", "area")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"))
+  
 ## 2.2. 1km resolution ---------------------------------------------------------
 
 # Forest -> TWS
