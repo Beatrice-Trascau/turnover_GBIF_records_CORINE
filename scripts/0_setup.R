@@ -238,4 +238,28 @@ aggregate_transitions <- function(transition_raster, factor) {
   return(rast(agg_counts))
 }
 
+# 10. RASTER SUMMARY TABLE -----------------------------------------------------
+
+# Function to create summary tables of land cover transitions
+create_summary_table <- function(raster, cell_size, transition_type) {
+  # Get cell counts for each category and time period
+  freq_df <- as.data.frame(freq(raster))
+  
+  # Calculate area in km2
+  freq_df$area_km2 <- freq_df$count * (cell_size/1000)^2
+  
+  # Add time period (based on layer names)
+  time_periods <- c("2000-2006", "2006-2012", "2012-2018")
+  freq_df$time_period <- rep(time_periods, each = nrow(freq_df)/3)
+  
+  # Add transition type
+  freq_df$transition_type <- transition_type
+  
+  # Add resolution
+  freq_df$resolution <- paste0(cell_size, "m")
+  
+  return(freq_df)
+}
+
+
 # END OF SCRIPT ----------------------------------------------------------------
