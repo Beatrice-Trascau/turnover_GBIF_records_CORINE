@@ -1,0 +1,102 @@
+---
+title: "Paper 2: CLC Land Cover Changes and Turnover of GBIF Records"
+format: html
+editor: visual
+---
+
+# Project Overview
+
+## Objective
+
+## File Structure
+
+-   0_setup.R: Sets up all the packages and functions needed for the project
+
+-   1.1_CORINE_layers_preparation.R: load and prepare CORINE layers for further analysis
+
+-   1.2_CORINE_aggregation.R: aggregate original rasters to 1km, 5km and 15km
+
+-   2.1_GBIF_import.R: import and download GBIF occurrences
+
+-   2.2_GBIF_data_cleaning.R: clean the downloaded occurrences
+
+-   3.1_turnover_land_cover.R: calculate temporal turnover
+
+# Analysis Log
+
+## Layer Aggregation (1.2)
+
+Aim: Aggregate original CLC Status layers to 1km, 5km, and 15km grid size.
+
+Method:
+
+-   Initially used function to calculate % change in each land cover category
+
+    -   Did this by counting the number of "small" pixels with that specific land cover category within the "big" pixels
+
+    -   Used the function below:
+
+```{r}
+#| label: old-aggregation-function
+#| eval: false
+#| include: true
+calculate_counts <- function(x) {
+  # remove NA values before counting
+  x <- na.omit(x)
+  
+  # count occurrences of each land cover category value
+  counts <- table(factor(x, levels = c(1, 80, 103, 250, 380, 590, 711)))
+  
+  # return the counts as a numeric vector
+  return(as.numeric(counts))
+}
+```
+
+Changed 07.02.2025 to use the following functions instead:
+
+```{r}
+#| label: new-aggregation-function
+#| eval: false
+#| include: true
+
+analyse_forest_transition <- function(rast_t1, rast_t2) {
+  # Create transition raster
+  # 0 = non-forest in t1
+  # 1 = forest remained forest
+  # 2 = forest converted to TWS
+  # 3 = other forest conversion
+  
+  # Create "dummy" raster with matching spatial characteristics
+  transition <- rast_t1
+  
+  # Give it 0 values to show non-forested areas
+  transition[] <- 0
+  
+  # Identify forest cells in initial layer
+  forest_t1 <- rast_t1 == 250
+  
+  # For forest cells in initial layer, categorize changes:
+  transition[forest_t1] <- case_when(
+    # Forest remained forest
+    rast_t2[forest_t1] == 250 ~ 1,
+    # Forest converted to shrubland
+    rast_t2[forest_t1] == 590 ~ 2,
+    # Forest converted to something else
+    TRUE ~ 3
+  )
+  
+  return(transition)
+}
+```
+
+Used an individual function for each of the three major land cover transitions assessed: Forests -\> Transitional Woodland Shurb, Transitional Woodland Shrub -\> Forests, all other classes -\> Urban.
+
+# Outstanding Issues & Next Steps
+
+## Current Challenges
+
+1.   Change function that calculates turnover
+
+## Planned Improvements
+
+## Further Questions
