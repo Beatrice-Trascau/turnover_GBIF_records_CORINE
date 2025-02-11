@@ -283,6 +283,26 @@ create_summary_stats <- function(forest_tws, tws_forest, all_urban, resolution) 
   )
 }
 
+# 11. PROCESS RESOLUTIONS FOR SUMMARY ------------------------------------------
+
+# Function to process all resolutions at once for the summary tables
+process_all_resolutions <- function(resolutions_data) {
+  # resolutions_data should be a list with entries for each resolution
+  # Each entry should contain forest_tws, tws_forest, and all_urban rasters
+  
+  summary_tables <- lapply(names(resolutions_data), function(res) {
+    data <- resolutions_data[[res]]
+    create_summary_stats(
+      data$forest_tws,
+      data$tws_forest,
+      data$all_urban,
+      res
+    )
+  })
+  
+  return(summary_tables)
+}
+
 # 12. MAP LAND COVER TRANSITIONS AT 100M ---------------------------------------
 
 # Function to map land cover transitions at 100m resolution in single panel
