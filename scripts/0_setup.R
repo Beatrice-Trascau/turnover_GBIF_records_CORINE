@@ -317,6 +317,58 @@ create_transition_panel <- function(raster_layer, norway, transition_type, time_
   return(p)
 }
 
+# 13. MAP TRANSITIONS FOR AGGREGATIONS -----------------------------------------
+
+
+# Function to create single panel figure with land cover transitions and time
+  # periods for each aggregation
+create_aggregated_panel <- function(raster_layer, norway, transition_type, 
+                                  time_period, is_first_row = FALSE, 
+                                  is_first_panel = FALSE) {
+  # Convert raster to dataframe
+  raster_df <- as.data.frame(raster_layer, xy = TRUE)
+  names(raster_df)[3] <- "count"
+  
+  # Create base plot
+  p <- ggplot() +
+    # Add Norway outline
+    geom_sf(data = st_as_sf(norway), fill = "white", color = "gray50", 
+            linewidth = 0.2) +
+    # Add filled cells
+    geom_tile(data = raster_df, aes(x = x, y = y, fill = count)) +
+    # Set color scheme
+    scale_fill_viridis_c(option = "magma", direction = -1,
+                         name = "Number of\n100m cells") +
+    coord_sf() +
+    theme_minimal() +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      plot.title = element_text(size = 8, hjust = 0.5),
+      # Only show legend for first panel
+      legend.position = if(is_first_panel) "right" else "none"
+    )
+  
+  # Add title only if it's in the first row
+  if(is_first_row) {
+    p <- p + ggtitle(paste0(time_period, "\n", transition_type))
+  }
+  
+  # Add north arrow and scale bar only to first panel
+  if(is_first_panel) {
+    p <- p +
+      annotation_north_arrow(
+        location = "br",
+        which_north = "true",
+        pad_y = unit(0.8, "cm"),
+        style = north_arrow_fancy_orienteering
+      ) +
+      annotation_scale(location = "br", width_hint = 0.35)
+  }
+  
+  return(p)
+}
 
 
 
