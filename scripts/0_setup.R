@@ -283,8 +283,41 @@ create_summary_stats <- function(forest_tws, tws_forest, all_urban, resolution) 
   )
 }
 
-# 11. MAP TO PLOT LAND COVER TRANSITIONS FOR AGGREGATIONS ----------------------
+# 12. MAP LAND COVER TRANSITIONS AT 100M ---------------------------------------
 
-# Function to map land cover transitions for aggregations
+# Function to map land cover transitions at 100m resolution in single panel
+create_transition_panel <- function(raster_layer, norway, transition_type, time_period, filter_value) {
+  # Convert raster to dataframe
+  raster_df <- as.data.frame(raster_layer, xy = TRUE)
+  names(raster_df)[3] <- "value"
+  
+  # Filter based on transition type
+  filtered_df <- switch(transition_type,
+                        "Forest to TWS" = filter(raster_df, value == "Forest to TWS"),
+                        "TWS to Forest" = filter(raster_df, value == "TWS to Forest"),
+                        "All to Urban" = filter(raster_df, 
+                                                !value %in% c("Urban no change", "No urban conversion"))
+  )
+  
+  # Create base plot
+  p <- ggplot() +
+    geom_sf(data = st_as_sf(norway), fill = "white", color = "gray50", linewidth = 0.2) +
+    geom_point(data = filtered_df, aes(x = x, y = y), 
+               size = 0.1, color = "red", alpha = 0.5) +
+    coord_sf() +
+    theme_minimal() +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      plot.title = element_text(size = 8, hjust = 0.5)
+    ) +
+    ggtitle(paste0(time_period, "\n", transition_type))
+  
+  return(p)
+}
+
+
+
 
 # END OF SCRIPT ----------------------------------------------------------------
