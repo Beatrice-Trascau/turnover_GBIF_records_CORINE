@@ -192,4 +192,42 @@ writeRaster(all_urban_15km,
             here("data", "derived_data", "clc_status_15km_all_urban.tif"),
             overwrite = TRUE)
 
+# Check names of layer
+names(all_urban_1km)
+
+# Create rasters that sum up all transitions to urban for each time period
+# Define list of resolutions
+urban_rasters <- list(
+  "1km" = all_urban_1km,
+  "5km" = all_urban_5km,
+  "15km" = all_urban_15km)
+
+# Loop through each resolution
+for(res in resolutions) {
+  # Load the appropriate raster
+  all_urban <- urban_rasters[[res]]
+  
+  # Create combined urban transitions for each time period
+  urban_2000_2006 <- sum(all_urban[[2:7]])    # layers 2-7 for 2000-2006
+  urban_2006_2012 <- sum(all_urban[[10:15]])  # layers 10-15 for 2006-2012
+  urban_2012_2018 <- sum(all_urban[[18:23]])  # layers 18-23 for 2012-2018
+  
+  # Combine into a single raster with 3 layers
+  all_urban_combined <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
+  
+  # Set names for the layers
+  names(all_urban_combined) <- c("2000-2006_all_to_urban", 
+                                 "2006-2012_all_to_urban", 
+                                 "2012-2018_all_to_urban")
+  
+  # Save the new raster
+  writeRaster(all_urban_combined, 
+              filename = here("data", "derived_data", 
+                              paste0("clc_status_", res, "_all_urban_combined.tif")),
+              overwrite = TRUE)
+  
+  # Print progress
+  print(paste("Completed processing", res, "resolution"))
+}
+
 # END OF SCRIPT ----------------------------------------------------------------
