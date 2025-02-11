@@ -26,7 +26,7 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
                  "tidyterra", "ggspatial", "htmlwidgets",
                  "htmltools", "patchwork", "webshot2",
                  "rgbif", "CoordinateCleaner", "codyn",
-                 "gratia", "lattice", "car")
+                 "gratia", "lattice", "car", "kableExtra")
 
 # Execute the function
 sapply(package_vec, install_load_package)
@@ -240,69 +240,51 @@ aggregate_transitions <- function(transition_raster, factor) {
 
 # 10. RASTER SUMMARY TABLE -----------------------------------------------------
 
-# Function to create summary tables of land cover transitions of interest
-create_summary_table_aggregated <- function(raster, cell_size, transition_type) {
-  # Get all layer names
-  layer_names <- names(raster)
-  
-  # Identify time periods
-  time_periods <- unique(gsub("_.*$", "", layer_names))
-  time_periods <- time_periods[time_periods != "class"]
-  
-  # Define transitions of interest based on transition type
-  transitions_of_interest <- switch(transition_type,
-                                    "Forest to TWS" = c("Forest no change", "Forest to TWS"),
-                                    "TWS to Forest" = c("TWS no change", "TWS to Forest"),
-                                    "All to Urban" = names(raster)  # Keep all for urban transitions
-  )
-  
-  # Initialize list to store results
-  result_list <- list()
-  
-  # Process each time period
-  for(period in time_periods) {
-    # Get layers for this time period
-    period_layers <- layer_names[grepl(paste0("^", period), layer_names)]
-    
-    # Filter for transitions of interest
-    period_layers <- period_layers[sapply(period_layers, function(x) 
-      any(sapply(transitions_of_interest, function(t) 
-        grepl(t, x, fixed = TRUE))))]
-    
-    # Extract categories from layer names
-    categories <- gsub(paste0(period, "_"), "", period_layers)
-    
-    # Create data frame for this period
-    period_df <- data.frame(
-      time_period = case_when(
-        period == "lc2006" ~ "2000-2006",
-        period == "lc2012" ~ "2006-2012",
-        period == "lc2018" ~ "2012-2018"
-      ),
-      category = categories,
-      count = sapply(period_layers, function(l) sum(values(raster[[l]]), na.rm = TRUE))
+# Function to create summary statistics for all resolutions
+create_summary_stats <- function(forest_tws, tws_forest, all_urban, resolution) {
+  # Extract frequency tables and add metadata
+  forest_tws_freq <- freq(forest_tws) |>
+    mutate(
+      transition = "Forest to TWS",
+      layer_name = names(forest_tws)[layer]
     )
-    
-    result_list[[period]] <- period_df
-  }
   
-  # Combine all periods
-  freq_df <- do.call(rbind, result_list)
+  tws_forest_freq <- freq(tws_forest) |>
+    mutate(
+      transition = "TWS to Forest",
+      layer_name = names(tws_forest)[layer]
+    )
   
-  # Calculate area (note: count is already number of cells in original resolution)
-  freq_df$area_km2 <- freq_df$count * (0.1 * 0.1) # convert from 100m x 100m to km2
+  all_urban_freq <- freq(all_urban) |>
+    mutate(
+      transition = "All to Urban",
+      layer_name = names(all_urban)[layer]
+    )
   
-  # Add metadata
-  freq_df$transition_type <- transition_type
-  freq_df$resolution <- paste0(cell_size, "m")
+  # Combine all frequencies into single dataframe
+  summary_df <- rbind(forest_tws_freq, tws_forest_freq, all_urban_freq)
   
-  # Reorder columns
-  freq_df <- freq_df %>%
-    select(time_period, category, count, area_km2, resolution, transition_type)
+  # Clean up the dataframe
+  summary_df_clean <- summary_df |>
+    mutate(
+      area = count * 0.01,
+      resolution = resolution
+    ) |>
+    rename(small_pixel_number = value)
   
-  return(freq_df)
+  # Create and return formatted table
+  return(
+    summary_df_clean |>
+      kable(
+        col.names = c("layer", "small_pixel_number", "count", 
+                      "transition", "layer_name", "area", "resolution")
+      ) |>
+      kable_styling(bootstrap_options = c("striped", "hover"))
+  )
 }
 
+# 11. MAP TO PLOT LAND COVER TRANSITIONS FOR AGGREGATIONS ----------------------
 
+# Function to map land cover transitions for aggregations
 
 # END OF SCRIPT ----------------------------------------------------------------
