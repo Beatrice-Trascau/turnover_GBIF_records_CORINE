@@ -226,8 +226,6 @@ for(res in resolutions) {
                               paste0("clc_status_", res, "_all_urban_combined.tif")),
               overwrite = TRUE)
   
-  # Print progress
-  print(paste("Completed processing", res, "resolution"))
 }
 
 # END OF SCRIPT ----------------------------------------------------------------
