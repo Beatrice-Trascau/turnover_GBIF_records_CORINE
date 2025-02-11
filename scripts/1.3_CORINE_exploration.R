@@ -69,139 +69,33 @@ norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
 
 # 2. EXTRACT SUMMARY TABLES ----------------------------------------------------
 
-## 2.1. 100m resolution --------------------------------------------------------
+# Create list with all transitions for each resolution
+resolution_data <- list(
+  "100m" = list(
+    forest_tws = forest_tws_100m,
+    tws_forest = tws_forest_100m,
+    all_urban = all_urban_100m),
+  "1km" = list(
+    forest_tws = forest_tws_1km,
+    tws_forest = tws_forest_1km,
+    all_urban = all_urban_1km),
+  "5km" = list(
+    forest_tws = forest_tws_5km,
+    tws_forest = tws_forest_5km,
+    all_urban = all_urban_5km),
+  "15km" = list(
+    forest_tws = forest_tws_15km,
+    tws_forest = tws_forest_15km,
+    all_urban = all_urban_15km))
 
-# Extract frequency tables
-forest_tws_100m_freq <- freq(forest_tws_100m)
-tws_forest_100m_freq <- freq(tws_forest_100m)
-all_urban_100m_freq <- freq(all_urban_100m)
+# Extract summary statistics tables for all resolutions at once
+summary_tables <- process_all_resolutions(resolution_data)
 
-# Add column to distinguish transition types
-forest_tws_100m_freq$transition <- "Forest to TWS"
-tws_forest_100m_freq$transition <- "TWS to Forest"
-all_urban_100m_freq$transition <- "All to Urban"
-
-# Bind all 3 into single df
-summary_df_100m <- rbind(forest_tws_100m_freq,
-                    tws_forest_100m_freq,
-                    all_urban_100m_freq)
-# Clean it up 
-summary_df_100m_clean <- summary_df_100m |>
-  mutate(layer = case_when(layer == 1 ~ "2000-2006",
-                           layer == 2 ~ "2006-2012",
-                           layer == 3 ~ "2012-2018"),
-         area = count * 0.01)
-
-# Create table from the data
-summary_df_100m_clean |>
-  kable(col.names = c("layer", "value", "count", "transition", "area")) |>
-  kable_styling(bootstrap_options = c("striped", "hover"))
-  
-## 2.2. 1km resolution ---------------------------------------------------------
-
-# Extract frequency tables
-forest_tws_1km_freq <- freq(forest_tws_1km)
-tws_forest_1km_freq <- freq(tws_forest_1km)
-all_urban_1km_freq <- freq(all_urban_1km)
-
-# Add layer names to the frequency tables
-forest_tws_1km_freq <- forest_tws_1km_freq |>
-  mutate(transition = "Forest to TWS",
-         layer_name = names(forest_tws_1km)[forest_tws_1km_freq$layer])
-
-tws_forest_1km_freq <- tws_forest_1km_freq |>
-  mutate(transition = "TWS to Forest",
-         layer_name = names(tws_forest_1km)[tws_forest_1km_freq$layer])
-
-all_urban_1km_freq <- all_urban_1km_freq |>
-  mutate(transition = "All to Urban",
-         layer_name = names(all_urban_1km)[all_urban_1km_freq$layer])
-
-# Bind all 3 into single df
-summary_df_1km <- rbind(forest_tws_1km_freq,
-                         tws_forest_1km_freq,
-                         all_urban_1km_freq)
-# Clean it up 
-summary_df_1km_clean <- summary_df_1km |>
-  mutate(area = count * 0.01) |>
-  rename(small_pixel_number = value)
-
-# Create table from the data
-summary_df_1km_clean |>
-  kable(col.names = c("layer", "small_pixel_number", "count", "transition", 
-                      "layer_name", "area")) |>
-  kable_styling(bootstrap_options = c("striped", "hover"))
-
-
-## 2.3. 5km resolution ---------------------------------------------------------
-
-# Extract frequency tables
-forest_tws_5km_freq <- freq(forest_tws_5km)
-tws_forest_5km_freq <- freq(tws_forest_5km)
-all_urban_5km_freq <- freq(all_urban_5km)
-
-# Add layer names to the frequency tables
-forest_tws_5km_freq <- forest_tws_5km_freq |>
-  mutate(transition = "Forest to TWS",
-         layer_name = names(forest_tws_5km)[forest_tws_5km_freq$layer])
-
-tws_forest_5km_freq <- tws_forest_5km_freq |>
-  mutate(transition = "TWS to Forest",
-         layer_name = names(tws_forest_5km)[tws_forest_5km_freq$layer])
-
-all_urban_5km_freq <- all_urban_5km_freq |>
-  mutate(transition = "All to Urban",
-         layer_name = names(all_urban_5km)[all_urban_5km_freq$layer])
-
-# Bind all 3 into single df
-summary_df_5km <- rbind(forest_tws_5km_freq,
-                        tws_forest_5km_freq,
-                        all_urban_5km_freq)
-# Clean it up 
-summary_df_5km_clean <- summary_df_5km |>
-  mutate(area = count * 0.01) |>
-  rename(small_pixel_number = value)
-
-# Create table from the data
-summary_df_5km_clean |>
-  kable(col.names = c("layer", "small_pixel_number", "count", "transition", 
-                      "layer_name", "area")) |>
-  kable_styling(bootstrap_options = c("striped", "hover"))
-
-## 2.4. 15km resolution --------------------------------------------------------
-
-# Extract frequency tables
-forest_tws_15km_freq <- freq(forest_tws_15km)
-tws_forest_15km_freq <- freq(tws_forest_15km)
-all_urban_15km_freq <- freq(all_urban_15km)
-
-# Add layer names to the frequency tables
-forest_tws_15km_freq <- forest_tws_15km_freq |>
-  mutate(transition = "Forest to TWS",
-         layer_name = names(forest_tws_15km)[forest_tws_15km_freq$layer])
-
-tws_forest_15km_freq <- tws_forest_15km_freq |>
-  mutate(transition = "TWS to Forest",
-         layer_name = names(tws_forest_15km)[tws_forest_15km_freq$layer])
-
-all_urban_15km_freq <- all_urban_15km_freq |>
-  mutate(transition = "All to Urban",
-         layer_name = names(all_urban_15km)[all_urban_15km_freq$layer])
-
-# Bind all 3 into single df
-summary_df_15km <- rbind(forest_tws_15km_freq,
-                        tws_forest_15km_freq,
-                        all_urban_15km_freq)
-# Clean it up 
-summary_df_15km_clean <- summary_df_15km |>
-  mutate(area = count * 0.01) |>
-  rename(small_pixel_number = value)
-
-# Create table from the data
-summary_df_15km_clean |>
-  kable(col.names = c("layer", "small_pixel_number", "count", "transition", 
-                      "layer_name", "area")) |>
-  kable_styling(bootstrap_options = c("striped", "hover"))
+# Check individual tables
+summary_100m <- summary_tables[[1]]
+summary_1km <- summary_tables[[2]]
+summary_5km <- summary_tables[[3]]
+summary_15km <- summary_tables[[4]]
 
 # 3. MAP CHANGES ---------------------------------------------------------------
 
