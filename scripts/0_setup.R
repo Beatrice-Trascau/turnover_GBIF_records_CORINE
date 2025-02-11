@@ -334,7 +334,7 @@ create_aggregated_panel <- function(raster_layer, norway, transition_type,
   # Create base plot
   p <- ggplot() +
     # Add Norway outline
-    geom_sf(data = st_as_sf(norway), fill = "white", color = "black", 
+    geom_sf(data = st_as_sf(norway), fill = "lightgrey", color = "black", 
             linewidth = 0.5) +
     # Add filled cells
     geom_tile(data = raster_df, aes(x = x, y = y, fill = count)) +
