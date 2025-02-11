@@ -93,6 +93,138 @@ analyse_forest_transition <- function(rast_t1, rast_t2) {
 
 Used an individual function for each of the three major land cover transitions assessed: Forests -\> Transitional Woodland Shurb, Transitional Woodland Shrub -\> Forests, all other classes -\> Urban.
 
+For the all other classes -\> Urban aggregation, the process was creating individual layer for each conversion. Therefore, the end product, for example all_urban_1km had the following layers:
+
+```         
+
+layer   layer_name
+1   2000-2006_Urban no change
+2   2000-2006_Forest to urban
+3   2000-2006_TWS to urban
+4   2000-2006_Complex agriculture to urban
+5   2000-2006_Agriculture & vegetation to urban
+6   2000-2006_Moors, heathland & grassland to urban
+7   2000-2006_Sparse vegetation to urban
+8   2000-2006_No urban conversion
+9   2006-2012_Urban no change
+10  2006-2012_Forest to urban
+11  2006-2012_TWS to urban
+12  2006-2012_Complex agriculture to urban
+13  2006-2012_Agriculture & vegetation to urban
+14  2006-2012_Moors, heathland & grassland to urban
+15  2006-2012_Sparse vegetation to urban
+16  2006-2012_No urban conversion
+17  2012-2018_Urban no change
+18  2012-2018_Forest to urban
+19  2012-2018_TWS to urban
+20  2012-2018_Complex agriculture to urban
+21  2012-2018_Agriculture & vegetation to urban
+22  2012-2018_Moors, heathland & grassland to urban
+23  2012-2018_Sparse vegetation to urban
+24  2012-2018_No urban conversion
+```
+
+However, we are not interested in the specific changes to urban, so I summed all of the layers that are not "Urban no change" or "No urban conversion" for each time period using the loop below
+
+```{r}
+#| label: sum_urban_transitions
+#| eval: false
+#| include: true
+
+# Define list of resolutions
+urban_rasters <- list(
+  "1km" = all_urban_1km,
+  "5km" = all_urban_5km,
+  "15km" = all_urban_15km)
+
+# Loop through each resolution
+for(res in resolutions) {
+  # Load the appropriate raster
+  all_urban <- urban_rasters[[res]]
+  
+  # Create combined urban transitions for each time period
+  urban_2000_2006 <- sum(all_urban[[2:7]])    # layers 2-7 for 2000-2006
+  urban_2006_2012 <- sum(all_urban[[10:15]])  # layers 10-15 for 2006-2012
+  urban_2012_2018 <- sum(all_urban[[18:23]])  # layers 18-23 for 2012-2018
+  
+  # Combine into a single raster with 3 layers
+  all_urban_combined <- c(urban_2000_2006, urban_2006_2012, urban_2012_2018)
+  
+  # Set names for the layers
+  names(all_urban_combined) <- c("2000-2006_all_to_urban", 
+                                 "2006-2012_all_to_urban", 
+                                 "2012-2018_all_to_urban")
+  
+  # Save the new raster
+  writeRaster(all_urban_combined, 
+              filename = here("data", "derived_data", 
+                              paste0("clc_status_", res, "_all_urban_combined.tif")),
+              overwrite = TRUE)
+  
+}
+
+
+```
+
+This leaves us with an urban raster with 3 layers: "2000-2006_all_to_urban", "2006-2012_all_to_urban" and "2012-2018_all_to_urban", which will be much easier to work with.
+
+In the case of the forest_tws\_ and tws_forest_100m we have the following layer names:
+
+```         
+layer_number    layer_name
+1   2000-2006_Non-forest
+2   2000-2006_Forest no change
+3   2000-2006_Forest to TWS
+4   2000-2006_Other forest conversion
+5   2006-2012_Non-forest
+6   2006-2012_Forest no change
+7   2006-2012_Forest to TWS
+8   2006-2012_Other forest conversion
+9   2012-2018_Non-forest
+10  2012-2018_Forest no change
+11  2012-2018_Forest to TWS
+12  2012-2018_Other forest conversion
+
+
+layer_number    layer_name
+1   2000-2006_Non-TWS
+2   2000-2006_TWS no change
+3   2000-2006_TWS to Forest
+4   2000-2006_Other TWS conversion
+5   2006-2012_Non-TWS
+6   2006-2012_TWS no change
+7   2006-2012_TWS to Forest
+8   2006-2012_Other TWS conversion
+9   2012-2018_Non-TWS
+10  2012-2018_TWS no change
+11  2012-2018_TWS to Forest
+12  2012-2018_Other TWS conversion
+```
+
+Since we are only interested in 2000-2006_Forest to TWS, 2006-2012_Forest to TWS, 2012-2018_Forest to TWS and 2000-2006_TWS to Forest, 2006-2012_TWS to Forest and 2012-2018_TWS to Forest respectively, these are easy enough to call when we use them with the \[\[\]\] operator. And are all the layers 3, 7, and 11, which is why we use the following code when we use them:
+
+```{r}
+#| label: aggregated_layers_used
+#| eval: false
+#| include: true
+
+# Forest -> TWS
+p1_1km <- create_aggregated_panel(forest_tws_1km[[3]], norway, 
+                                  "Forest to TWS", "2000-2006", TRUE, TRUE)
+p2_1km <- create_aggregated_panel(forest_tws_1km[[7]], norway, 
+                                  "Forest to TWS", "2006-2012", FALSE, FALSE)
+p3_1km <- create_aggregated_panel(forest_tws_1km[[11]], norway, 
+                                  "Forest to TWS", "2012-2018", FALSE, FALSE)
+
+# TWS -> Forest
+p4_1km <- create_aggregated_panel(tws_forest_1km[[3]], norway, 
+                                  "TWS to Forest", "2000-2006", TRUE, FALSE)
+p5_1km <- create_aggregated_panel(tws_forest_1km[[7]], norway, 
+                                  "TWS to Forest", "2006-2012", FALSE, FALSE)
+p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway, 
+                                  "TWS to Forest", "2012-2018", FALSE, FALSE)
+```
+
 # Outstanding Issues & Next Steps
 
 ## Current Challenges
