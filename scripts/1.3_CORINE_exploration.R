@@ -33,7 +33,7 @@ tws_forest_1km <- rast(here("data", "derived_data",
 
 # All -> Urban
 all_urban_1km <- rast(here("data", "derived_data", 
-                           "clc_status_1km_all_urban.tif"))
+                           "clc_status_1km_all_urban_combined.tif"))
 
 ## 1.3. 5km resolution ---------------------------------------------------------
 
@@ -47,7 +47,7 @@ tws_forest_5km <- rast(here("data", "derived_data",
 
 # All -> Urban
 all_urban_5km <- rast(here("data", "derived_data", 
-                           "clc_status_5km_all_urban.tif"))
+                           "clc_status_5km_all_urban_combined.tif"))
 
 ## 1.4. 15km resolution --------------------------------------------------------
 
@@ -61,7 +61,7 @@ tws_forest_15km <- rast(here("data", "derived_data",
 
 # All -> Urban
 all_urban_15km <- rast(here("data", "derived_data", 
-                            "clc_status_15km_all_urban.tif"))
+                            "clc_status_15km_all_urban_combined.tif"))
 
 # Load Norway shapefile
 norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile", 
@@ -145,19 +145,19 @@ ggsave(
 ## 3.2. Plot at 1km resolution -------------------------------------------------
 
 # Forest -> TWS
-p1_1km <- create_aggregated_panel(forest_tws_1km[[1]], norway, 
+p1_1km <- create_aggregated_panel(forest_tws_1km[[3]], norway, 
                                   "Forest to TWS", "2000-2006", TRUE, TRUE)
-p2_1km <- create_aggregated_panel(forest_tws_1km[[2]], norway, 
+p2_1km <- create_aggregated_panel(forest_tws_1km[[7]], norway, 
                                   "Forest to TWS", "2006-2012", FALSE, FALSE)
-p3_1km <- create_aggregated_panel(forest_tws_1km[[3]], norway, 
+p3_1km <- create_aggregated_panel(forest_tws_1km[[11]], norway, 
                                   "Forest to TWS", "2012-2018", FALSE, FALSE)
 
 # TWS -> Forest
-p4_1km <- create_aggregated_panel(tws_forest_1km[[1]], norway, 
+p4_1km <- create_aggregated_panel(tws_forest_1km[[3]], norway, 
                                   "TWS to Forest", "2000-2006", TRUE, FALSE)
-p5_1km <- create_aggregated_panel(tws_forest_1km[[2]], norway, 
+p5_1km <- create_aggregated_panel(tws_forest_1km[[7]], norway, 
                                   "TWS to Forest", "2006-2012", FALSE, FALSE)
-p6_1km <- create_aggregated_panel(tws_forest_1km[[3]], norway, 
+p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway, 
                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
 
 # All -> Urban panels
@@ -185,19 +185,19 @@ ggsave(filename = here("figures", "Figure1_landcover_transitions_1km.png"),
 ## 3.3. Plot at 5km resolution -------------------------------------------------
 
 # Forest -> TWS
-p1_5km <- create_aggregated_panel(forest_tws_5km[[1]], norway, 
+p1_5km <- create_aggregated_panel(forest_tws_5km[[3]], norway, 
                                   "Forest to TWS", "2000-2006", TRUE, TRUE)
-p2_5km <- create_aggregated_panel(forest_tws_5km[[2]], norway, 
+p2_5km <- create_aggregated_panel(forest_tws_5km[[7]], norway, 
                                   "Forest to TWS", "2006-2012", FALSE, FALSE)
-p3_5km <- create_aggregated_panel(forest_tws_5km[[3]], norway, 
+p3_5km <- create_aggregated_panel(forest_tws_5km[[11]], norway, 
                                   "Forest to TWS", "2012-2018", FALSE, FALSE)
 
 # TWS -> Forest
-p4_5km <- create_aggregated_panel(tws_forest_5km[[1]], norway, 
+p4_5km <- create_aggregated_panel(tws_forest_5km[[3]], norway, 
                                   "TWS to Forest", "2000-2006", TRUE, FALSE)
-p5_5km <- create_aggregated_panel(tws_forest_5km[[2]], norway, 
+p5_5km <- create_aggregated_panel(tws_forest_5km[[7]], norway, 
                                   "TWS to Forest", "2006-2012", FALSE, FALSE)
-p6_5km <- create_aggregated_panel(tws_forest_5km[[3]], norway, 
+p6_5km <- create_aggregated_panel(tws_forest_5km[[11]], norway, 
                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
 
 # All -> Urban 
@@ -225,19 +225,19 @@ ggsave(filename = here("figures", "Figure1_landcover_transitions_5km.png"),
 ## 3.4. Plot at 15km resolution ------------------------------------------------
 
 # Forest -> TWS 
-p1_15km <- create_aggregated_panel(forest_tws_15km[[1]], norway, 
+p1_15km <- create_aggregated_panel(forest_tws_15km[[3]], norway, 
                                    "Forest to TWS", "2000-2006", TRUE, TRUE)
-p2_15km <- create_aggregated_panel(forest_tws_15km[[2]], norway, 
+p2_15km <- create_aggregated_panel(forest_tws_15km[[7]], norway, 
                                    "Forest to TWS", "2006-2012", FALSE, FALSE)
-p3_15km <- create_aggregated_panel(forest_tws_15km[[3]], norway,
+p3_15km <- create_aggregated_panel(forest_tws_15km[[11]], norway,
                                    "Forest to TWS", "2012-2018", FALSE, FALSE)
 
 # TWS -> Forest
-p4_15km <- create_aggregated_panel(tws_forest_15km[[1]], norway, 
+p4_15km <- create_aggregated_panel(tws_forest_15km[[3]], norway, 
                                    "TWS to Forest", "2000-2006", TRUE, FALSE)
-p5_15km <- create_aggregated_panel(tws_forest_15km[[2]], norway, 
+p5_15km <- create_aggregated_panel(tws_forest_15km[[7]], norway, 
                                    "TWS to Forest", "2006-2012", FALSE, FALSE)
-p6_15km <- create_aggregated_panel(tws_forest_15km[[3]], norway, 
+p6_15km <- create_aggregated_panel(tws_forest_15km[[11]], norway, 
                                    "TWS to Forest", "2012-2018", FALSE, FALSE)
 
 # All -> Urban 
