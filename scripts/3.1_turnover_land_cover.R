@@ -55,3 +55,36 @@ occurrences_sf_reprojected <- st_transform(occurrences_sf,
 
 ## 3.2. Add before and after periods -------------------------------------------
 
+# Filtering and classification is done step by step to avoid overwriting of
+  # years that are shared between periods
+
+# First period (2000-2006 LC change, 1997-2000 = before, 2006-2012 = after)
+period1_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(1997:2000, 2006:2009)) |>
+  mutate(period = case_when(
+    year %in% 1997:2000 ~ "1997-2000",
+    year %in% 2006:2009 ~ "2006-2009"
+  ))
+
+# Second period (2006-2012 LC change, 2003-2006 = before, 2012-2015 = after)
+period2_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(2003:2006, 2012:2015)) |>
+  mutate(period = case_when(
+    year %in% 2003:2006 ~ "2003-2006",
+    year %in% 2012:2015 ~ "2012-2015"
+  ))
+
+# Third period (2012-2018 LC change, 2008-2012 = before, 2015-2018 = after)
+period3_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(2008:2012, 2015:2018)) |>
+  mutate(period = case_when(
+    year %in% 2008:2012 ~ "2008-2012",
+    year %in% 2015:2018 ~ "2015-2018"
+  ))
+
+# Combine all periods
+clean_occurrences_sf <- bind_rows(
+  period1_occurrences,
+  period2_occurrences,
+  period3_occurrences
+)
