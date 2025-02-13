@@ -28,6 +28,8 @@ editor: visual
 
 ## Layer Aggregation (1.2)
 
+**Updated 10.02.2025**
+
 Aim: Aggregate original CLC Status layers to 1km, 5km, and 15km grid size.
 
 Method:
@@ -223,6 +225,163 @@ p5_1km <- create_aggregated_panel(tws_forest_1km[[7]], norway,
                                   "TWS to Forest", "2006-2012", FALSE, FALSE)
 p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway, 
                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
+```
+
+## Turnover Calculation (3.1)
+
+**Updated: 12.02.2025**
+
+Aim: Calculate Jaccard's dissimilarity index for each land cover cell between the "before" and "after" occurrences. Jaccard's dissimilarity index was chosen because it tends to better deal with the lack of absences and biased sampling we often find with GBIF occurrences. Jaccard's index:
+
+$$J(A,B) = \frac{|A \cap B|}{|A \cup B|}$$
+
+Jaccard' distance/dissimilarity index:
+
+$$d_{j} = 1 - \frac{|A \cap B|}{|A \cup B|}$$
+
+Therefore, $d_{j}\in [0,1]$.
+
+$d_{j} = 0$ when $|A \cap B| = 1$, which can only happen if there is total overlap between species in $T_{1}$ (A) and species in $T_{2}$ (B) = i.e. no turnover
+
+$d_{j} = 1$ when $|A \cap B| = 0$, which can only happen if there is 0 overlap between species in $T_{1}$ (A) and species in $T_{2}$ (B) = i.e. complete turnover.
+
+### Classification of occurrences
+
+The first issue I ran into had to do with how the occurrences were classified in the before and after a specific time period. Initially we were using the code below:
+
+```{r}
+#| label: initial_occurrence_classification
+#| eval: false
+#| include: true
+clean_occurrences_sf <- occurrences_sf_reprojected |>
+  mutate(period = case_when(
+    year %in% c(1997:2000) ~ "1997-2000",
+    year %in% c(2006:2009) ~ "2006-2009",
+    year %in% c(2003:2006) ~ "2003-2006",
+    year %in% c(2012:2015) ~ "2012-2015",
+    year %in% c(2009:2012) ~ "2009-2012",
+    year %in% c(2015:2018) ~ "2015-2018",
+    TRUE ~ NA_character_)) |>
+  filter(!is.na(period))
+```
+
+The problem with this approach however, is that shared years would be overwritten. For example, occurrences with year = 2006 would first be classified as "2006-2009" and then as "2003-2006". Since the occurrences do not overlap (in the 2006 case, in the first classification it would be "after" for the 2000-2006 period and in the second classification it would be "before" for the 2006-2012 period), it's actually ok if the same occurrences are used multiple times. This is why I instead chose to go with a fragmented classification step, as seen below:
+
+```{r}
+#| label: new_occurrence_classification
+#| eval: false
+#| include: true
+
+# Filtering and classification is done step by step to avoid overwriting of
+  # years that are shared between periods
+
+# First period (2000-2006 LC change, 1997-2000 = before, 2006-2012 = after)
+period1_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(1997:2000, 2006:2009)) |>
+  mutate(period = case_when(year %in% 1997:2000 ~ "1997-2000",
+                            year %in% 2006:2009 ~ "2006-2009"))
+
+# Second period (2006-2012 LC change, 2003-2006 = before, 2012-2015 = after)
+period2_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(2003:2006, 2012:2015)) |>
+  mutate(period = case_when(year %in% 2003:2006 ~ "2003-2006",
+                            year %in% 2012:2015 ~ "2012-2015"))
+
+# Third period (2012-2018 LC change, 2008-2012 = before, 2015-2018 = after)
+period3_occurrences <- occurrences_sf_reprojected |>
+  filter(year %in% c(2008:2012, 2015:2018)) |>
+  mutate(period = case_when(year %in% 2008:2012 ~ "2008-2012",
+                            year %in% 2015:2018 ~ "2015-2018"))
+
+# Combine all periods
+clean_occurrences_sf <- bind_rows(period1_occurrences,
+                                  period2_occurrences,
+                                  period3_occurrences)
+
+```
+
+### Cell ID extraction
+
+Then, the next problem was that we were extracting cell IDs for the occurrences, then extracting land cover classes for the cell IDs and then adding the land cover values to the occurrence df based on the cell IDs. Switched approaches to instead create a spatial dataframe from the land cover raster and spatial points from the occurrences.
+
+### Function for Turnover Calculation
+
+The old turnover calculation function looked like this:
+
+```{r}
+#| label: old_turnover_function
+#| eval: false
+#| include: true
+calculate_jaccard_for_periods <- function(df, start_period, end_period) {
+  start_data <- df |>
+    filter(period == start_period)
+  end_data <- df |>
+    filter(period == end_period)
+  
+  combined_data <- start_data |>
+    full_join(end_data, by = "cell", suffix = c("_start", "_end"))
+  
+  # Extract land cover for start period
+  combined_data <- combined_data |>
+    mutate(land_cover_start = extract_land_cover(cell, start_period))
+  
+  jaccard_results <- combined_data |>
+    group_by(cell) |>
+    summarize(
+      species_start = list(unique(species_start)),
+      species_end = list(unique(species_end)),
+      jaccard_dissimilarity = 1 - length(intersect(species_start[[1]], 
+                                                   species_end[[1]])) / length(union(species_start[[1]], 
+                                                                                     species_end[[1]])),
+      land_cover_start = first(land_cover_start)) |>
+    mutate(start_period = start_period, end_period = end_period)
+  
+  return(jaccard_results)
+}
+
+```
+
+I have changed th function to have the following inputs: df, before_period, after_period, change_period. This makes it easier to distinguish between the land cover change periods used and the before and after periods. The function is now also no longer extracting the land cover values, because this is done before, for all cells (and implicitly for all occurrences). The new function is as follows:
+
+```{r}
+#| label: new_turnover_function
+#| eval: false
+#| include: true
+
+calculate_jaccard_for_periods <- function(df, before_period, after_period, change_period) {
+  # Get data for before and after periods
+  before_data <- df |>
+    filter(period == before_period)
+  after_data <- df |>
+    filter(period == after_period)
+  
+  # Combine data
+  combined_data <- before_data |>
+    full_join(after_data, by = "cell", suffix = c("_before", "_after"))
+  
+  # Calculate Jaccard dissimilarity and species counts
+  jaccard_results <- combined_data |>
+    group_by(cell) |>
+    summarize(
+      species_before = list(unique(species_before)),
+      species_after = list(unique(species_after)),
+      n_species_before = length(unique(species_before)),
+      n_species_after = length(unique(species_after)),
+      jaccard_dissimilarity = 1 - length(intersect(species_before[[1]], 
+                                                species_after[[1]])) / 
+                              length(union(species_before[[1]], 
+                                       species_after[[1]])),
+      .groups = 'drop'
+    ) |>
+    mutate(
+      before_period = before_period,
+      after_period = after_period,
+      change_period = change_period
+    )
+  
+  return(jaccard_results)
+}
+
 ```
 
 # Outstanding Issues & Next Steps
