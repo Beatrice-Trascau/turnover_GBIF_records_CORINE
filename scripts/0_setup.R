@@ -397,4 +397,42 @@ create_aggregated_panel <- function(raster_layer, norway, transition_type,
   return(p)
 }
 
+# 14. CALCULATE JACCARD'S DISSIMILARITY INDEX ----------------------------------
+
+# Function to calculate Jaccard dissimilarity for a period pair
+calculate_jaccard_for_periods <- function(df, before_period, after_period, change_period) {
+  # Get data for before and after periods
+  before_data <- df |>
+    filter(period == before_period)
+  after_data <- df |>
+    filter(period == after_period)
+  
+  # Combine data
+  combined_data <- before_data |>
+    full_join(after_data, by = "cell", suffix = c("_before", "_after"))
+  
+  # Calculate Jaccard dissimilarity and species counts
+  jaccard_results <- combined_data |>
+    group_by(cell) |>
+    summarize(
+      species_before = list(unique(species_before)),
+      species_after = list(unique(species_after)),
+      n_species_before = length(unique(species_before)),
+      n_species_after = length(unique(species_after)),
+      jaccard_dissimilarity = 1 - length(intersect(species_before[[1]], 
+                                                   species_after[[1]])) / 
+        length(union(species_before[[1]], 
+                     species_after[[1]])),
+      .groups = 'drop'
+    ) |>
+    mutate(
+      before_period = before_period,
+      after_period = after_period,
+      change_period = change_period
+    )
+  
+  return(jaccard_results)
+}
+
+
 # END OF SCRIPT ----------------------------------------------------------------
