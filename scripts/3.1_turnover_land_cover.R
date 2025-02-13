@@ -87,4 +87,66 @@ clean_occurrences_sf <- bind_rows(period1_occurrences,
 
 # This method retains spatial information for later
 clean_occurrences_for_turnover <- clean_occurrences_sf |>
-  mutate(cell = terra::extract(land_cover_id, st_coordinates(.))[, 1])
+  mutate(cell = terra::extract(land_cover_id, 
+                               st_coordinates(clean_occurrences_sf))[, 1])
+
+## 4.2. Keep unique species records per cell and period ------------------------
+
+# Make sure to only retain unique species records per cell and period
+unique_occurrences <- clean_occurrences_for_turnover |>
+  select(period, species, cell) |>
+  distinct(cell, species, period)
+
+# 5. CALCULATE TURNOVER --------------------------------------------------------
+
+# Define period pairs to use in the function
+period_pairs <- list(
+  list(before = "1997-2000", after = "2006-2009", change_period = "2000-2006"),
+  list(before = "2003-2006", after = "2012-2015", change_period = "2006-2012"),
+  list(before = "2008-2012", after = "2015-2018", change_period = "2012-2018"))
+
+# Apply turnover function to all periods
+temporal_turnover <- map_df(period_pairs, function(pair) {
+  calculate_jaccard_for_periods(
+    unique_occurrences,
+    pair$before,
+    pair$after,
+    pair$change_period)
+})
+
+# 6. COMBINE TURNOVER AND LAND COVER -------------------------------------------
+
+# Add turnover results to the spatial dataframe and land cover
+turnover_with_landcover <- temporal_turnover |>
+  left_join(st_as_sf(land_cover_grid) |>
+      mutate(x = st_coordinates(.)[,1],
+             y = st_coordinates(.)[,2]),
+      by = "cell") |>
+  mutate(landcover_category = case_when(change_period == "2000-2006" ~ period_2000_2006,
+                                        change_period == "2006-2012" ~ period_2006_2012,
+                                        change_period == "2012-2018" ~ period_2012_2018))
+
+# Save df 
+saveRDS(turnover_with_landcover, 
+        here("data", "derived_data", "full_turnover_results_100m.rds"))
+
+# 7. QUICK EXPLORATION ---------------------------------------------------------
+ggplot() +
+  geom_boxplot(data = turnover_with_landcover,
+               aes(x = landcover_category, y = jaccard_dissimilarity,
+                   fill = "All data")) +
+  geom_boxplot(data = turnover_3plus_species,
+               aes(x = landcover_category, y = jaccard_dissimilarity,
+                   fill = "3+ species")) +
+  geom_boxplot(data = turnover_5plus_species,
+               aes(x = landcover_category, y = jaccard_dissimilarity,
+                   fill = "5+ species")) +
+  facet_wrap(~change_period) +
+  theme_bw() +
+  labs(
+    x = "Land Cover Category",
+    y = "Jaccard Dissimilarity Index",
+    title = "Species Turnover by Land Cover Change Category and Filtering",
+    fill = "Dataset"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
