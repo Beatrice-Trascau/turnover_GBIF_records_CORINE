@@ -19,10 +19,6 @@ tws_forest_15km <- rast(here("data", "derived_data",
 all_urban_15km <- rast(here("data", "derived_data", 
                             "clc_status_15km_all_urban_combined.tif"))
 
-# Load Norway shapefile
-norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile", 
-                    "norway_corine_projection.shp"))
-
 # 2. EXTRACT SUMMARY TABLES ----------------------------------------------------
 
 # Frequency table for Forest -> TWS
