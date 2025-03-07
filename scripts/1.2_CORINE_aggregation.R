@@ -2,7 +2,7 @@
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
 # 1.2_CORINE_aggregation
 # This script contains code which calculates the land cover transitions in the
-# original rasters and the aggregations (1km, 5km, 15km)
+# original rasters and the aggregation (15km)
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
