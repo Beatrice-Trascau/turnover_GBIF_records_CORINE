@@ -8,6 +8,20 @@ editor: visual
 
 ## Objective
 
+The main objective of the project is to understand the effect of land cover changes on rates of temporal turnover in time and space.
+
+### Research Questions:
+
+1.  Do land cover changes impact rates of temporal turnover?
+
+    1.  If so, to what extent and how?
+
+2.  Do land cover changes impact the taxonomic composition of species assemblages?
+
+    1.  If so, to what extent and how?
+
+3.  Do signals of change (temporal turnover) differ based on the spatial resolution used for analysis?
+
 ## File Structure
 
 -   0_setup.R: Sets up all the packages and functions needed for the project
@@ -25,6 +39,16 @@ editor: visual
 -   3.1_turnover_land_cover.R: calculate temporal turnover
 
 # Analysis Log
+
+# Before & After Periods
+
+| LC Time Period | Before    | After     |
+|----------------|-----------|-----------|
+| 2000-2006      | 1997-2000 | 2006-2012 |
+| 2006-2012      | 2003-2006 | 2012-2015 |
+| 2012-2018      | 2008-2012 | 2015-2018 |
+
+: Before & After periods for each LC time period
 
 ## Layer Aggregation (1.2)
 
@@ -383,6 +407,46 @@ calculate_jaccard_for_periods <- function(df, before_period, after_period, chang
 }
 
 ```
+
+## Update 14.02.2025
+
+After meeting with supervisors, decided to proceed with turnover calculations only at 15km resolution.
+
+Will also run an exploratory glm: turnover \~ LC_Change + LC_No_Change + $\Delta$recorder_effort + recorder_effort + time_period
+
+However, there are several questions to clarify about this:
+
+1.  Should we include LC_No_Change = i.e. should we have a measure of the % of small pixels in the large pixels that remain forest (for example)?
+
+2.  If so, will there be autocorrelation issues?
+
+3.  Is $\Delta$recorder_effort = recorder_effort(before) - recorder_effort(after)?
+
+4.  Is recoder_effort = total number of occurrences in the before + after period?
+
+5.  Do we run one model separately for each transition (i.e. F -\> TWS, TWS -\> F, All -\> UF)?
+
+## Update 06.03.2025
+
+Changing the model to:
+
+$$
+turnover \sim LC_{Change} + LC_{NoChange} + \Delta recorder_{effort} + recorder_{effort} + time_{period} 
+$$
+
+where
+
+$$
+\Delta recorder_{effort} = \frac{RecorderEffort_{before} - RecorderEffort_{after}}{RecorderEffort_{before} + RecorderEffort_{after}}
+$$
+
+recorder effort = ${RecorderEffort_{before} + RecorderEffort_{after}}$
+
+$RecorderEffort_{before}$ = the total number of species occurrence records recorded in a LC cell in the "before" period
+
+$LC_{Change}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells where the target land cover transition is detected
+
+$LC_{NoChange}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells where the target land cover is not changing
 
 # Outstanding Issues & Next Steps
 
