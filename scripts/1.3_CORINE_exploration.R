@@ -101,18 +101,27 @@ min_percent <- min(all_percent_values, na.rm = TRUE)
 max_percent <- max(all_percent_values, na.rm = TRUE)
 
 # Round values up and down to 2 decimal places
-min_percent_rounded <- floor(min_percent * 100) / 100  # Round down
+min_percent_rounded <- ceiling(min_percent * 100) / 100 
 max_percent_rounded <- ceiling(max_percent * 100) / 100  # Round up
 
 # Create common scale for all plots
-common_fill_scale <- scale_fill_viridis_c(option = "magma",
-                                          direction = -1,
-                                          name = "% of grid cell\narea changed",
-                                          limits = c(min_percent_rounded,
-                                                     max_percent_rounded,
-                                                     length.out = 5),
-                                          labels = function(x) sprintf("%.2f%%", x),
-                                          na.value = "white")
+common_fill_scale <- scale_fill_viridis_c(option = "virdis",
+                                         name = "% of grid cell\narea changed",
+                                         limits = c(min_percent_rounded,
+                                                    max_percent_rounded),
+                                         breaks = seq(min_percent_rounded, 
+                                                      max_percent_rounded, 
+                                                      length.out = 5),
+                                         labels = function(x) sprintf("%.2f%%", x),
+                                         na.value = "white",
+                                         guide = guide_colorbar(direction = "vertical",
+                                                                barheight = unit(10, "lines"),
+                                                                barwidth = unit(1, "lines"),
+                                                                title.position = "top",
+                                                                title.hjust = 0.5,
+                                                                frame.colour = "black",
+                                                                ticks.colour = "black"))
+
   
 ## 3.2. F -> TWS panels --------------------------------------------------------
 
@@ -268,3 +277,30 @@ p9 <- ggplot() +
         plot.background = element_rect(fill = "white", color = NA))
 
 ## 3.5. Combine plots into single figure ---------------------------------------
+
+# First row
+top_row <- plot_grid(p1, p2, p3, nrow = 1, 
+                     labels = c('a)', 'b)', 'c)'),
+                     align = "h", rel_widths = c(1.3, 1, 1))
+
+# Second row
+middle_row <- plot_grid(p4, p5, p6, 
+                        labels = c('d)', 'e)', 'f)'),
+                        nrow = 1, align = "h")
+
+
+# Third row
+bottom_row <- plot_grid(p7, p8, p9, 
+                        labels = c('g)', 'h)', 'i)'),
+                        nrow = 1, align = "h")
+
+# Combine all rows into a single figure
+final_map <- plot_grid(top_row, middle_row, bottom_row,
+                       nrow = 3, align = "v")
+
+# Save figure to file
+ggsave(filename = here("figures", "Figure1_landcover_transitions_15km.png"),
+       plot = final_map, width = 12, height = 12, dpi = 300)
+
+ggsave(filename = here("figures", "Figure1_landcover_transitions_15km.svg"),
+       plot = final_map, width = 12, height = 12, dpi = 300)
