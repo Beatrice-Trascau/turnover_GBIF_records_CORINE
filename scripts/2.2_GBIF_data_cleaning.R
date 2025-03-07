@@ -20,7 +20,7 @@ clean_occurrences1 <- occurrence_a |>
 # 2.2. Remove records that are not Animalia, Plantae or Fungi ------------------
 
 clean_occurrences2 <- clean_occurrences1 |>
-  filter(kingdom %in% c("Animalia", "Animalia", "Fungi"))
+  filter(kingdom %in% c("Animalia", "Plantae", "Fungi"))
 
 # 2.3. Remove records with no registered species-level information -------------
 clean_occurrences3 <- clean_occurrences2 |>
