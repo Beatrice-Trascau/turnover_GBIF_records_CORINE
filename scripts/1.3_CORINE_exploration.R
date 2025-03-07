@@ -1,55 +1,11 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
 # 1.3_CORINE_exploration
-# This script contains code which explores land cover transitions for each
-# grain size considered
+# This script contains code which explores land cover transitions for the 
+# 15km x 15km resolution
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
-
-## 1.1. 100m resolution --------------------------------------------------------
-
-# Forest -> TWS
-forest_tws_100m <- rast(here("data", "derived_data", 
-                             "clc_status_100m_forest_tws.tif"))
-
-# TWS -> Forest
-tws_forest_100m <- rast(here("data", "derived_data", 
-                             "clc_status_100m_tws_forest.tif"))
-
-# All -> Urban
-all_urban_100m <- rast(here("data", "derived_data", 
-                            "clc_status_100m_all_urban.tif"))
-
-## 1.2. 1km resolution ---------------------------------------------------------
-
-# Forest -> TWS
-forest_tws_1km <- rast(here("data", "derived_data", 
-                            "clc_status_1km_forest_tws.tif"))
-
-# TWS -> Forest
-tws_forest_1km <- rast(here("data", "derived_data", 
-                            "clc_status_1km_tws_forest.tif"))
-
-# All -> Urban
-all_urban_1km <- rast(here("data", "derived_data", 
-                           "clc_status_1km_all_urban_combined.tif"))
-
-## 1.3. 5km resolution ---------------------------------------------------------
-
-# Forest -> TWS
-forest_tws_5km <- rast(here("data", "derived_data", 
-                            "clc_status_5km_forest_tws.tif"))
-
-# TWS -> Forest
-tws_forest_5km <- rast(here("data", "derived_data", 
-                            "clc_status_5km_tws_forest.tif"))
-
-# All -> Urban
-all_urban_5km <- rast(here("data", "derived_data", 
-                           "clc_status_5km_all_urban_combined.tif"))
-
-## 1.4. 15km resolution --------------------------------------------------------
 
 # Forest -> TWS
 forest_tws_15km <- rast(here("data", "derived_data", 
@@ -69,33 +25,39 @@ norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
 
 # 2. EXTRACT SUMMARY TABLES ----------------------------------------------------
 
-# Create list with all transitions for each resolution
-resolution_data <- list(
-  "100m" = list(
-    forest_tws = forest_tws_100m,
-    tws_forest = tws_forest_100m,
-    all_urban = all_urban_100m),
-  "1km" = list(
-    forest_tws = forest_tws_1km,
-    tws_forest = tws_forest_1km,
-    all_urban = all_urban_1km),
-  "5km" = list(
-    forest_tws = forest_tws_5km,
-    tws_forest = tws_forest_5km,
-    all_urban = all_urban_5km),
-  "15km" = list(
-    forest_tws = forest_tws_15km,
-    tws_forest = tws_forest_15km,
-    all_urban = all_urban_15km))
+# Frequency table for Forest -> TWS
+forest_tws_freq <- freq(forest_tws_15km) |>
+  mutate(transition = "Forest to TWS",
+         layer_name = names(forest_tws_15km)[layer])
+    
+# Frequency table for TWS -> Forest
+tws_forest_freq <- freq(tws_forest_15km) |>
+  mutate(transition = "TWS to Forest",
+         layer_name = names(tws_forest_15km)[layer])
 
-# Extract summary statistics tables for all resolutions at once
-summary_tables <- process_all_resolutions(resolution_data)
+# Frequency table for all to urban 
+all_urban_freq <- freq(all_urban_15km) |>
+  mutate(transition = "All to Urban", 
+         layer_name = names(all_urban_15km)[layer])
 
-# Check individual tables
-summary_100m <- summary_tables[[1]]
-summary_1km <- summary_tables[[2]]
-summary_5km <- summary_tables[[3]]
-summary_15km <- summary_tables[[4]]
+# Combine all frequencies in a single dataframe
+summary_15km  <- rbind(forest_tws_freq, tws_forest_freq, all_urban_freq)
+
+# Clean up the dataframe 
+summary_15km_clean <- summary_15km |>
+  rename(small_pixel_number = value) |>
+  mutate(area = small_pixel_number * 0.01,
+         resolution = "15km") 
+
+# Get summary table
+summary_15km_table <- summary_15km_clean |>
+  kable(col.names = c("layer", "small_pixel_number", "count", 
+                      "transition", "layer_name", "area", "resolution")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Print summary
+print(summary_15km_table)
+
 
 # 3. MAP CHANGES ---------------------------------------------------------------
 
