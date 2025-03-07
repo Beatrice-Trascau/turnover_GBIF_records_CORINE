@@ -120,9 +120,7 @@ common_fill_scale <- scale_fill_viridis_c(option = "magma",
 p1 <- ggplot() +
   geom_tile(data = raster_dfs[["forest_tws_3"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -141,9 +139,8 @@ p1 <- ggplot() +
 p2 <- ggplot() +
   geom_tile(data = raster_dfs[["forest_tws_7"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -158,9 +155,8 @@ p2 <- ggplot() +
 p3 <- ggplot() +
   geom_tile(data = raster_dfs[["forest_tws_11"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -177,9 +173,8 @@ p3 <- ggplot() +
 p4 <- ggplot() +
   geom_tile(data = raster_dfs[["tws_forest_3"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -194,9 +189,8 @@ p4 <- ggplot() +
 p5 <- ggplot() +
   geom_tile(data = raster_dfs[["tws_forest_7"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -211,9 +205,8 @@ p5 <- ggplot() +
 p6 <- ggplot() +
   geom_tile(data = raster_dfs[["tws_forest_11"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -230,9 +223,8 @@ p6 <- ggplot() +
 p7 <- ggplot() +
   geom_tile(data = raster_dfs[["all_urban_2"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -247,9 +239,8 @@ p7 <- ggplot() +
 p8 <- ggplot() +
   geom_tile(data = raster_dfs[["all_urban_5"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
@@ -264,9 +255,8 @@ p8 <- ggplot() +
 p9 <- ggplot() +
   geom_tile(data = raster_dfs[["all_urban_8"]], 
             aes(x = x, y = y, fill = percent)) +
-  scale_fill_viridis_c(option = "magma", direction = -1,
-                       name = "% of grid cell\narea changed",
-                       na.value = "white") +
+  common_fill_scale +
+  guides(fill = "none") +
   geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
   coord_sf() +
   theme_minimal() +
