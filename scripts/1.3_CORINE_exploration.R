@@ -57,43 +57,39 @@ print(summary_15km_table)
 
 # 3. MAP CHANGES ---------------------------------------------------------------
 
+# 3.1. Convert rasters to df for plotting --------------------------------------
 
-## 3.4. Plot at 15km resolution ------------------------------------------------
+# Define the list of rasters to be converted
+raster_list <- list("forest_tws_3" = forest_tws_15km[[3]],   # Forest -> TWS 2000-2006
+                    "forest_tws_7" = forest_tws_15km[[7]],   # Forest -> TWS 2006-2012
+                    "forest_tws_11" = forest_tws_15km[[11]], # Forest -> TWS 2012-2018
+                    "tws_forest_3" = tws_forest_15km[[3]],   # TWS -> Forest 2000-2006
+                    "tws_forest_7" = tws_forest_15km[[7]],   # TWS -> Forest 2006-2012
+                    "tws_forest_11" = tws_forest_15km[[11]], # TWS -> Forest 2012-2018
+                    "all_urban_2" = all_urban_15km[[2]],     # All -> Urban 2000-2006
+                    "all_urban_5" = all_urban_15km[[5]],     # All -> Urban 2006-2012
+                    "all_urban_8" = all_urban_15km[[8]])      # All -> Urban 2012-2018
 
-# Forest -> TWS 
-p1_15km <- create_aggregated_panel(forest_tws_15km[[3]], norway, 
-                                   "Forest to TWS", "2000-2006", TRUE, TRUE)
-p2_15km <- create_aggregated_panel(forest_tws_15km[[7]], norway, 
-                                   "Forest to TWS", "2006-2012", FALSE, FALSE)
-p3_15km <- create_aggregated_panel(forest_tws_15km[[11]], norway,
-                                   "Forest to TWS", "2012-2018", FALSE, FALSE)
+# Define list to store dfs
+raster_dfs <- list()
 
-# TWS -> Forest
-p4_15km <- create_aggregated_panel(tws_forest_15km[[3]], norway, 
-                                   "TWS to Forest", "2000-2006", TRUE, FALSE)
-p5_15km <- create_aggregated_panel(tws_forest_15km[[7]], norway, 
-                                   "TWS to Forest", "2006-2012", FALSE, FALSE)
-p6_15km <- create_aggregated_panel(tws_forest_15km[[11]], norway, 
-                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
+# Loop through rasters and create dfs
+for (name in names(raster_list)){
+  # Convert raster to df
+  df <- as.data.frame(raster_list[[name]], xy = TRUE)
+  
+  # Rename third column to "value"
+  names(df)[3] <- "value"
+  
+  # Set 0 values to NA for better map visualisation
+  df$value[df$value == 0] <- NA
+  
+  # Calculate % relative to total possible pixels in 15km cells = 150 * 150 = 22 500
+  df$percent <- (df$value / 22500) * 100
+  
+  # Store dfs in the list created earlier
+  raster_dfs[[name]] <- df
+}
+  
+## 3.2. F -> TWS panels --------------------------------------------------------
 
-# All -> Urban 
-p7_15km <- create_aggregated_panel(all_urban_15km[[1]], norway, 
-                                   "All to Urban", "2000-2006", TRUE, FALSE)
-p8_15km <- create_aggregated_panel(all_urban_15km[[2]], norway, 
-                                   "All to Urban", "2006-2012", FALSE, FALSE)
-p9_15km <- create_aggregated_panel(all_urban_15km[[3]], norway, 
-                                   "All to Urban", "2012-2018", FALSE, FALSE)
-
-# Combine 15km plots into specific rows
-top_row_15km <- plot_grid(p1_15km, p4_15km, p7_15km, nrow = 1, align = 'h',
-                          rel_widths = c(1.2, 1, 1))
-middle_row_15km <- plot_grid(p2_15km, p5_15km, p8_15km, nrow = 1, align = 'h')
-bottom_row_15km <- plot_grid(p3_15km, p6_15km, p9_15km, nrow = 1, align = 'h')
-
-# Combine all rows into 1
-final_plot_15km <- plot_grid(top_row_15km, middle_row_15km, bottom_row_15km,
-                             nrow = 3, align = 'v')
-
-# Save 15km plot
-ggsave(filename = here("figures", "Figure1_landcover_transitions_15km.png"),
-       plot = final_plot_15km, width = 12, height = 12, dpi = 300)
