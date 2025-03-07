@@ -19,6 +19,10 @@ tws_forest_15km <- rast(here("data", "derived_data",
 all_urban_15km <- rast(here("data", "derived_data", 
                             "clc_status_15km_all_urban_combined.tif"))
 
+# Load Norway shapefile
+norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
+                    "norway_corine_projection.shp"))
+
 # 2. EXTRACT SUMMARY TABLES ----------------------------------------------------
 
 # Frequency table for Forest -> TWS
@@ -57,7 +61,7 @@ print(summary_15km_table)
 
 # 3. MAP CHANGES ---------------------------------------------------------------
 
-# 3.1. Convert rasters to df for plotting --------------------------------------
+## 3.1. Convert rasters to df for plotting -------------------------------------
 
 # Define the list of rasters to be converted
 raster_list <- list("forest_tws_3" = forest_tws_15km[[3]],   # Forest -> TWS 2000-2006
@@ -93,3 +97,165 @@ for (name in names(raster_list)){
   
 ## 3.2. F -> TWS panels --------------------------------------------------------
 
+# F -> TWS 2000-2006
+p1 <- ggplot() +
+  geom_tile(data = raster_dfs[["forest_tws_3"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  annotation_north_arrow(location = "br", which_north = "true", 
+                         pad_y = unit(0.8, "cm"), 
+                         style = north_arrow_fancy_orienteering) +
+  annotation_scale(location = "br", width_hint = 0.35)
+
+# F -> TWS 2006-2012
+p2 <- ggplot() +
+  geom_tile(data = raster_dfs[["forest_tws_7"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+# F -> TWS 2012-2018
+p3 <- ggplot() +
+  geom_tile(data = raster_dfs[["forest_tws_11"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+## 3.3. TWS -> F panels --------------------------------------------------------
+
+# TWS -> F 2000-2006
+p4 <- ggplot() +
+  geom_tile(data = raster_dfs[["tws_forest_3"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+# TWS -> F 2006-2012
+p5 <- ggplot() +
+  geom_tile(data = raster_dfs[["tws_forest_7"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+# TWS -> F 2012-2018
+p6 <- ggplot() +
+  geom_tile(data = raster_dfs[["tws_forest_11"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+## 3.4. All -> Artifical Surfaces panels ---------------------------------------
+
+# All -> AF 2000-2006
+p7 <- ggplot() +
+  geom_tile(data = raster_dfs[["all_urban_2"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+# All -> AF 2006-2012
+p8 <- ggplot() +
+  geom_tile(data = raster_dfs[["all_urban_5"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+# All -> AF 2012-2018
+p9 <- ggplot() +
+  geom_tile(data = raster_dfs[["all_urban_8"]], 
+            aes(x = x, y = y, fill = percent)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       name = "% of grid cell\narea changed",
+                       na.value = "white") +
+  geom_sf(data = st_as_sf(norway), fill = NA, color = "black", linewidth = 0.2) +
+  coord_sf() +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(size = 8, hjust = 0.5),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA))
+
+## 3.5. Combine plots into single figure ---------------------------------------
