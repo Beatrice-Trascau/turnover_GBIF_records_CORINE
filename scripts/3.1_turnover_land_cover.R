@@ -93,9 +93,30 @@ clean_occurrences_for_turnover <- clean_occurrences_sf |>
 ## 4.2. Keep unique species records per cell and period ------------------------
 
 # Make sure to only retain unique species records per cell and period
-unique_occurrences <- clean_occurrences_for_turnover |>
+# Splitting these by time period to hopefully save computing power
+
+# 2000-2006 period
+period1_unique <- clean_occurrences_for_turnover |>
+  filter(period %in% c("1997-2000", "2006-2009")) |>
   select(period, species, cell) |>
   distinct(cell, species, period)
+
+# 2006-2012 period  
+period2_unique <- clean_occurrences_for_turnover |>
+  filter(period %in% c("2003-2006", "2012-2015")) |>
+  select(period, species, cell) |>
+  distinct(cell, species, period)
+
+# 2012-2018 period
+period3_unique <- clean_occurrences_for_turnover |>
+  filter(period %in% c("2008-2012", "2015-2018")) |>
+  select(period, species, cell) |>
+  distinct(cell, species, period)
+
+# Combine the results
+unique_occurrences <- bind_rows(period1_unique,
+                                period2_unique,
+                                period3_unique)
 
 # 5. CALCULATE TURNOVER --------------------------------------------------------
 
