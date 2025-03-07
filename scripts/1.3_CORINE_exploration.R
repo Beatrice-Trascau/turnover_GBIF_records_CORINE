@@ -94,6 +94,25 @@ for (name in names(raster_list)){
   # Store dfs in the list created earlier
   raster_dfs[[name]] <- df
 }
+
+# Find global min and max for unified legend scale
+all_percent_values <- unlist(lapply(raster_dfs, function(df) df$percent))
+min_percent <- min(all_percent_values, na.rm = TRUE)
+max_percent <- max(all_percent_values, na.rm = TRUE)
+
+# Round values up and down to 2 decimal places
+min_percent_rounded <- floor(min_percent * 100) / 100  # Round down
+max_percent_rounded <- ceiling(max_percent * 100) / 100  # Round up
+
+# Create common scale for all plots
+common_fill_scale <- scale_fill_viridis_c(option = "magma",
+                                          direction = -1,
+                                          name = "% of grid cell\narea changed",
+                                          limits = c(min_percent_rounded,
+                                                     max_percent_rounded,
+                                                     length.out = 5),
+                                          labels = function(x) sprintf("%.2f%%", x),
+                                          na.value = "white")
   
 ## 3.2. F -> TWS panels --------------------------------------------------------
 
