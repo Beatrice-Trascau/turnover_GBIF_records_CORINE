@@ -304,3 +304,34 @@ ggsave(filename = here("figures", "Figure1_landcover_transitions_15km.png"),
 
 ggsave(filename = here("figures", "Figure1_landcover_transitions_15km.svg"),
        plot = final_map, width = 12, height = 12, dpi = 300)
+
+# 4. EXPLORATORY FIGURES -------------------------------------------------------
+
+# Calculate total area affected by each transition type per time period
+transition_summary <- summary_15km_clean |>
+  group_by(transition, layer_name) |>
+  summarize(
+    total_area_km2 = sum(area),
+    .groups = 'drop'
+  ) |>
+  arrange(transition, layer_name)
+
+# Print transition summary
+print(transition_summary)
+
+# Create a bar plot of transition areas by time period
+transition_plot <- ggplot(transition_summary, 
+                          aes(x = layer_name, y = total_area_km2, fill = transition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_viridis_d() +
+  labs(x = "Time Period", y = "Total Area (km²)", 
+       title = "Land Cover Transitions in Norway (15km resolution)") +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Save the transition summary plot
+ggsave(filename = here("figures", "Figure2_transition_summary_15km.png"),
+       plot = transition_plot, width = 10, height = 6, dpi = 300)
+
+# END OF SCRIPT ----------------------------------------------------------------
