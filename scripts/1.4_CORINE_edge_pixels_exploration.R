@@ -49,3 +49,15 @@ cells_within$percent_within <- as.numeric(cells_within$area_within/cells_within$
 cells_within$percent_outside <- 100 - cells_within$percent_within
 
 # Extract cell coordinates from the centroids
+cell_centroids <- st_centroid(cells_within)
+coords <- st_coordinates(cell_centroids)
+cells_within$x <- coords[,1]
+cells_within$y <- coords[,2]
+
+# Exclude cells that are fully inside (percent_outside = 0)
+edge_cells <- cells_within |>
+  filter(percent_outside > 0) |>
+  mutate(cell_id = row_number(),
+         is_edge_cell = TRUE,
+         is_mostly_outside = percent_outside > 50) |>
+  mutate(area_km2 = as.numeric())
