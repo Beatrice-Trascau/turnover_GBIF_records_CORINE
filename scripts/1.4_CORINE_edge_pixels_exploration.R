@@ -24,7 +24,7 @@ template_raster <- forest_tws_15km[[1]]
 
 # Set all cell values to 1 (representing complete cells)
 # This will help us in the next step to differentiate target pixels from those that are NA or 0
-template_raster[] <- 1
+template_raster[] <- 1:ncell(template_raster)
 
 # Convert cells to polygons
 cell_polygons <- as.polygons(template_raster)
@@ -82,6 +82,7 @@ edge_summary_statistics <- data.frame(Statistic = c("Total number of edge cells"
                                                     "Mean percent outside boundary",
                                                     "Median percent outside boundary",
                                                     "Minimum percent outside boundary",
+                                                    "Maximum percent outside boundary",
                                                     "Number of cells mostly outside (>50%)",
                                                     "% of data cells that are edge cells",
                                                     "Total cells in raster",
@@ -120,10 +121,14 @@ edge_map <- ggplot() +
   annotation_north_arrow(location = "br", which_north = "true",
                          pad_y = unit(0.5, "cm"),
                          style = north_arrow_fancy_orienteering()) +
-  annotation_scale(location = "bl", width_hint = 0.3)
+  annotation_scale(location = "br", width_hint = 0.35)
 
-# Save as supplementary information
+# Save as supplementary information (.png)
 ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"),
+       plot = edge_map, width = 10, height = 6, dpi = 300)
+
+# Save as as supplementary information (.svg)
+ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.svg"),
        plot = edge_map, width = 10, height = 6, dpi = 300)
 
 # 6. SAVE SUMMARY DFS ----------------------------------------------------------
