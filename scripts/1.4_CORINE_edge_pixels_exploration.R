@@ -125,3 +125,11 @@ edge_map <- ggplot() +
 # Save as supplementary information
 ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"),
        plot = edge_map, width = 10, height = 6, dpi = 300)
+
+# 6. SAVE SUMMARY DFS ----------------------------------------------------------
+
+# Save edge cell data
+save(edge_cells, file = here("data", "derived_data", "edge_cells_15km.rda"))
+
+# Save summary statistics dfs
+save(edge_summary_statistics, file = here("data", "derived_data", "edge_summary_stats_15km.rda"))
