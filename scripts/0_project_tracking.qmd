@@ -11,6 +11,7 @@ editor: visual
 
 library(here)
 library(kableExtra)
+library(knitr)
 ```
 
 # Project Overview
@@ -266,6 +267,15 @@ Before proceeding with analysis, we need to check which pixels are partially off
 
 Using the Norway shapefile as the boundary also means that we will exclude 15km x 15km cells where \>50% of the area falls outside of the country, i.e. is in Sweden, Findland, or Russia. However, I don't think there is any way to distinguish between what part of the boundary is coastline and what part of it is a border.
 
+Across, Norway the distribution of the "edge" pixels is as follows:
+
+```{r Figure S1}
+#| label: supplementary_figure1
+#| fig-cap: "Map of edge pixels"
+
+knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
+```
+
 ```{r edge pixels summary}
 #| lavel: edge-pixels-summary
 #| echo: false
@@ -284,9 +294,25 @@ edge_summary_stats_15km |>
   column_spec(2, color = "steelblue")
 ```
 
+The percentages of areas falling outside of the Norway shapefile boundaries, are distributed as seen below:
+
+```{r Figure S2}
+#| label: supplementary_figure2
+#| fig-cap: "Histogram of edge pixels"
+
+knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
+```
+
 Data validation revealed that 426 cells were masked, instead of the expected 434. This meant that 8 cells were unaccounted for. Further exploration revealed that the specific 8 cells were already set to NA in the raster layers before the masking.
 
 Further validation also revealed that the masking did not alter the values of the unmasked cells and that the correct cells were masked.
+
+```{r Figure S3}
+#| label: supplementary_figure3
+#| fig-cap: "Validation of edge pixles"
+
+knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
+```
 
 ## Turnover Calculation (3.1)
 
