@@ -238,64 +238,35 @@ aggregate_transitions <- function(transition_raster, factor) {
   return(rast(agg_counts))
 }
 
-# 10. MAP TRANSITIONS FOR AGGREGATIONS -----------------------------------------
+# 10. CHECK IF CELLS ARE NA ----------------------------------------------------
 
-# Function to create single panel figure with land cover transitions and time
-  # periods for each aggregation
-create_aggregated_panel <- function(raster_layer, norway, transition_type, 
-                                    time_period, is_first_row = FALSE, 
-                                    is_first_panel = FALSE) {
-  # Convert raster to dataframe
-  raster_df <- as.data.frame(raster_layer, xy = TRUE)
-  names(raster_df)[3] <- "count"
+# Function to check if certain cells in a raster were already NA before the masking
+#   this function is used to check that masking of cells with >50% of their area
+#   outside of the boundary was done correctly
+check_na_values <- function(raster_layer, coords) {
+  # Extract values directly
+  extracted <- terra::extract(raster_layer, as.matrix(coords[, c("x", "y")]))
   
-  # Set 0 values to NA
-  raster_df$count[raster_df$count == 0] <- NA
+  # Print the structure to understand the output
+  print(str(extracted))
   
-  # Create base plot
-  p <- ggplot() +
-    # Add Norway outline
-    geom_sf(data = st_as_sf(norway), fill = "lightgrey", color = "black", 
-            linewidth = 0.5) +
-    # Add filled cells
-    geom_tile(data = raster_df, aes(x = x, y = y, fill = count)) +
-    # Set color scheme starting at 1
-    scale_fill_viridis_c(option = "magma", direction = -1,
-                         name = "Number of\n100m cells",
-                         limits = c(1, NA),
-                         na.value = "white") +
-    coord_sf() +
-    theme_minimal() +
-    theme(
-      panel.grid = element_blank(),
-      axis.text = element_blank(),
-      axis.title = element_blank(),
-      plot.title = element_text(size = 8, hjust = 0.5),
-      legend.position = if(is_first_panel) "right" else "none",
-      panel.background = element_rect(fill = "white", color = NA),
-      plot.background = element_rect(fill = "white", color = NA)
-    )
-  
-  # Add title - always show time period, but only show transition type in first row
-  if(is_first_row) {
-    p <- p + ggtitle(paste0(time_period, "\n", transition_type))
-  } else {
-    p <- p + ggtitle(time_period)
+  # Check if extraction worked and what format it returned
+  if (is.null(extracted)) {
+    return(NA)
+  } else if (is.data.frame(extracted)) {
+    # If it's a data frame, find the value column (usually the second column)
+    if (ncol(extracted) >= 2) {
+      return(sum(is.na(extracted[,2])))
+    } else if (ncol(extracted) == 1) {
+      return(sum(is.na(extracted[,1])))
+    }
+  } else if (is.vector(extracted)) {
+    # If it's a vector, count NAs directly
+    return(sum(is.na(extracted)))
   }
   
-  # Add north arrow and scale bar only to first panel
-  if(is_first_panel) {
-    p <- p +
-      annotation_north_arrow(
-        location = "br",
-        which_north = "true",
-        pad_y = unit(0.8, "cm"),
-        style = north_arrow_fancy_orienteering
-      ) +
-      annotation_scale(location = "br", width_hint = 0.35)
-  }
-  
-  return(p)
+  # Fallback
+  return(NA)
 }
 
 # 14. CALCULATE JACCARD'S DISSIMILARITY INDEX ----------------------------------
