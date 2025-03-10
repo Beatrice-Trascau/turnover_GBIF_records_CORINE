@@ -246,6 +246,39 @@ cat("Actual cells masked in tws_forest:",
 cat("Actual cells masked in all_urban:", 
     global(urban_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
 
+## 6.2. Visual check of masked cells -------------------------------------------
+
+# Create a raster with the masked cells
+masked_cell_raster <- forest_tws_15km_masked[[1]]
+
+# Set all cells to 0
+masked_cell_raster[] <- 0 
+
+# Set the masked cells to 1
+masked_cell_raster[forest_masked_check] <- 1
+
+# Plot masked cells
+ggplot() +
+  geom_sf(data = norway_sf, fill = "lightgrey", color = "black") +
+  geom_tile(data = as.data.frame(masked_cell_raster, xy = TRUE),
+            aes(x = x, y = y, fill = factor('2000-2006_Non-forest'))) +
+  geom_sf(data = edge_cells %>% filter(is_mostly_outside == TRUE),
+          color = "red", size = 1, fill = NA) +
+  scale_fill_manual(values = c("0" = "transparent", "1" = "blue",
+                               name = "Status",
+                               labels = c("0" = "Unchanged", "1" = "Masked"))) +
+  theme_classic()
+
+## 6.3. Check that unmasked cells are unchanged --------------------------------
+
+
+
+
+
+
+
+
+
 
 
 
