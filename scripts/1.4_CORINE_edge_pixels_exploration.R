@@ -366,6 +366,43 @@ cat("Cells correctly masked:", cells_correctly_masked, "\n") #426
 cat("Cells that should be masked but weren't:", cells_missed, "\n") #0
 cat("Cells that shouldn't be masked but were:", cells_wrongly_masked, "\n") #0
 
+# Create a spatial visualization of the comparison
+mask_comparison_df <- as.data.frame(mask_comparison, xy=TRUE)
+names(mask_comparison_df)[3] <- "status"
+
+# Create factor levels with meaningful labels
+mask_comparison_df$status_factor <- factor(mask_comparison_df$status,
+                                           levels = c(0, 1, 2, 3),
+                                           labels = c("Not affected",
+                                                      "Correctly masked",
+                                                      "Should be masked but wasn't",
+                                                      "Shouldn't be masked but was"))
+
+# Plot the comparison
+ggplot() +
+  geom_sf(data = norway_sf, fill = "lightgrey", color = "black", linewidth = 0.5) +
+  geom_tile(data = mask_comparison_df, 
+            aes(x = x, y = y, fill = status_factor)) +
+  scale_fill_manual(values = c("Not affected" = "transparent",
+                               "Correctly masked" = "green",
+                               "Should be masked but wasn't" = "red",
+                               "Shouldn't be masked but was" = "orange"),
+                    name = "Masking Status") +
+  labs(title = "Spatial Accuracy of Cell Masking",
+       subtitle = paste0("Correctly masked: ", cells_correctly_masked,
+                         " | Missed: ", cells_missed,
+                         " | Wrongly masked: ", cells_wrongly_masked)) +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
+
+# Save the validation figure
+ggsave(filename = here("figures", "SupplementaryFigure3_MaskingValidation.png"),
+       width = 10, height = 8, dpi = 300)
+
 ## 6.6. Save masked layers to file ---------------------------------------------
 
 # Forest -> TWS
