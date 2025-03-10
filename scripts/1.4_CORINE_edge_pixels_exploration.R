@@ -160,5 +160,39 @@ ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogr
 
 # 5. REMOVE CELLS WITH >50% OUTSIDE OF BOUNDARY --------------------------------
 
+## 5.1. Identify cells to mask -------------------------------------------------
+
+# Get coordinates of cells with >50% area outside
+cells_to_mask <- edge_cells |>
+  filter(is_mostly_outside == TRUE) |>
+  st_drop_geometry() |>
+  select(x, y)
+
+## 5.2. Create mask for each raster --------------------------------------------
+
+### 5.2.1. Forest -> TWS -------------------------------------------------------
+
+# Create copy of input raster
+forest_tws_15km_masked <- forest_tws_15km
+
+# Loop through each raster and set the cells >50% outside to NA
+for(i in 1:nlyr(forest_tws_15km_masked)){
+  # Get the current layer
+  current_layer <- forest_tws_15km[[i]]
+  
+  # Convert coordinates to cell indices
+  cells_idx <- cellFromXY(current_layer, as.matrix(cells_to_mask[, c("x", "y")]))
+  
+  # Set these cells to NA
+  current_layer[cells_idx] <- NA
+  
+  # Update the layer in the stack
+  forest_tws_15km_masked[[i]] <- current_layer
+}
+
+
+
+
+
 
 
