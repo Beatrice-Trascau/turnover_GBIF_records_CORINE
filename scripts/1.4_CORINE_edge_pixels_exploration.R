@@ -271,12 +271,28 @@ ggplot() +
 
 ## 6.3. Check that unmasked cells are unchanged --------------------------------
 
+# Compare values in the non-masked cells between original and masked rasters
+forest_tws_check <- forest_tws_15km[[1]]
+forest_tws_masked_check <- forest_tws_15km_masked[[1]]
 
+# Create a mask for non-NA cells in both rasters
+valid_cells <- !is.na(forest_tws_check) & !is.na(forest_tws_masked_check)
 
+# Extract values for valid cells for both rasters
+original_value <- forest_tws_check[valid_cells]
+masked_values <- forest_tws_masked_check[valid_cells]
 
+# Check if values are identical
+all_values_match <- all(original_value == masked_values)
+cat("All unmasked values remain unchanged:", all_values_match, "\n")
 
-
-
+# If they don't all match, show statistics about the differences
+if(!all_values_match){
+  differences <- original_values - masked_values
+  cat("Number of cells with different values:", sum(differences != 0), "\n")
+  cat("Mean difference:", mean(differences), "\n")
+  cat("Range of differences:", range(differences), "\n")
+} 
 
 
 
