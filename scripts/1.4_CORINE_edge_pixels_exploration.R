@@ -7,9 +7,17 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-# One of the 15km rasters
+# Forest -> TWS
 forest_tws_15km <- rast(here("data", "derived_data", 
                              "clc_status_15km_forest_tws.tif"))
+
+# TWS -> Forest
+tws_forest_15km <- rast(here("data", "derived_data", 
+                             "clc_status_15km_tws_forest.tif"))
+
+# All -> Urban
+all_urban_15km <- rast(here("data", "derived_data", 
+                            "clc_status_15km_all_urban_combined.tif"))
 
 # Norway shapefile
 norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
@@ -150,7 +158,7 @@ ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogr
 ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.svg"),
        plot = edge_histogram, width = 10, height = 6, dpi = 300)
 
-
+# 5. REMOVE CELLS WITH >50% OUTSIDE OF BOUNDARY --------------------------------
 
 
 
