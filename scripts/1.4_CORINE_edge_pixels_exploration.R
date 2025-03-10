@@ -17,6 +17,8 @@ norway <- vect(here("data", "derived_data", "reprojected_norway_shapefile",
 
 # 2. GET PIXELS (PARTIALLY) OUTSIDE OF SHAPEFILE -------------------------------
 
+## 2.1. Prepare data -----------------------------------------------------------
+
 # Create template raster with same extent as resolution from CLC
 template_raster <- forest_tws_15km[[1]]
 
@@ -32,6 +34,8 @@ cell_polygons_sf <- st_as_sf(cell_polygons)
 
 # Convert shapefile to sf object
 norway_sf <- st_as_sf(norway)
+
+## 2.2. Calculate area outside and within the boundary -------------------------
 
 # Calculate area of each cell
 cell_polygons_sf$total_area <- st_area(cell_polygons_sf)
@@ -60,4 +64,34 @@ edge_cells <- cells_within |>
   mutate(cell_id = row_number(),
          is_edge_cell = TRUE,
          is_mostly_outside = percent_outside > 50) |>
-  mutate(area_km2 = as.numeric())
+  select(cell_id, x, y, percent_outside, is_mostly_outside, geometry)
+
+# 3. CREATE SUMMARY INFORMATION TABLE ------------------------------------------
+
+# Get the total number of cells in the raster
+total_cells <- ncell(template_raster)
+
+# Get the cells that have data
+cells_with_data <- global(template_raster, function(x) sum(!is.na(x)))[1,1]
+
+# Calculate % of cells that are edge cells
+percent_edge <- (nrow(edge_cells) / cells_with_data) * 100
+
+# Create df with summary statistics
+edge_summary_statistics <- data.frame(Statistic = c("Total number of edge cells",
+                                                    "Mean percent outside boundary",
+                                                    "Median percent outside boundary",
+                                                    "Minimum percent outside boundary",
+                                                    "Number of cells mostly outside (>50%)",
+                                                    "% of data cells that are edge cells",
+                                                    "Total cells in raster",
+                                                    "Cells with data"),
+                                      Value = c(nrow(edge_cells),
+                                                round(mean(edge_cells$percent_outside), 2),
+                                                round(median(edge_cells$percent_outside), 2),
+                                                round(min(edge_cells$percent_outside), 2),
+                                                round(max(edge_cells$percent_outside), 2),
+                                                sum(edge_cells$is_mostly_outside),
+                                                round(percent_edge, 2),
+                                                total_cells,
+                                                cells_with_data)) 
