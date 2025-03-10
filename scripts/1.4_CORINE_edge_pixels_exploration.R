@@ -294,8 +294,22 @@ if(!all_values_match){
   cat("Range of differences:", range(differences), "\n")
 } 
 
+## 6.4. Save masked layers to file ---------------------------------------------
 
+# Forest -> TWS
+writeRaster(forest_tws_15km_masked, 
+            here("data", "derived_data", "clc_status_15km_forest_tws_masked.tif"),
+            overwrite = TRUE)
 
+# TWS -> Forest
+writeRaster(tws_forest_15km_masked, 
+            here("data", "derived_data", "clc_status_15km_tws_forest_masked.tif"),
+            overwrite = TRUE)
+
+# All -> Urban
+writeRaster(all_urban_15km_masked, 
+            here("data", "derived_data", "clc_status_15km_all_urban_combined_masked.tif"),
+            overwrite = TRUE)
 
 
 
