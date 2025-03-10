@@ -4,6 +4,15 @@ format: html
 editor: visual
 ---
 
+```{r packages}
+#| label: packages
+#| echo: false
+#| include: false
+
+library(here)
+library(kableExtra)
+```
+
 # Project Overview
 
 ## Objective
@@ -256,6 +265,24 @@ p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway,
 Before proceeding with analysis, we need to check which pixels are partially off the coast. It is especially important to remove the 15km x 15km pixels where \>50% of their area is outside of the Norway boundary.
 
 Using the Norway shapefile as the boundary also means that we will exclude 15km x 15km cells where \>50% of the area falls outside of the country, i.e. is in Sweden, Findland, or Russia. However, I don't think there is any way to distinguish between what part of the boundary is coastline and what part of it is a border.
+
+```{r edge pixels summary}
+#| lavel: edge-pixels-summary
+#| echo: false
+
+# Load summary statistics
+load(here("data", "derived_data", "edge_summary_stats_15km.rda"))
+
+# Create table
+edge_summary_stats_15km |>
+  kbl(caption = "Table 1: Summary of Edge Pixels in 15km Rasters",
+      col.names = c("Statistic", "Value"),
+      align = c("l", "r")) |>
+  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+                full_width = FALSE) |>
+  column_spec(1, bold = TRUE) |>
+  column_spec(2, color = "steelblue")
+```
 
 ## Turnover Calculation (3.1)
 
