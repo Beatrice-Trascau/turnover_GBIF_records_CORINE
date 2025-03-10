@@ -66,6 +66,9 @@ edge_cells <- cells_within |>
          is_mostly_outside = percent_outside > 50) |>
   select(cell_id, x, y, percent_outside, is_mostly_outside, geometry)
 
+# Save edfe cell data to file
+save(edge_cells, file = here("data", "derived_data", "edge_cells_15km.rda"))
+
 # 3. CREATE SUMMARY INFORMATION TABLE ------------------------------------------
 
 # Get the total number of cells in the raster
@@ -97,17 +100,12 @@ edge_summary_stats_15km <- data.frame(Statistic = c("Total number of edge cells"
                                                 total_cells,
                                                 cells_with_data))
 
-# 4. CREATE SIMPLIFIED DATASET FOR FILTERING -----------------------------------
+# Save summary statistics dfs to file
+save(edge_summary_stats_15km, file = here("data", "derived_data", "edge_summary_stats_15km.rda"))
 
-# Get only cell coordinates and % outside
-edge_cell_locations <- edge_cells |>
-  st_drop_geometry() |>
-  select(x, y, percent_outside, is_mostly_outside) |>
-  arrange(desc(percent_outside))
+# 4. VISUALISE EDGE PIXELS -----------------------------------------------------
 
-# 5. VISUALISE EDGE PIXELS -----------------------------------------------------
-
-## 5.1. Map of edge pixels -----------------------------------------------------
+## 4.1. Map of edge pixels -----------------------------------------------------
 
 # Create map of the edge pixels
 edge_map <- ggplot() +
@@ -133,7 +131,7 @@ ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"),
 ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.svg"),
        plot = edge_map, width = 10, height = 6, dpi = 300)
 
-## 5.2. Histogram of values for % outside of the the boundary ------------------
+## 4.2. Histogram of values for % outside of the the boundary ------------------
 
 # Plot histogram
 edge_histogram <- ggplot(edge_cells, aes(x=percent_outside)) + 
@@ -153,10 +151,6 @@ ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogr
        plot = edge_histogram, width = 10, height = 6, dpi = 300)
 
 
-# 6. SAVE SUMMARY DFS ----------------------------------------------------------
 
-# Save edge cell data
-save(edge_cells, file = here("data", "derived_data", "edge_cells_15km.rda"))
 
-# Save summary statistics dfs
-save(edge_summary_stats_15km, file = here("data", "derived_data", "edge_summary_stats_15km.rda"))
+
