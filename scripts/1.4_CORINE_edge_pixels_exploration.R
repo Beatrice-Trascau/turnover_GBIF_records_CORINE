@@ -168,9 +168,7 @@ cells_to_mask <- edge_cells |>
   st_drop_geometry() |>
   select(x, y)
 
-## 5.2. Create mask for each raster --------------------------------------------
-
-### 5.2.1. Forest -> TWS -------------------------------------------------------
+## 5.2. Mask cells from Forest -> TWS ------------------------------------------
 
 # Create copy of input raster
 forest_tws_15km_masked <- forest_tws_15km
@@ -190,8 +188,7 @@ for(i in 1:nlyr(forest_tws_15km_masked)){
   forest_tws_15km_masked[[i]] <- current_layer
 }
 
-### 5.2.2. TWS -> Forest -------------------------------------------------------
-
+## 5.3. Mask cells from TWS -> Forest ------------------------------------------
 # Create copy of input raster
 tws_forest_15km_masked <- tws_forest_15km
 
@@ -210,7 +207,7 @@ for(i in 1:nlyr(tws_forest_15km_masked)){
   tws_forest_15km_masked[[i]] <- current_layer
 }
 
-### 5.2.3. All -> Urban --------------------------------------------------------
+## 5.4. Mask cells from All -> Urban -------------------------------------------
 
 # Create copy of input raster
 all_urban_15km_masked <- all_urban_15km
