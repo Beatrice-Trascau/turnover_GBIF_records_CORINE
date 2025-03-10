@@ -227,6 +227,28 @@ for(i in 1:nlyr(all_urban_15km_masked)){
   all_urban_15km_masked[[i]] <- current_layer
 }
 
+# 6. Validation checks ---------------------------------------------------------
+
+## 6.1. Check that correct cells were removed ----------------------------------
+
+# Compare numer of cells that should be removed with the cells that were actually removed
+expecte_masked_cells <- nrow(cells_to_mask) #434
+
+# Check the first layer or each raster
+forest_masked_check <- is.na(forest_tws_15km_masked[[1]]) & !is.na(forest_tws_15km[[1]])
+tws_masked_check <- is.na(tws_forest_15km_masked[[1]]) & !is.na(tws_forest_15km[[1]])
+urban_masked_check <- is.na(all_urban_15km_masked[[1]]) & !is.na(all_urban_15km[[1]])
+
+cat("Actual cells masked in forest_tws:", 
+    global(forest_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
+cat("Actual cells masked in tws_forest:", 
+    global(tws_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
+cat("Actual cells masked in all_urban:", 
+    global(urban_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
+
+
+
+
 
 
 
