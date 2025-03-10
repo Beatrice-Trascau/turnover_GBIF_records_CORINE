@@ -229,7 +229,7 @@ for(i in 1:nlyr(all_urban_15km_masked)){
 
 # 6. Validation checks ---------------------------------------------------------
 
-## 6.1. Check that correct cells were removed ----------------------------------
+## 6.1. Check that correct amount of cells were removed ------------------------
 
 # Compare numer of cells that should be removed with the cells that were actually removed
 expecte_masked_cells <- nrow(cells_to_mask) #434
@@ -327,7 +327,46 @@ if(!all_values_match){
   cat("Range of differences:", range(differences), "\n")
 } 
 
-## 6.5. Save masked layers to file ---------------------------------------------
+## 6.5. Check that the correct cells were masked -------------------------------
+
+# Create raster to mark cells that should be masked
+should_be_masked <- template_raster
+
+# Set all cells to 0
+should_be_masked[] <- 0
+
+# Get cell indices
+cell_index <- cellFromXY(should_be_masked, as.matrix(cells_to_mask[, c("x", "y")]))
+
+# Set target cells to 1
+should_be_masked[cell_index] <- 1
+
+# Create a zero raster with the same structure showing which cells were actually masked
+actually_masked <- forest_tws_15km[[1]] * 0
+
+# Set masked cells to 0
+actually_masked[forest_masked_check] <- 1
+
+# Create a comparison raster with different outcomes:
+# 0 = not affected (not masked or already NA)
+# 1 = correctly masked (should be masked and was masked)
+# 2 = incorrectly not masked (should have been masked but wasn't)
+# 3 = incorrectly masked (should not have been masked but was)
+mask_comparison <- should_be_masked * 0
+mask_comparison[should_be_masked == 1 & actually_masked == 1] <- 1
+mask_comparison[should_be_masked == 1 & actually_masked == 0] <- 2
+mask_comparison[should_be_masked == 0 & actually_masked == 1] <- 3
+
+# Count the cells in each category
+cells_correctly_masked <- global(mask_comparison == 1, "sum", na.rm=TRUE)[1,1]
+cells_missed <- global(mask_comparison == 2, "sum", na.rm=TRUE)[1,1]
+cells_wrongly_masked <- global(mask_comparison == 3, "sum", na.rm=TRUE)[1,1]
+
+cat("Cells correctly masked:", cells_correctly_masked, "\n") #426
+cat("Cells that should be masked but weren't:", cells_missed, "\n") #0
+cat("Cells that shouldn't be masked but were:", cells_wrongly_masked, "\n") #0
+
+## 6.6. Save masked layers to file ---------------------------------------------
 
 # Forest -> TWS
 writeRaster(forest_tws_15km_masked, 
