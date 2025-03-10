@@ -94,4 +94,34 @@ edge_summary_statistics <- data.frame(Statistic = c("Total number of edge cells"
                                                 sum(edge_cells$is_mostly_outside),
                                                 round(percent_edge, 2),
                                                 total_cells,
-                                                cells_with_data)) 
+                                                cells_with_data))
+
+# 4. CREATE SIMPLIFIED DATASET FOR FILTERING -----------------------------------
+
+# Get only cell coordinates and % outside
+edge_cell_locations <- edge_cells |>
+  st_drop_geometry() |>
+  select(x, y, percent_outside, is_mostly_outside) |>
+  arrange(desc(percent_outside))
+
+# 5. VISUALISE EDGE PIXELS -----------------------------------------------------
+
+# Create map of the edge pixels
+edge_map <- ggplot() +
+  geom_sf(data = norway_sf, fill = "lightgrey", color = "black") +
+  geom_sf(data = edge_cells, aes(color = percent_outside, size = percent_outside)) +
+  scale_color_viridis_c(option = "magma", direction = -1,
+                        name = "% Outside\nBoundary") +
+  scale_size_continuous(range = c(0.5, 3), guide = "none") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank()) +
+  annotation_north_arrow(location = "br", which_north = "true",
+                         pad_y = unit(0.5, "cm"),
+                         style = north_arrow_fancy_orienteering()) +
+  annotation_scale(location = "bl", width_hint = 0.3)
+
+# Save as supplementary information
+ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"),
+       plot = edge_map, width = 10, height = 6, dpi = 300)
