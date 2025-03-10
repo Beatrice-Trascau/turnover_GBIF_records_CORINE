@@ -244,9 +244,42 @@ cat("Actual cells masked in forest_tws:",
 cat("Actual cells masked in tws_forest:", 
     global(tws_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
 cat("Actual cells masked in all_urban:", 
-    global(urban_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426
+    global(urban_masked_check, "sum", na.rm=TRUE)[1,1], "\n") #426 - 8 cells are not masked, why?
 
-## 6.2. Visual check of masked cells -------------------------------------------
+## 6.2. Check why the 8 cells are missing --------------------------------------
+
+# Check if any cells_to_mask coordinates fall outside the raster extent
+raster_extent <- ext(forest_tws_15km)
+outside_extent <- cells_to_mask |>
+  mutate(outside = x < raster_extent[1] | x > raster_extent[2] | 
+           y < raster_extent[3] | y > raster_extent[4])
+cat("Cells outside raster extent:", sum(outside_extent$outside), "\n") 
+ # Cells outside raster extent: 0
+
+# Check if any cells are already NA in the unmasked layer
+tryCatch({
+  already_na_forest <- check_na_values(forest_tws_15km[[1]], cells_to_mask)
+  cat("Cells already NA in forest_tws:", already_na_forest, "\n")
+}, error = function(e) {
+  cat("Error checking forest_tws:", e$message, "\n")
+}) # Cells already NA in forest_tws: 8
+
+tryCatch({
+  already_na_tws <- check_na_values(tws_forest_15km[[1]], cells_to_mask)
+  cat("Cells already NA in tws_forest:", already_na_tws, "\n")
+}, error = function(e) {
+  cat("Error checking tws_forest:", e$message, "\n")
+}) # Cells already NA in tws_forest: 8
+
+tryCatch({
+  already_na_urban <- check_na_values(all_urban_15km[[1]], cells_to_mask)
+  cat("Cells already NA in all_urban:", already_na_urban, "\n")
+}, error = function(e) {
+  cat("Error checking all_urban:", e$message, "\n")
+}) # Cells already NA in all_urban: 8
+
+
+## 6.3. Visual check of masked cells -------------------------------------------
 
 # Create a raster with the masked cells
 masked_cell_raster <- forest_tws_15km_masked[[1]]
@@ -269,7 +302,7 @@ ggplot() +
                                labels = c("0" = "Unchanged", "1" = "Masked"))) +
   theme_classic()
 
-## 6.3. Check that unmasked cells are unchanged --------------------------------
+## 6.4. Check that unmasked cells are unchanged --------------------------------
 
 # Compare values in the non-masked cells between original and masked rasters
 forest_tws_check <- forest_tws_15km[[1]]
@@ -294,7 +327,7 @@ if(!all_values_match){
   cat("Range of differences:", range(differences), "\n")
 } 
 
-## 6.4. Save masked layers to file ---------------------------------------------
+## 6.5. Save masked layers to file ---------------------------------------------
 
 # Forest -> TWS
 writeRaster(forest_tws_15km_masked, 
@@ -311,7 +344,4 @@ writeRaster(all_urban_15km_masked,
             here("data", "derived_data", "clc_status_15km_all_urban_combined_masked.tif"),
             overwrite = TRUE)
 
-
-
-
-
+# END OF SCRIPT ----------------------------------------------------------------
