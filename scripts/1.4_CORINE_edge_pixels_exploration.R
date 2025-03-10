@@ -78,7 +78,7 @@ cells_with_data <- global(template_raster, function(x) sum(!is.na(x)))[1,1]
 percent_edge <- (nrow(edge_cells) / cells_with_data) * 100
 
 # Create df with summary statistics
-edge_summary_statistics <- data.frame(Statistic = c("Total number of edge cells",
+edge_summary_stats_15km <- data.frame(Statistic = c("Total number of edge cells",
                                                     "Mean percent outside boundary",
                                                     "Median percent outside boundary",
                                                     "Minimum percent outside boundary",
@@ -137,4 +137,4 @@ ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.svg"),
 save(edge_cells, file = here("data", "derived_data", "edge_cells_15km.rda"))
 
 # Save summary statistics dfs
-save(edge_summary_statistics, file = here("data", "derived_data", "edge_summary_stats_15km.rda"))
+save(edge_summary_stats_15km, file = here("data", "derived_data", "edge_summary_stats_15km.rda"))
