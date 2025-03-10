@@ -190,8 +190,45 @@ for(i in 1:nlyr(forest_tws_15km_masked)){
   forest_tws_15km_masked[[i]] <- current_layer
 }
 
+### 5.2.2. TWS -> Forest -------------------------------------------------------
 
+# Create copy of input raster
+tws_forest_15km_masked <- tws_forest_15km
 
+# Loop through each raster and set the cells >50% outside to NA
+for(i in 1:nlyr(tws_forest_15km_masked)){
+  # Get the current layer
+  current_layer <- tws_forest_15km[[i]]
+  
+  # Convert coordinates to cell indices
+  cells_idx <- cellFromXY(current_layer, as.matrix(cells_to_mask[, c("x", "y")]))
+  
+  # Set these cells to NA
+  current_layer[cells_idx] <- NA
+  
+  # Update the layer in the stack
+  tws_forest_15km_masked[[i]] <- current_layer
+}
+
+### 5.2.3. All -> Urban --------------------------------------------------------
+
+# Create copy of input raster
+all_urban_15km_masked <- all_urban_15km
+
+# Loop through each raster and set the cells >50% outside to NA
+for(i in 1:nlyr(all_urban_15km_masked)){
+  # Get the current layer
+  current_layer <- all_urban_15km[[i]]
+  
+  # Convert coordinates to cell indices
+  cells_idx <- cellFromXY(current_layer, as.matrix(cells_to_mask[, c("x", "y")]))
+  
+  # Set these cells to NA
+  current_layer[cells_idx] <- NA
+  
+  # Update the layer in the stack
+  all_urban_15km_masked[[i]] <- current_layer
+}
 
 
 
