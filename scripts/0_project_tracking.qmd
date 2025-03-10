@@ -272,6 +272,7 @@ Across, Norway the distribution of the "edge" pixels is as follows:
 ```{r Figure S1}
 #| label: supplementary_figure1
 #| fig-cap: "Map of edge pixels"
+#| out-width: "491px"
 
 knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
 ```
@@ -299,6 +300,7 @@ The percentages of areas falling outside of the Norway shapefile boundaries, are
 ```{r Figure S2}
 #| label: supplementary_figure2
 #| fig-cap: "Histogram of edge pixels"
+#| out-width: "491px"
 
 knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
 ```
@@ -310,6 +312,7 @@ Further validation also revealed that the masking did not alter the values of th
 ```{r Figure S3}
 #| label: supplementary_figure3
 #| fig-cap: "Validation of edge pixles"
+#| out-width: "491px"
 
 knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
 ```
