@@ -107,6 +107,8 @@ edge_cell_locations <- edge_cells |>
 
 # 5. VISUALISE EDGE PIXELS -----------------------------------------------------
 
+## 5.1. Map of edge pixels -----------------------------------------------------
+
 # Create map of the edge pixels
 edge_map <- ggplot() +
   geom_sf(data = norway_sf, fill = "lightgrey", color = "black") +
@@ -130,6 +132,26 @@ ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"),
 # Save as as supplementary information (.svg)
 ggsave(filename = here("figures", "SupplementaryFigure1_Edge_Pixels_15km.svg"),
        plot = edge_map, width = 10, height = 6, dpi = 300)
+
+## 5.2. Histogram of values for % outside of the the boundary ------------------
+
+# Plot histogram
+edge_histogram <- ggplot(edge_cells, aes(x=percent_outside)) + 
+  geom_histogram(binwidth = 10, boundary = 0, 
+                 fill = "#C3B1E1", color = "#e9ecef", alpha = 0.9) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) +
+  labs(x = "% of raster cell outside of boundary",
+       y = "Count") + 
+  theme_classic()
+
+# Save as supplementary information (.png)
+ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"),
+       plot = edge_histogram, width = 10, height = 6, dpi = 300)
+
+# Save as as supplementary information (.svg)
+ggsave(filename = here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.svg"),
+       plot = edge_histogram, width = 10, height = 6, dpi = 300)
+
 
 # 6. SAVE SUMMARY DFS ----------------------------------------------------------
 
