@@ -244,6 +244,8 @@ p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway,
 
 ## Edge Pixels Exploration (1.4)
 
+### Update 10.03.2025
+
 Before proceeding with analysis, we need to check which pixels are partially off the coast. It is especially important to remove the 15km x 15km pixels where \>50% of their area is outside of the Norway boundary.
 
 Using the Norway shapefile as the boundary also means that we will exclude 15km x 15km cells where \>50% of the area falls outside of the country, i.e. is in Sweden, Findland, or Russia. However, I don't think there is any way to distinguish between what part of the boundary is coastline and what part of it is a border.
