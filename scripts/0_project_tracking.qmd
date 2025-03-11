@@ -306,7 +306,17 @@ Further validation also revealed that the masking did not alter the values of th
 
 ## Turnover Calculation (3.1)
 
-**Updated: 12.02.2025**
+### Update 10.02.2025 - Before & After Periods
+
+| LC Time Period | Before    | After     |
+|----------------|-----------|-----------|
+| 2000-2006      | 1997-2000 | 2006-2012 |
+| 2006-2012      | 2003-2006 | 2012-2015 |
+| 2012-2018      | 2008-2012 | 2015-2018 |
+
+: Before & After periods for each LC time period
+
+### Update 12.02.2025 - Jaccard's Dissimilarity Index
 
 Aim: Calculate Jaccard's dissimilarity index for each land cover cell between the "before" and "after" occurrences. Jaccard's dissimilarity index was chosen because it tends to better deal with the lack of absences and biased sampling we often find with GBIF occurrences. Jaccard's index:
 
@@ -322,7 +332,7 @@ $d_{j} = 0$ when $|A \cap B| = 1$, which can only happen if there is total overl
 
 $d_{j} = 1$ when $|A \cap B| = 0$, which can only happen if there is 0 overlap between species in $T_{1}$ (A) and species in $T_{2}$ (B) = i.e. complete turnover.
 
-### Classification of occurrences
+### Update 13.02.2025 - Classification of occurrences
 
 The first issue I ran into had to do with how the occurrences were classified in the before and after a specific time period. Initially we were using the code below:
 
@@ -377,11 +387,11 @@ clean_occurrences_sf <- bind_rows(period1_occurrences,
 
 ```
 
-### Cell ID extraction
+### Update 14.02.2025 - Cell ID extraction
 
 Then, the next problem was that we were extracting cell IDs for the occurrences, then extracting land cover classes for the cell IDs and then adding the land cover values to the occurrence df based on the cell IDs. Switched approaches to instead create a spatial dataframe from the land cover raster and spatial points from the occurrences.
 
-### Function for Turnover Calculation
+### Update 14.02.2025 - Function for Turnover Calculation
 
 The old turnover calculation function looked like this:
 
@@ -458,26 +468,9 @@ calculate_jaccard_for_periods <- function(df, before_period, after_period, chang
   
   return(jaccard_results)
 }
-
 ```
 
-## Update 14.02.2025
-
-After meeting with supervisors, decided to proceed with turnover calculations only at 15km resolution.
-
-Will also run an exploratory glm: turnover \~ LC_Change + LC_No_Change + $\Delta$recorder_effort + recorder_effort + time_period
-
-However, there are several questions to clarify about this:
-
-1.  Should we include LC_No_Change = i.e. should we have a measure of the % of small pixels in the large pixels that remain forest (for example)?
-
-2.  If so, will there be autocorrelation issues?
-
-3.  Is $\Delta$recorder_effort = recorder_effort(before) - recorder_effort(after)?
-
-4.  Is recoder_effort = total number of occurrences in the before + after period?
-
-5.  Do we run one model separately for each transition (i.e. F -\> TWS, TWS -\> F, All -\> UF)?
+# Turnover Models (4.1)
 
 ## Update 06.03.2025
 
@@ -511,12 +504,4 @@ $LC_{NoChange}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells
 
 ## Further Questions
 
-# Before & After Periods
-
-| LC Time Period | Before    | After     |
-|----------------|-----------|-----------|
-| 2000-2006      | 1997-2000 | 2006-2012 |
-| 2006-2012      | 2003-2006 | 2012-2015 |
-| 2012-2018      | 2008-2012 | 2015-2018 |
-
-: Before & After periods for each LC time period
+# 
