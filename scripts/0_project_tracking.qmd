@@ -49,29 +49,13 @@ The main objective of the project is to understand the effect of land cover chan
 
 # Analysis Log
 
-# Before & After Periods
+## CORINE Layer Aggregation (1.2)
 
-| LC Time Period | Before    | After     |
-|----------------|-----------|-----------|
-| 2000-2006      | 1997-2000 | 2006-2012 |
-| 2006-2012      | 2003-2006 | 2012-2015 |
-| 2012-2018      | 2008-2012 | 2015-2018 |
-
-: Before & After periods for each LC time period
-
-## Layer Aggregation (1.2)
-
-**Updated 10.02.2025**
+### Update 10.01.2025
 
 Aim: Aggregate original CLC Status layers to 1km, 5km, and 15km grid size.
 
-Method:
-
--   Initially used function to calculate % change in each land cover category
-
-    -   Did this by counting the number of "small" pixels with that specific land cover category within the "big" pixels
-
-    -   Used the function below:
+Initially used function to calculate % change in each land cover category. I did this by counting the number of "small" pixels with that specific land cover category within the "big" pixels, using the function:
 
 ```{r}
 #| label: old-aggregation-function
@@ -89,7 +73,9 @@ calculate_counts <- function(x) {
 }
 ```
 
-Changed 07.02.2025 to use the following functions instead:
+### Update 07.02.2025
+
+Changed the method to create a dummy raster from the T1 raster, which compares values to T2 raster and gives the cell a value (0,1,2,3) depending on the type of conversion. This creates one layer in the raster for each of the specific transitions. Used function below:
 
 ```{r}
 #| label: new-aggregation-function
@@ -197,8 +183,6 @@ for(res in resolutions) {
               overwrite = TRUE)
   
 }
-
-
 ```
 
 This leaves us with an urban raster with 3 layers: "2000-2006_all_to_urban", "2006-2012_all_to_urban" and "2012-2018_all_to_urban", which will be much easier to work with.
@@ -206,34 +190,32 @@ This leaves us with an urban raster with 3 layers: "2000-2006_all_to_urban", "20
 In the case of the forest_tws\_ and tws_forest_100m we have the following layer names:
 
 ```         
-layer_number    layer_name
-1   2000-2006_Non-forest
-2   2000-2006_Forest no change
-3   2000-2006_Forest to TWS
-4   2000-2006_Other forest conversion
-5   2006-2012_Non-forest
-6   2006-2012_Forest no change
-7   2006-2012_Forest to TWS
-8   2006-2012_Other forest conversion
-9   2012-2018_Non-forest
-10  2012-2018_Forest no change
-11  2012-2018_Forest to TWS
-12  2012-2018_Other forest conversion
+layer_name
+2000-2006_Non-forest
+2000-2006_Forest no change
+2000-2006_Forest to TWS
+2000-2006_Other forest conversion
+2006-2012_Non-forest
+2006-2012_Forest no change
+2006-2012_Forest to TWS
+2006-2012_Other forest conversion
+2012-2018_Non-forest
+2012-2018_Forest no change
+2012-2018_Forest to TWS
+2012-2018_Other forest conversion
 
-
-layer_number    layer_name
-1   2000-2006_Non-TWS
-2   2000-2006_TWS no change
-3   2000-2006_TWS to Forest
-4   2000-2006_Other TWS conversion
-5   2006-2012_Non-TWS
-6   2006-2012_TWS no change
-7   2006-2012_TWS to Forest
-8   2006-2012_Other TWS conversion
-9   2012-2018_Non-TWS
-10  2012-2018_TWS no change
-11  2012-2018_TWS to Forest
-12  2012-2018_Other TWS conversion
+2000-2006_Non-TWS
+2000-2006_TWS no change
+2000-2006_TWS to Forest
+2000-2006_Other TWS conversion
+2006-2012_Non-TWS
+2006-2012_TWS no change
+2006-2012_TWS to Forest
+2006-2012_Other TWS conversion
+2012-2018_Non-TWS
+2012-2018_TWS no change
+2012-2018_TWS to Forest
+2012-2018_Other TWS conversion
 ```
 
 Since we are only interested in 2000-2006_Forest to TWS, 2006-2012_Forest to TWS, 2012-2018_Forest to TWS and 2000-2006_TWS to Forest, 2006-2012_TWS to Forest and 2012-2018_TWS to Forest respectively, these are easy enough to call when we use them with the \[\[\]\] operator. And are all the layers 3, 7, and 11, which is why we use the following code when we use them:
@@ -260,7 +242,7 @@ p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway,
                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
 ```
 
-## Identify Pixels \>50% off the coast
+## Edge Pixels Exploration (1.4)
 
 Before proceeding with analysis, we need to check which pixels are partially off the coast. It is especially important to remove the 15km x 15km pixels where \>50% of their area is outside of the Norway boundary.
 
@@ -528,3 +510,13 @@ $LC_{NoChange}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells
 ## Planned Improvements
 
 ## Further Questions
+
+# Before & After Periods
+
+| LC Time Period | Before    | After     |
+|----------------|-----------|-----------|
+| 2000-2006      | 1997-2000 | 2006-2012 |
+| 2006-2012      | 2003-2006 | 2012-2015 |
+| 2012-2018      | 2008-2012 | 2015-2018 |
+
+: Before & After periods for each LC time period
