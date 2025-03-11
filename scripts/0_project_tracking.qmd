@@ -271,11 +271,13 @@ Across, Norway the distribution of the "edge" pixels is as follows:
 
 ```{r Figure S1}
 #| label: supplementary_figure1
-#| fig-cap: "Map of edge pixels"
-#| out-width: "491px"
+#| fig_cap: "Figure 1: Map of Edge Pixels Across Norway"
+#| eval: false
 
-knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
+#knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
 ```
+
+![](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
 
 ```{r edge pixels summary}
 #| lavel: edge-pixels-summary
@@ -299,11 +301,13 @@ The percentages of areas falling outside of the Norway shapefile boundaries, are
 
 ```{r Figure S2}
 #| label: supplementary_figure2
-#| fig-cap: "Histogram of edge pixels"
-#| out-width: "491px"
+#| fig-cap: "Histogram of % area outside boundary of edge pixels"
+#| eval: false
 
-knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
+#knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
 ```
+
+![](images/SupplementaryFigure2_Edge_Pixels_15km_Histogram.png){width="531"}
 
 Data validation revealed that 426 cells were masked, instead of the expected 434. This meant that 8 cells were unaccounted for. Further exploration revealed that the specific 8 cells were already set to NA in the raster layers before the masking.
 
@@ -311,11 +315,13 @@ Further validation also revealed that the masking did not alter the values of th
 
 ```{r Figure S3}
 #| label: supplementary_figure3
-#| fig-cap: "Validation of edge pixles"
-#| out-width: "491px"
+#| fig-cap: "Validation of edge pixels"
+#| eval: false
 
-knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
+#knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
 ```
+
+![](images/SupplementaryFigure3_MaskingValidation.png){width="498"}
 
 ## Turnover Calculation (3.1)
 
