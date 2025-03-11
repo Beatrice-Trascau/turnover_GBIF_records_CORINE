@@ -23,29 +23,29 @@ The main objective of the project is to understand the effect of land cover chan
 
 1.  Do land cover changes impact rates of temporal turnover?
 
-    1.  If so, to what extent and how?
-
 2.  Do land cover changes impact the taxonomic composition of species assemblages?
-
-    1.  If so, to what extent and how?
 
 3.  Do signals of change (temporal turnover) differ based on the spatial resolution used for analysis?
 
 ## File Structure
 
--   0_setup.R: Sets up all the packages and functions needed for the project
+-   0_setup: Sets up all the packages and functions needed for the project
 
--   1.1_CORINE_layers_preparation.R: load and prepare CORINE layers for further analysis
+-   1.1_CORINE_layers_preparation: load and prepare CORINE layers for further analysis
 
--   1.2_CORINE_aggregation.R: aggregate original rasters to 1km, 5km and 15km
+-   1.2_CORINE_aggregation: aggregate original rasters to 15km
 
--   1.3_CORINE_exploration.R: get summary statistics for land cover transitions
+-   1.3_CORINE_exploration: get summary statistics for land cover transitions
 
--   2.1_GBIF_import.R: import and download GBIF occurrences
+-   1.4_CORINE_edge_pixel_exploration: identify pixels outside of Norway boundary and remove them from raster
 
--   2.2_GBIF_data_cleaning.R: clean the downloaded occurrences
+-   2.1_GBIF_import: import and download GBIF occurrences
 
--   3.1_turnover_land_cover.R: calculate temporal turnover
+-   2.2_GBIF_data_cleaning: clean the downloaded occurrences
+
+-   2.3_GBIF_taxonomic_composition: explores taxonomic composition of occurrence records through time
+
+-   3.1_turnover_land_cover: calculate temporal turnover
 
 # Analysis Log
 
