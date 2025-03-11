@@ -110,36 +110,7 @@ analyse_forest_transition <- function(rast_t1, rast_t2) {
 
 Used an individual function for each of the three major land cover transitions assessed: Forests -\> Transitional Woodland Shurb, Transitional Woodland Shrub -\> Forests, all other classes -\> Urban.
 
-For the all other classes -\> Urban aggregation, the process was creating individual layer for each conversion. Therefore, the end product, for example all_urban_1km had the following layers:
-
-```         
-
-layer   layer_name
-1   2000-2006_Urban no change
-2   2000-2006_Forest to urban
-3   2000-2006_TWS to urban
-4   2000-2006_Complex agriculture to urban
-5   2000-2006_Agriculture & vegetation to urban
-6   2000-2006_Moors, heathland & grassland to urban
-7   2000-2006_Sparse vegetation to urban
-8   2000-2006_No urban conversion
-9   2006-2012_Urban no change
-10  2006-2012_Forest to urban
-11  2006-2012_TWS to urban
-12  2006-2012_Complex agriculture to urban
-13  2006-2012_Agriculture & vegetation to urban
-14  2006-2012_Moors, heathland & grassland to urban
-15  2006-2012_Sparse vegetation to urban
-16  2006-2012_No urban conversion
-17  2012-2018_Urban no change
-18  2012-2018_Forest to urban
-19  2012-2018_TWS to urban
-20  2012-2018_Complex agriculture to urban
-21  2012-2018_Agriculture & vegetation to urban
-22  2012-2018_Moors, heathland & grassland to urban
-23  2012-2018_Sparse vegetation to urban
-24  2012-2018_No urban conversion
-```
+For the all other classes -\> Urban aggregation, the process was creating individual layer for each conversion. Therefore, the end product, for example all_urban_1km had layers such as: 2000-2006_Sparse vegetation to urban, 2012-2018_Forest to urban etc.
 
 However, we are not interested in the specific changes to urban, so I summed all of the layers that are not "Urban no change" or "No urban conversion" for each time period using the loop below
 
@@ -185,33 +156,35 @@ This leaves us with an urban raster with 3 layers: "2000-2006_all_to_urban", "20
 
 In the case of the forest_tws\_ and tws_forest_100m we have the following layer names:
 
-```         
-layer_name
-2000-2006_Non-forest
-2000-2006_Forest no change
-2000-2006_Forest to TWS
-2000-2006_Other forest conversion
-2006-2012_Non-forest
-2006-2012_Forest no change
-2006-2012_Forest to TWS
-2006-2012_Other forest conversion
-2012-2018_Non-forest
-2012-2018_Forest no change
-2012-2018_Forest to TWS
-2012-2018_Other forest conversion
+```{r layer names}
+#| echo: false
 
-2000-2006_Non-TWS
-2000-2006_TWS no change
-2000-2006_TWS to Forest
-2000-2006_Other TWS conversion
-2006-2012_Non-TWS
-2006-2012_TWS no change
-2006-2012_TWS to Forest
-2006-2012_Other TWS conversion
-2012-2018_Non-TWS
-2012-2018_TWS no change
-2012-2018_TWS to Forest
-2012-2018_Other TWS conversion
+# Forest -> TWS
+forest_tws_15km <- rast(here("data", "derived_data", 
+                             "clc_status_15km_forest_tws.tif"))
+
+# TWS -> Forest
+tws_forest_15km <- rast(here("data", "derived_data", 
+                             "clc_status_15km_tws_forest.tif"))
+
+# Extract layer names
+forest_tws_names <- names(forest_tws_15km)
+tws_forest_names <- names(tws_forest_15km)
+layer_names <- rbind(forest_tws_names, tws_forest_names)
+numbers <- c(1: 24)
+
+# Put into single df
+layer_names_df <- data.frame(numbers, layer_names)
+
+# Create table
+layer_names_df |>
+  kbl(caption = "Table 2: Layer Names for 15km Rasters",
+      col.names = c("Number", "Layer Names"),
+      align = c("l", "r")) |>
+  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+                full_width = FALSE) |>
+  column_spec(1, bold = TRUE) |>
+  column_spec(2, color = "steelblue")
 ```
 
 Since we are only interested in 2000-2006_Forest to TWS, 2006-2012_Forest to TWS, 2012-2018_Forest to TWS and 2000-2006_TWS to Forest, 2006-2012_TWS to Forest and 2012-2018_TWS to Forest respectively, these are easy enough to call when we use them with the \[\[\]\] operator. And are all the layers 3, 7, and 11, which is why we use the following code when we use them:
@@ -237,6 +210,10 @@ p5_1km <- create_aggregated_panel(tws_forest_1km[[7]], norway,
 p6_1km <- create_aggregated_panel(tws_forest_1km[[11]], norway, 
                                   "TWS to Forest", "2012-2018", FALSE, FALSE)
 ```
+
+### Update 10.03.2025
+
+Decided to only do analyses at the 15km resolution. Therefore, the aggregation of the other resolutions was removed from scripts.
 
 ## Edge Pixels Exploration (1.4)
 
@@ -267,7 +244,7 @@ load(here("data", "derived_data", "edge_summary_stats_15km.rda"))
 
 # Create table
 edge_summary_stats_15km |>
-  kbl(caption = "Table 1: Summary of Edge Pixels in 15km Rasters",
+  kbl(caption = "Table 3: Summary of Edge Pixels in 15km Rasters",
       col.names = c("Statistic", "Value"),
       align = c("l", "r")) |>
   kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
