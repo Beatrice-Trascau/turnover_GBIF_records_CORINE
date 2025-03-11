@@ -8,7 +8,6 @@ editor: visual
 #| label: packages
 #| echo: false
 #| include: false
-
 library(here)
 library(kableExtra)
 library(knitr)
