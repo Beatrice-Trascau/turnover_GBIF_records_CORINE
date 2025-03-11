@@ -29,23 +29,19 @@ The main objective of the project is to understand the effect of land cover chan
 
 ## File Structure
 
--   0_setup: Sets up all the packages and functions needed for the project
+| Name                              | Function                                                                  |
+|--------------------------|----------------------------------------------|
+| 0_setup                           | Sets up all the packages and functions needed for the project             |
+| 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
+| 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
+| 1.3_CORINE_exploration            | Gets summary statistics for land cover transitions                        |
+| 1.4_CORINE_edge_pixel_exploration | Identifies pixels outside of Norway boundary and removes them from raster |
+| 2.1_GBIF_import                   | Imports and downloads GBIF occurrences                                    |
+| 2.2_GBIF_data_cleaning            | Cleans the downloaded occurrences                                         |
+| 2.3_GBIF_taxonomic_composition    | Explores taxonomic composition of occurrence records through time         |
+| 3.1_turnover_land_cover           | Calculates temporal turnover                                              |
 
--   1.1_CORINE_layers_preparation: load and prepare CORINE layers for further analysis
-
--   1.2_CORINE_aggregation: aggregate original rasters to 15km
-
--   1.3_CORINE_exploration: get summary statistics for land cover transitions
-
--   1.4_CORINE_edge_pixel_exploration: identify pixels outside of Norway boundary and remove them from raster
-
--   2.1_GBIF_import: import and download GBIF occurrences
-
--   2.2_GBIF_data_cleaning: clean the downloaded occurrences
-
--   2.3_GBIF_taxonomic_composition: explores taxonomic composition of occurrence records through time
-
--   3.1_turnover_land_cover: calculate temporal turnover
+: Table 1: Analysis Script Structure
 
 # Analysis Log
 
