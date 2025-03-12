@@ -7,25 +7,26 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-## 1.1. 100m CORINE Status Layers ----------------------------------------------
+## 1.1. 15km CORINE Status Layers ----------------------------------------------
 
 # Forest -> TWS
-forest_tws_100m <- rast(here("data", "derived_data", 
-                             "clc_status_100m_forest_tws.tif"))
+forest_tws_15km <- rast(here("data", "derived_data", 
+                             "clc_status_15km_forest_tws_masked.tif"))
 
 # TWS -> Forest
-tws_forest_100m <- rast(here("data", "derived_data", 
-                             "clc_status_100m_tws_forest.tif"))
+tws_forest_15km <- rast(here("data", "derived_data", 
+                             "clc_status_15km_tws_forest_masked.tif"))
 
 # All -> Urban
-all_urban_100m <- rast(here("data", "derived_data", 
-                            "clc_status_100m_all_urban.tif"))
+all_urban_15km <- rast(here("data", "derived_data", 
+                            "clc_status_15km_all_urban_combined_masked.tif"))
+
 
 ## 1.2. Cleaned GBIF Occurrences -----------------------------------------------
 
 # Cleaned occurrence records
 occurrences_norway <- fread(here("data", "derived_data", 
-                                 "clean_occurrences_100m.txt"))
+                                 "clean_occurrences_15km.txt"))
 
 # 2. SPATIAL REFERENCE GRID ----------------------------------------------------
 
