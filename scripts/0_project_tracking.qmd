@@ -31,7 +31,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|--------------------------|----------------------------------------------|
+|-----------------------------------|---------------------------------------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -441,6 +441,12 @@ calculate_jaccard_for_periods <- function(df, before_period, after_period, chang
   return(jaccard_results)
 }
 ```
+
+### Update 12.03.2025
+
+In the part of the turnover script where a reference grid was created, data validation steps were added to ensure that when assigning cell IDs, the correct amount of NA cells were excluded. Data validation revealed that from the total of 7931 cells in the rasters, 179 of them have an NA value. This is likely due to the masking performed on the edge cells as well as when the original CLC layers were cut to Norway.
+
+In the reference grid created, 7752 cells had non-NA values. This means that the number of cells with non-NA values is the same in the rasters and in the reference grid. We can then assume that the reference grid, and therefore the spatial dataframe created from the CLC layer, contain the correct data for the analysis.
 
 # Turnover Models (4.1)
 
