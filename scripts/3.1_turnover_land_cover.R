@@ -54,7 +54,7 @@ for(i in 1:nlyr(all_urban_15km)){
 }
 
 # Get indices of cells with valid data in at least one layer
-valud_cells <- which(valid_cell_mask)
+valid_cells <- which(valid_cell_mask)
 
 ## 2.2. Create reference grid with consecutive cell IDs ------------------------
 
@@ -87,3 +87,72 @@ cat("Cells without valid data in any layer:", all_na_count, "\n")
 cat("Verification check:", ncell(reference_grid_15km) - nrow(grid_15km_df) == all_na_count, "\n")
 cat("Proportion of grid with analyzable data:", 
     round(nrow(grid_15km_df)/ncell(reference_grid_15km)*100, 2), "%\n")
+
+# 3. EXTRACT LAND COVER CHANGE VALUES FOR EACH CELL ----------------------------
+
+## 3.1. Extract all land cover values ------------------------------------------
+
+# Create df for the land cover values for each cell
+lc_values <- data.frame(cell_id = grid_15km_df$cell_id)
+
+# Extract land cover values for Forest -> TWS
+for(layer_name in names(forest_tws_15km)){
+  layer_values <- terra::extract(forest_tws_15km[[layer_name]], 
+                          grid_15km_df[, c("x", "y")])
+  lc_values[[layer_name]] <- layer_values[, 2]
+}
+
+# Extract land cover values for TWS -> Forest
+for(layer_name in names(tws_forest_15km)){
+  layer_values <- terra::extract(tws_forest_15km[[layer_name]], 
+                                 grid_15km_df[, c("x", "y")])
+  lc_values[[layer_name]] <- layer_values[, 2]
+}
+
+# Extract land cover values for All -> Urban
+for(layer_name in names(all_urban_15km)){
+  layer_values <- terra::extract(all_urban_15km[[layer_name]], 
+                                 grid_15km_df[, c("x", "y")])
+  lc_values[[layer_name]] <- layer_values[, 2]
+}
+
+# Check if all layers were exracted
+ncol(lc_values)-1 #33
+nlyr(forest_tws_15km) #12
+nlyr(tws_forest_15km) #12
+nlyr(all_urban_15km) #9
+
+# 4. PREPARE OCCURRENCES FOR ANALYSIS ------------------------------------------
+
+## 4.1. Convert occurrences to spatial data ------------------------------------
+
+# Convert occurrence records to sf 
+occurrences_sf <- st_as_sf(occurrences_norway,
+                           coords = c("decimalLongitude", "decimalLatitude"),
+                           crs = 4326)
+
+# Re-project to match CORINE CRS
+occurrences_sf_reprojected <- st_transform(occurrences_sf,
+                                           st_crs(forest_tws_15km))
+
+
+## 4.2. Assign before and after period for each time period --------------------
+
+# Define time periods (2000-2006, 2006-2012, 2012-2018)
+occurrences_with_periods <- occurrences_sf_reprojected |>
+  mutate(period_2000_2006 = case_when(year %in% 1997:2000 ~ "1997-2000", #Before
+                                      year %in% 2006:2009 ~ "2006-2009", # After
+                                      TRUE ~ NA_character_),
+         period_2006_2012 = case_when(year %in% 2003:2006 ~ "2003-2006", #Before
+                                      year %in% 2012:2015 ~ "2012-2015", # After
+                                      TRUE ~ NA_character_),
+         period_2012_2018 = case_when(year %in% 2008:2012 ~ "2008-2012", #Before
+                                      year %in% 2015:2018 ~ "2015-2018", # After
+                                      TRUE ~ NA_character_)) |>
+  # Keep only rows with at least one period assigned
+  filter(!is.na(period_2000_2006) | !is.na(period_2006_2012) | !is.na(period_2012_2018))
+
+## 4.3. Assign grid cell IDs to occurrences ------------------------------------
+
+# Create a 1m buffer for grid cells to account for boundary precision issues
+
