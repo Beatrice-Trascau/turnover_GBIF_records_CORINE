@@ -181,6 +181,7 @@ raster_layers <- data.frame(
 
 # Display the table using kable for better formatting in quarto
 kable(raster_layers, caption = "Layer names of forest and TWS raster files") |>
+  kbl(caption = "Table 2: Raster Layer Names") |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
@@ -233,7 +234,7 @@ Across, Norway the distribution of the "edge" pixels is as follows:
 ![](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
 
 ```{r edge pixels summary}
-#| lavel: edge-pixels-summary
+#| label: edge-pixels-summary
 #| echo: false
 
 # Load summary statistics
