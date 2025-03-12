@@ -30,145 +30,60 @@ occurrences_norway <- fread(here("data", "derived_data",
 
 # 2. SPATIAL REFERENCE GRID ----------------------------------------------------
 
-# Create ID raster for cell extraction with same properties as CORINE
-land_cover_id <- forest_tws_100m[[1]]
+## 2.1. Identify non-NA cells across all raster stacks -------------------------
 
-#Assign each cell a unique ID from 1 to ncell
-land_cover_id[] <- 1:ncell(forest_tws_100m[[1]])
+# Create a reference grid raster with same properties as CLC
+reference_grid_15km <- forest_tws_15km[[1]]
 
-# Convert CORINE raster to spatial dataframe with correct cell IDs
-land_cover_grid <- as.data.frame(forest_tws_100m, xy = TRUE) |>
-  mutate(cell = terra::extract(land_cover_id, cbind(x, y))[,1]) |>
-  st_as_sf(coords = c("x", "y"), crs = st_crs(forest_tws_100m))
+# Create a cell validity mask with all values = FALSE
+valid_cell_mask <- rep(FALSE, ncell(reference_grid_15km))
 
-# 3. PREPARE OCCURRENCES FOR ANALYSIS ------------------------------------------
+# Check all layers in Forest -> TWS raster
+for(i in 1:nlyr(forest_tws_15km)){
+  valid_cell_mask <- valid_cell_mask | !is.na(values(forest_tws_15km[[i]]))
+}
 
-## 3.1. Convert occurrences to spatial data ------------------------------------
+# Check all layers in TWs -> Forest raster
+for(i in 1:nlyr(tws_forest_15km)){
+  valid_cell_mask <- valid_cell_mask | !is.na(values(tws_forest_15km[[i]]))
+}
 
-# Convert occurrence records df to sf object
-occurrences_sf <- st_as_sf(occurrences_norway,
-                           coords = c("decimalLongitude", "decimalLatitude"),
-                           crs = 4326)
+# Check all layers in TWs -> Forest raster
+for(i in 1:nlyr(all_urban_15km)){
+  valid_cell_mask <- valid_cell_mask | !is.na(values(all_urban_15km[[i]]))
+}
 
-# Re-project to match CORINE crs
-occurrences_sf_reprojected <- st_transform(occurrences_sf, 
-                                           st_crs(forest_tws_100m))
+# Get indices of cells with valid data in at least one layer
+valud_cells <- which(valid_cell_mask)
 
-## 3.2. Add before and after periods -------------------------------------------
+## 2.2. Create reference grid with consecutive cell IDs ------------------------
 
-# Filtering and classification is done step by step to avoid overwriting of
-  # years that are shared between periods
+# Create the grid with all cells = NA
+reference_grid_15km[] <- NA
 
-# First period (2000-2006 LC change, 1997-2000 = before, 2006-2012 = after)
-period1_occurrences <- occurrences_sf_reprojected |>
-  filter(year %in% c(1997:2000, 2006:2009)) |>
-  mutate(period = case_when(year %in% 1997:2000 ~ "1997-2000",
-                            year %in% 2006:2009 ~ "2006-2009"))
+# Assign consecutive cell IDs
+reference_grid_15km[valid_cells] <- 1:length(valid_cells)
 
-# Second period (2006-2012 LC change, 2003-2006 = before, 2012-2015 = after)
-period2_occurrences <- occurrences_sf_reprojected |>
-  filter(year %in% c(2003:2006, 2012:2015)) |>
-  mutate(period = case_when(year %in% 2003:2006 ~ "2003-2006",
-                            year %in% 2012:2015 ~ "2012-2015"))
+# Convert to dataframe with coordinates and cell IDs
+grid_15km_df <- as.data.frame(reference_grid_15km, xy = TRUE) |>
+  rename(cell_id = '2000-2006_Non-forest') |>
+  na.omit()
 
-# Third period (2012-2018 LC change, 2008-2012 = before, 2015-2018 = after)
-period3_occurrences <- occurrences_sf_reprojected |>
-  filter(year %in% c(2008:2012, 2015:2018)) |>
-  mutate(period = case_when(year %in% 2008:2012 ~ "2008-2012",
-                            year %in% 2015:2018 ~ "2015-2018"))
+# Convert df to sf object
+grid_15km_sf <- st_as_sf(grid_15km_df, coords = c("x", "y"),
+                         crs = st_crs(forest_tws_15km))
 
-# Combine all periods
-clean_occurrences_sf <- bind_rows(period1_occurrences,
-                                  period2_occurrences,
-                                  period3_occurrences)
+## 2.3. Validate spatial coverage of the grid ----------------------------------
 
-# 4. PREP DATA FOR TURNOVER CALCULATION  ---------------------------------------
+# Count cells that are NA across all layers in all raster stacks
+all_na_count <- sum(apply(is.na(values(forest_tws_15km)), 1, all)&
+                    apply(is.na(values(tws_forest_15km)), 1, all) &
+                    apply(is.na(values(all_urban_15km)), 1, all))
 
-## 4.1. Extract cell IDs for occurrences ---------------------------------------
-
-# This method retains spatial information for later
-clean_occurrences_for_turnover <- clean_occurrences_sf |>
-  mutate(cell = terra::extract(land_cover_id, 
-                               st_coordinates(clean_occurrences_sf))[, 1])
-
-## 4.2. Keep unique species records per cell and period ------------------------
-
-# Make sure to only retain unique species records per cell and period
-# Splitting these by time period to hopefully save computing power
-
-# 2000-2006 period
-period1_unique <- clean_occurrences_for_turnover |>
-  filter(period %in% c("1997-2000", "2006-2009")) |>
-  select(period, species, cell) |>
-  distinct(cell, species, period)
-
-# 2006-2012 period  
-period2_unique <- clean_occurrences_for_turnover |>
-  filter(period %in% c("2003-2006", "2012-2015")) |>
-  select(period, species, cell) |>
-  distinct(cell, species, period)
-
-# 2012-2018 period
-period3_unique <- clean_occurrences_for_turnover |>
-  filter(period %in% c("2008-2012", "2015-2018")) |>
-  select(period, species, cell) |>
-  distinct(cell, species, period)
-
-# Combine the results
-unique_occurrences <- bind_rows(period1_unique,
-                                period2_unique,
-                                period3_unique)
-
-# 5. CALCULATE TURNOVER --------------------------------------------------------
-
-# Define period pairs to use in the function
-period_pairs <- list(
-  list(before = "1997-2000", after = "2006-2009", change_period = "2000-2006"),
-  list(before = "2003-2006", after = "2012-2015", change_period = "2006-2012"),
-  list(before = "2008-2012", after = "2015-2018", change_period = "2012-2018"))
-
-# Apply turnover function to all periods
-temporal_turnover <- map_df(period_pairs, function(pair) {
-  calculate_jaccard_for_periods(
-    unique_occurrences,
-    pair$before,
-    pair$after,
-    pair$change_period)
-})
-
-# 6. COMBINE TURNOVER AND LAND COVER -------------------------------------------
-
-# Add turnover results to the spatial dataframe and land cover
-turnover_with_landcover <- temporal_turnover |>
-  left_join(st_as_sf(land_cover_grid) |>
-      mutate(x = st_coordinates(.)[,1],
-             y = st_coordinates(.)[,2]),
-      by = "cell") |>
-  mutate(landcover_category = case_when(change_period == "2000-2006" ~ period_2000_2006,
-                                        change_period == "2006-2012" ~ period_2006_2012,
-                                        change_period == "2012-2018" ~ period_2012_2018))
-
-# Save df 
-saveRDS(turnover_with_landcover, 
-        here("data", "derived_data", "full_turnover_results_100m.rds"))
-
-# 7. QUICK EXPLORATION ---------------------------------------------------------
-ggplot() +
-  geom_boxplot(data = turnover_with_landcover,
-               aes(x = landcover_category, y = jaccard_dissimilarity,
-                   fill = "All data")) +
-  geom_boxplot(data = turnover_3plus_species,
-               aes(x = landcover_category, y = jaccard_dissimilarity,
-                   fill = "3+ species")) +
-  geom_boxplot(data = turnover_5plus_species,
-               aes(x = landcover_category, y = jaccard_dissimilarity,
-                   fill = "5+ species")) +
-  facet_wrap(~change_period) +
-  theme_bw() +
-  labs(
-    x = "Land Cover Category",
-    y = "Jaccard Dissimilarity Index",
-    title = "Species Turnover by Land Cover Change Category and Filtering",
-    fill = "Dataset"
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Validate spatial coverage
+cat("Total raster cells in grid extent:", ncell(reference_grid_15km), "\n")
+cat("Cells with valid data in at least one layer:", nrow(grid_15km_df), "\n")
+cat("Cells without valid data in any layer:", all_na_count, "\n")
+cat("Verification check:", ncell(reference_grid_15km) - nrow(grid_15km_df) == all_na_count, "\n")
+cat("Proportion of grid with analyzable data:", 
+    round(nrow(grid_15km_df)/ncell(reference_grid_15km)*100, 2), "%\n")
