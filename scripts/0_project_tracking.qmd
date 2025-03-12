@@ -180,8 +180,7 @@ raster_layers <- data.frame(
   Layer_name = c(forest_tws_names, tws_forest_names))
 
 # Display the table using kable for better formatting in quarto
-kable(raster_layers, caption = "Layer names of forest and TWS raster files") |>
-  kbl(caption = "Table 2: Raster Layer Names") |>
+kable(raster_layers, caption = "Table 2: Layer names of forest and TWS raster files") |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
@@ -231,7 +230,7 @@ Across, Norway the distribution of the "edge" pixels is as follows:
 #knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
 ```
 
-![](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
+![Figure 1: Distribution of edge pixels across Norway.](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
 
 ```{r edge pixels summary}
 #| label: edge-pixels-summary
@@ -261,7 +260,7 @@ The percentages of areas falling outside of the Norway shapefile boundaries, are
 #knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
 ```
 
-![](images/SupplementaryFigure2_Edge_Pixels_15km_Histogram.png){width="531"}
+![Figure 2: Histogram of % area outside of Norway boundary of edge pixels.](images/SupplementaryFigure2_Edge_Pixels_15km_Histogram.png){width="531"}
 
 Data validation revealed that 426 cells were masked, instead of the expected 434. This meant that 8 cells were unaccounted for. Further exploration revealed that the specific 8 cells were already set to NA in the raster layers before the masking.
 
@@ -275,7 +274,7 @@ Further validation also revealed that the masking did not alter the values of th
 #knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
 ```
 
-![](images/SupplementaryFigure3_MaskingValidation.png){width="498"}
+![Figure 3: Validation results of spatial accuracy of masking.](images/SupplementaryFigure3_MaskingValidation.png){width="498"}
 
 ## Turnover Calculation (3.1)
 
@@ -287,7 +286,7 @@ Further validation also revealed that the masking did not alter the values of th
 | 2006-2012      | 2003-2006 | 2012-2015 |
 | 2012-2018      | 2008-2012 | 2015-2018 |
 
-: Before & After periods for each LC time period
+: Table 4: Before & After periods for each LC time period
 
 ### Update 12.02.2025 - Jaccard's Dissimilarity Index
 
