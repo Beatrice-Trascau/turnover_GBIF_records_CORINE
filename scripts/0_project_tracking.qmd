@@ -11,6 +11,7 @@ editor: visual
 library(here)
 library(kableExtra)
 library(knitr)
+library(terra)
 ```
 
 # Project Overview
@@ -170,21 +171,17 @@ tws_forest_15km <- rast(here("data", "derived_data",
 # Extract layer names
 forest_tws_names <- names(forest_tws_15km)
 tws_forest_names <- names(tws_forest_15km)
-layer_names <- rbind(forest_tws_names, tws_forest_names)
-numbers <- c(1: 24)
 
-# Put into single df
-layer_names_df <- data.frame(numbers, layer_names)
+# Create a combined data frame for the table
+raster_layers <- data.frame(
+  Raster = c(rep("forest_tws_15km", length(forest_tws_names)), 
+             rep("tws_forest_15km", length(tws_forest_names))),
+  Number = 1:(length(forest_tws_names) + length(tws_forest_names)),
+  Layer_name = c(forest_tws_names, tws_forest_names))
 
-# Create table
-layer_names_df |>
-  kbl(caption = "Table 2: Layer Names for 15km Rasters",
-      col.names = c("Number", "Layer Names"),
-      align = c("l", "r")) |>
-  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
-                full_width = FALSE) |>
-  column_spec(1, bold = TRUE) |>
-  column_spec(2, color = "steelblue")
+# Display the table using kable for better formatting in quarto
+kable(raster_layers, caption = "Layer names of forest and TWS raster files") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 Since we are only interested in 2000-2006_Forest to TWS, 2006-2012_Forest to TWS, 2012-2018_Forest to TWS and 2000-2006_TWS to Forest, 2006-2012_TWS to Forest and 2012-2018_TWS to Forest respectively, these are easy enough to call when we use them with the \[\[\]\] operator. And are all the layers 3, 7, and 11, which is why we use the following code when we use them:
@@ -285,7 +282,7 @@ Further validation also revealed that the masking did not alter the values of th
 
 | LC Time Period | Before    | After     |
 |----------------|-----------|-----------|
-| 2000-2006      | 1997-2000 | 2006-2012 |
+| 2000-2006      | 1997-2000 | 2006-2009 |
 | 2006-2012      | 2003-2006 | 2012-2015 |
 | 2012-2018      | 2008-2012 | 2015-2018 |
 
