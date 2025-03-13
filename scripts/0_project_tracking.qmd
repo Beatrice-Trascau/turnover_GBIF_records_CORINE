@@ -284,7 +284,7 @@ Further validation also revealed that the masking did not alter the values of th
 |----------------|-----------|-----------|
 | 2000-2006      | 1997-2000 | 2006-2009 |
 | 2006-2012      | 2003-2006 | 2012-2015 |
-| 2012-2018      | 2008-2012 | 2015-2018 |
+| 2012-2018      | 2009-2012 | 2015-2018 |
 
 : Table 4: Before & After periods for each LC time period
 
@@ -446,7 +446,53 @@ calculate_jaccard_for_periods <- function(df, before_period, after_period, chang
 
 In the part of the turnover script where a reference grid was created, data validation steps were added to ensure that when assigning cell IDs, the correct amount of NA cells were excluded. Data validation revealed that from the total of 7931 cells in the rasters, 605 of them have an NA value. This is likely due to the masking performed on the edge cells as well as when the original CLC layers were cut to Norway.
 
-In the reference grid created, 77326 cells had non-NA values. This means that the number of cells with non-NA values is the same in the rasters and in the reference grid. We can then assume that the reference grid, and therefore the spatial dataframe created from the CLC layer, contain the correct data for the analysis.
+In the reference grid created, 7326 cells had non-NA values. This means that the number of cells with non-NA values is the same in the rasters and in the reference grid. We can then assume that the reference grid, and therefore the spatial dataframe created from the CLC layer, contain the correct data for the analysis.
+
+### Update 13.03.2025
+
+The previous method ran into several problems and became too complicated, likely because of the overlapping years in the before-after periods. Devised a new strategy which involves processing each period (2000-2006, 2006-2012, 2012-2018) at at time. For each period, we will do the following steps:
+
+1.  Filter occurrences based on the before and after years
+
+2.  Extract cell IDs for each occurrence
+
+3.  Summarise occurrences by cell ID (and possibly time)
+
+    1.  Here we need to get lists of species and the number of occurrences for before and afer
+
+4.  Extract Land Cover Change and Land Cover No Change from the respective layers of the rasters
+
+5.  Calculate recorder effrot and delta recorder effort
+
+6.  Calculate turnover
+
+7.  Move on to the next period
+
+At the end, we should have a dataframe with the following columns:
+
+| cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
+|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
+| 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
+
+At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
+
+#### Period 1: 2000-2006
+
+Total number of occurrences: 3 336 822. Before = 941 073, After = 2 395 749.
+
+Total number of occurrences assigned to a non-NA grid cell: 2 516 58/3 336 822 (75.42%). Occurrences were assigned to a total of 1454 unique cells (out of the total of 7326 non-NA cells).
+
+#### Period 2: 2006-2012
+
+Total number of occurrences = 7 111 129. Before = 1 281 012, After = 5 830 117.
+
+Total number of occurrences assigned to non-NA grid cell: 5 433 853/7 111 129 (76.41%). Occurrences were assigned to a total of 1448 unique non-NA cells.
+
+#### Period 3: 2012-2018
+
+Total number of occurrences = 11 492 996. Before = 4 847 584, After = 6 645 412.
+
+Total number of occurrences assigned to non-NA grid cells: 9 055 263/11 492 996 (78.79%). Occurrences were assigned to a total of 1462 unique non-NA cells.
 
 # Turnover Models (4.1)
 
