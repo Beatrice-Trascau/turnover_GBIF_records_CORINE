@@ -28,65 +28,26 @@ all_urban_15km <- rast(here("data", "derived_data",
 occurrences_norway <- fread(here("data", "derived_data", 
                                  "clean_occurrences_15km.txt"))
 
-# 2. SPATIAL REFERENCE GRID ----------------------------------------------------
+# 2. CREATE A SPATIAL REFERENCE GRID WITH CELL IDS -----------------------------
 
-## 2.1. Identify non-NA cells across all raster stacks -------------------------
+# Create a reference grid from the CLC rasters
+reference_grid <- forest_tws_15km[[1]]
 
-# Create a reference grid raster with same properties as CLC
-reference_grid_15km <- forest_tws_15km[[1]]
+# Reset all values to NA
+reference_grid[] <-NA
 
-# Create a cell validity mask with all values = FALSE
-valid_cell_mask <- rep(FALSE, ncell(reference_grid_15km))
+# Find all valid cells across all raster layers
+valid_cells <- which(!is.na(values(forest_tws_15km[[1]])) |
+                     !is.na(values(tws_forest_15km[[1]])) |
+                     !is.na(values(all_urban_15km[[1]])))
 
-# Check all layers in Forest -> TWS raster
-for(i in 1:nlyr(forest_tws_15km)){
-  valid_cell_mask <- valid_cell_mask | !is.na(values(forest_tws_15km[[i]]))
-}
+# Assign sequential cell IDs to valid cells
+reference_grid[valid_cells] <- 1:length(valid_cells)
 
-# Check all layers in TWs -> Forest raster
-for(i in 1:nlyr(tws_forest_15km)){
-  valid_cell_mask <- valid_cell_mask | !is.na(values(tws_forest_15km[[i]]))
-}
-
-# Check all layers in TWs -> Forest raster
-for(i in 1:nlyr(all_urban_15km)){
-  valid_cell_mask <- valid_cell_mask | !is.na(values(all_urban_15km[[i]]))
-}
-
-# Get indices of cells with valid data in at least one layer
-valid_cells <- which(valid_cell_mask)
-
-## 2.2. Create reference grid with consecutive cell IDs ------------------------
-
-# Create the grid with all cells = NA
-reference_grid_15km[] <- NA
-
-# Assign consecutive cell IDs
-reference_grid_15km[valid_cells] <- 1:length(valid_cells)
-
-# Convert to dataframe with coordinates and cell IDs
-grid_15km_df <- as.data.frame(reference_grid_15km, xy = TRUE) |>
-  rename(cell_id = '2000-2006_Non-forest') |>
-  na.omit()
-
-# Convert df to sf object
-grid_15km_sf <- st_as_sf(grid_15km_df, coords = c("x", "y"),
-                         crs = st_crs(forest_tws_15km))
-
-## 2.3. Validate spatial coverage of the grid ----------------------------------
-
-# Count cells that are NA across all layers in all raster stacks
-all_na_count <- sum(apply(is.na(values(forest_tws_15km)), 1, all)&
-                    apply(is.na(values(tws_forest_15km)), 1, all) &
-                    apply(is.na(values(all_urban_15km)), 1, all))
-
-# Validate spatial coverage
-cat("Total raster cells in grid extent:", ncell(reference_grid_15km), "\n")
-cat("Cells with valid data in at least one layer:", nrow(grid_15km_df), "\n")
-cat("Cells without valid data in any layer:", all_na_count, "\n")
-cat("Verification check:", ncell(reference_grid_15km) - nrow(grid_15km_df) == all_na_count, "\n")
-cat("Proportion of grid with analyzable data:", 
-    round(nrow(grid_15km_df)/ncell(reference_grid_15km)*100, 2), "%\n")
+# Create dataframe with cell IDs and coordinates
+grid_df <- as.data.frame(reference_grid, xy = TRUE) |>
+  rename(cell_id = 1) |>
+  filter(!is.na(cell_id))
 
 # 3. EXTRACT LAND COVER CHANGE VALUES FOR EACH CELL ----------------------------
 
