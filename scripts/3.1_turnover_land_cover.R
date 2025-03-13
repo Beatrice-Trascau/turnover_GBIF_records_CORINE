@@ -552,3 +552,15 @@ save(turnover_2012_2018_lc,
      file = here("data", "derived_data", "turnover_2012_2018_all_data.rda"))
 
 ## 7.4 Combine all into single df ----------------------------------------------
+
+# Combine all periods into a single dataframe ----------------------------------
+all_periods_turnover_all_land_cover_chanegs_15km <- bind_rows(turnover_2000_2006_lc,
+                                                              turnover_2006_2012_lc,
+                                                              turnover_2012_2018_lc)
+
+# Save df to file
+save(all_periods_turnover_all_land_cover_chanegs_15km,
+     file = here("data", "derived_data", 
+                 "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# END OF SCRIPT ----------------------------------------------------------------
