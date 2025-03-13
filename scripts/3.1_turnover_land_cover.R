@@ -186,34 +186,34 @@ if(n_with_cell > 0) {
 }
 
 # 5. CALCULATE SPECIES TURNOVER AND RECORDER EFFORT ----------------------------
-
 ## 5.1. Create long format dataset for turnover calculation --------------------
-
-# Convert to long format
+# Transform to long format for easier analysis of temporal patterns
 periods_long <- occurrences_with_cell |>
-  # keep only the columns that are needed
+  # Select only needed columns for efficient processing
   select(species, cell_id, period_2000_2006, period_2006_2012, period_2012_2018) |>
-  # pivot longer
-  pivot_longer(cols = starts_with("period_"),
-               names_to = "lc_change_period",
-               values_to = "time_period") |>
-  # remove NA values
+  # Transform to long format
+  pivot_longer(
+    cols = starts_with("period_"),
+    names_to = "lc_change_period",
+    values_to = "time_period"
+  ) |>
+  # Remove NA values
   filter(!is.na(time_period)) |>
-  # extract years from lc_change_period for clearer identification
-  mutate(lc_change_period = gsub("period_","", lc_change_period))
+  # Extract the years from the lc_change_period for clearer identification
+  mutate(
+    lc_change_period = gsub("period_", "", lc_change_period)
+  )
 
 ## 5.2. Calculate Jaccard's dissimilarity index for each cell and period -------
-
-# Create list to store the results
+# List to store results for each period
 turnover_results <- list()
 
-# Define the period pairs
-period_pairs <- list(list(lc_period = "2000-2006", before = "1997-2000", 
-                          after = "2006-2009"),
-                     list(lc_period = "2006-2012", before = "2003-2006", 
-                          after = "2012-2015"),
-                     list(lc_period = "2012-2018", before = "2008-2012", 
-                          after = "2015-2018"))
+# Define the period pairs based on our temporal analysis framework
+period_pairs <- list(
+  list(lc_period = "2000-2006", before = "1997-2000", after = "2006-2009"),
+  list(lc_period = "2006-2012", before = "2003-2006", after = "2012-2015"),
+  list(lc_period = "2012-2018", before = "2008-2012", after = "2015-2018")
+)
 
 # Calculate turnover for each land cover change period
 for (pair in period_pairs) {
@@ -233,20 +233,23 @@ for (pair in period_pairs) {
       .groups = "drop"
     ) |>
     # Pivot to get before and after columns
+    # Use names_transform to replace dashes with dots in column names
+    # This prevents R from interpreting dashes as subtraction operators
     pivot_wider(
       id_cols = cell_id,
       names_from = time_period,
+      names_transform = list(time_period = ~gsub("-", ".", .)),
       values_from = c(species_list, n_species, n_occurrences)
     )
   
   # Create column names based on the specific periods
-  # These will vary based on the time period being processed
-  before_species_col <- paste0("species_list_", pair$before)
-  after_species_col <- paste0("species_list_", pair$after)
-  before_count_col <- paste0("n_occurrences_", pair$before)
-  after_count_col <- paste0("n_occurrences_", pair$after)
-  before_species_count_col <- paste0("n_species_", pair$before)
-  after_species_count_col <- paste0("n_species_", pair$after)
+  # Replace dashes with dots to avoid R syntax issues
+  before_species_col <- paste0("species_list_", gsub("-", ".", pair$before))
+  after_species_col <- paste0("species_list_", gsub("-", ".", pair$after))
+  before_count_col <- paste0("n_occurrences_", gsub("-", ".", pair$before))
+  after_count_col <- paste0("n_occurrences_", gsub("-", ".", pair$after))
+  before_species_count_col <- paste0("n_species_", gsub("-", ".", pair$before))
+  after_species_count_col <- paste0("n_species_", gsub("-", ".", pair$after))
   
   # Calculate Jaccard's dissimilarity and effort metrics
   turnover_period <- cell_turnover |>
