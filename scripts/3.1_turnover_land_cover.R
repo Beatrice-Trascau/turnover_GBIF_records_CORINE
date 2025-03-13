@@ -95,6 +95,23 @@ cat("Before period (2003-2006):",
 cat("After period (2012-2015):", 
     sum(occurrences_sf_2006_2012$time_period == "2012-2015"), "records\n")
 
+## 3.4. Filter for the before and after periods for 2012-2018 ------------------
+
+# Filter occurrences and label the periods
+occurrences_sf_2012_2018 <- occurrences_sf |>
+  filter(year %in% c(2009:2012, 2015:2018)) |>
+  mutate(time_period = case_when(year %in% 2009:2012 ~ "2009-2012",
+                                 year %in% 2015:2018 ~ "2015-2018",
+                                 TRUE ~ NA_character_))
+
+# Check filtering results
+cat("Period 3 (2012-2018) occurrences:\n")
+cat("Total records:", nrow(occurrences_sf_2012_2018), "\n")
+cat("Before period (2009-2012):",
+    sum(occurrences_sf_2012_2018$time_period == "2009-2012"), "records\n")
+cat("After period (2015-2018):", 
+    sum(occurrences_sf_2012_2018$time_period == "2015-2018"), "records\n")
+
 # 4. EXTRACT CELL ID -----------------------------------------------------------
 
 ## 4.1. First period: 2000-2006 ------------------------------------------------
@@ -139,6 +156,26 @@ cat("Occurrences assigned to valid grid cells:", nrow(occurrences_sf_2006_2012_v
 cat("Number of unique cells with occurrences:", 
     length(unique(occurrences_sf_2006_2012_valid$cell_ID)), "\n")
 
+## 4.3. Third period: 2012-2018 ------------------------------------------------
+
+# Extract cell IDs from the reference grid
+occurrences_sf_2012_2018$cell_ID <- terra::extract(reference_grid,
+                                                   st_coordinates(occurrences_sf_2012_2018))[, "cell_id"]
+
+# Remove occurrences that fall outside valid grid cells
+occurrences_sf_2012_2018_valid <- occurrences_sf_2012_2018 |>
+  filter(!is.na(cell_ID))
+
+# Calculate proportion of records retained with valid cells
+rentention_rate_2012_2018 <- nrow(occurrences_sf_2012_2018_valid) / nrow(occurrences_sf_2012_2018) * 100
+
+# Summarize spatial assignment results
+cat("Cell ID extraction results:\n")
+cat("Total occurrences processed:", nrow(occurrences_sf_2012_2018), "\n")
+cat("Occurrences assigned to valid grid cells:", nrow(occurrences_sf_2012_2018_valid), 
+    sprintf("(%.2f%%)\n", rentention_rate_2012_2018))
+cat("Number of unique cells with occurrences:", 
+    length(unique(occurrences_sf_2012_2018_valid$cell_ID)), "\n")
 
 # 5. GET SPECIES LISTS AND NUMBER OF OCCURRENCES FOR EACH CELL -----------------
 
@@ -219,6 +256,47 @@ cell_2006_2012_summary_wide <- cell_2006_2012_summary |>
 
 # Replace NULL values in the species_list_columns
 cell_2006_2012_summary_wide <- cell_2006_2012_summary_wide |>
+  mutate(species_list_before = lapply(species_list_before, 
+                                      function(x) if(is.null(x)) character(0) else x),
+         species_list_after = lapply(species_list_after, 
+                                     function(x) if(is.null(x)) character(0) else x))
+
+## 5.3. Third period: 2012-2018 ------------------------------------------------
+
+# Create species list and total number of occurrences for each before and after period
+cell_2012_2018_summary <- occurrences_sf_2012_2018_valid |>
+  st_drop_geometry() |>
+  group_by(cell_ID, time_period) |>
+  summarize(species_list = list(unique(species)),
+            n_species = length(unique(species)),
+            n_occurrences = n(),
+            .group = "drop")
+
+# Reshape to wide formate to separate before and after columns
+cell_2012_2018_summary_wide <- cell_2012_2018_summary |>
+  # convert to wide format
+  pivot_wider(id_cols = cell_ID,
+              names_from = time_period,
+              values_from = c(species_list, n_species, n_occurrences)) |>
+  # rename columns 
+  rename(species_list_before = 'species_list_2009-2012',
+         species_list_after = 'species_list_2015-2018',
+         total_spp_before = 'n_species_2009-2012',
+         total_spp_after = 'n_species_2015-2018',
+         total_occ_before = 'n_occurrences_2009-2012',
+         total_occ_after = 'n_occurrences_2015-2018') |>
+  # replace NA values in occurrence columns with 0
+  mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
+         total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
+         total_occ_before = ifelse(is.na(total_occ_before), 0, total_occ_before),
+         total_occ_after = ifelse(is.na(total_occ_after), 0, total_occ_after)) |>
+  # add time period, recorder effort and delta recorder effort columns
+  mutate(lc_time_period = "2012-2018",
+         recorder_effort = total_occ_before + total_occ_after,
+         delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+
+# Replace NULL values in the species_list_columns
+cell_2012_2018_summary_wide <- cell_2012_2018_summary_wide |>
   mutate(species_list_before = lapply(species_list_before, 
                                       function(x) if(is.null(x)) character(0) else x),
          species_list_after = lapply(species_list_after, 
@@ -351,6 +429,69 @@ cell_2006_2012_summary_wide_LC3 <- cell_2006_2012_summary_wide_LC2 |>
             by = "cell_ID")
 
 
+## 6.3. Third period: 2012-2018 ------------------------------------------------
+
+# Check which layers are needed
+names(forest_tws_15km) #[[10]] = "2012-2018_Forest no change", [[11]] = "2012-2018_Forest to TWS"
+names(tws_forest_15km) #[[10]] = "2012-2018_TWS no change", [[11]] = "2012-2018_TWS to Forest"
+names(all_urban_15km) #[[7]] = "2012-2018_Urban_no_change", [[8]] = "2012-2018_all_to_urban"
+
+
+### 6.3.1. Forests -> TWS ------------------------------------------------------
+
+# Create df with raster layers of interest
+forest_tws_2012_2018_df <- as.data.frame(forest_tws_15km[[c(10,11)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+forest_tws_2012_2018_df$cell_ID <- terra::extract(reference_grid,
+                                                  forest_tws_2012_2018_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+forest_tws_2012_2018_df <- forest_tws_2012_2018_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2012_2018_summary_wide_LC1 <- cell_2012_2018_summary_wide |>
+  left_join(forest_tws_2012_2018_df, by = "cell_ID")
+
+### 6.3.2. TWS -> Forests ------------------------------------------------------
+
+# Create df with raster values
+tws_forest_2012_2018_df <- as.data.frame(tws_forest_15km[[c(10,11)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+tws_forest_2012_2018_df$cell_ID <- terra::extract(reference_grid,
+                                                  tws_forest_2012_2018_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+tws_forest_2012_2018_df <- tws_forest_2012_2018_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2012_2018_summary_wide_LC2 <- cell_2012_2018_summary_wide_LC1 |>
+  left_join(tws_forest_2012_2018_df |>
+              select(cell_ID, '2012-2018_TWS no change', '2012-2018_TWS to Forest'),
+            by = "cell_ID")
+
+### 6.3.3. All -> Urban --------------------------------------------------------
+
+# Create df with raster values
+all_urban_2012_2018_df <- as.data.frame(all_urban_15km[[c(7,8)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+all_urban_2012_2018_df$cell_ID <- terra::extract(reference_grid,
+                                                 all_urban_2012_2018_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+all_urban_2012_2018_df <- all_urban_2012_2018_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2012_2018_summary_wide_LC3 <- cell_2012_2018_summary_wide_LC2 |>
+  left_join(all_urban_2012_2018_df |>
+              select(cell_ID, '2012-2018_Urban_no_change', '2012-2018_all_to_urban'),
+            by = "cell_ID")
+
 # 7. CALCULATE JACCARD'S DISSIMILARITY INDEX -----------------------------------
 
 ## 7.1. First period: 2000-2006 ------------------------------------------------
@@ -390,3 +531,24 @@ turnover_2006_2012_lc <- cell_2006_2012_filtered |>
 # Save df 
 save(turnover_2006_2012_lc,
      file = here("data", "derived_data", "turnover_2006_2012_all_data.rda"))
+
+## 7.3. Third period: 2012-2018 ------------------------------------------------
+
+# Filter cells with < 3 species in each time step
+cell_2012_2018_filtered <- cell_2012_2018_summary_wide_LC3 |>
+  filter(total_spp_before >= 3 & total_spp_after >= 3)
+
+# Calculate Jaccard's Dissimilarity Index
+turnover_2012_2018_lc <- cell_2012_2018_filtered |>
+  rowwise() |>
+  # calculate shared (intersection) and total (union) species
+  mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
+         union_size = length(union(species_list_before, species_list_after)),
+         JDI = 1 - (intersection_size / union_size)) |>
+  ungroup()
+
+# Save df 
+save(turnover_2012_2018_lc,
+     file = here("data", "derived_data", "turnover_2012_2018_all_data.rda"))
+
+## 7.4 Combine all into single df ----------------------------------------------
