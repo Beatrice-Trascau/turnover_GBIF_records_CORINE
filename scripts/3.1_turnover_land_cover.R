@@ -44,298 +44,185 @@ valid_cells <- which(!is.na(values(forest_tws_15km[[1]])) |
 # Assign sequential cell IDs to valid cells
 reference_grid[valid_cells] <- 1:length(valid_cells)
 
+# Rename layer to cell_id
+names(reference_grid) <- "cell_id"
+
 # Create dataframe with cell IDs and coordinates
 grid_df <- as.data.frame(reference_grid, xy = TRUE) |>
-  rename(cell_id = 1) |>
   filter(!is.na(cell_id))
 
-# 3. EXTRACT LAND COVER CHANGE VALUES FOR EACH CELL ----------------------------
+# 3. PREPARE OCCURRENCE DATA ---------------------------------------------------
 
-## 3.1. Extract all land cover values ------------------------------------------
+## 3.1. Convert occurrences to sf ----------------------------------------------
 
-# Create df for the land cover values for each cell
-lc_values <- data.frame(cell_id = grid_15km_df$cell_id)
-
-# Extract land cover values for Forest -> TWS
-for(layer_name in names(forest_tws_15km)){
-  layer_values <- terra::extract(forest_tws_15km[[layer_name]], 
-                          grid_15km_df[, c("x", "y")])
-  lc_values[[layer_name]] <- layer_values[, 2]
-}
-
-# Extract land cover values for TWS -> Forest
-for(layer_name in names(tws_forest_15km)){
-  layer_values <- terra::extract(tws_forest_15km[[layer_name]], 
-                                 grid_15km_df[, c("x", "y")])
-  lc_values[[layer_name]] <- layer_values[, 2]
-}
-
-# Extract land cover values for All -> Urban
-for(layer_name in names(all_urban_15km)){
-  layer_values <- terra::extract(all_urban_15km[[layer_name]], 
-                                 grid_15km_df[, c("x", "y")])
-  lc_values[[layer_name]] <- layer_values[, 2]
-}
-
-# Check if all layers were exracted
-ncol(lc_values)-1 #33
-nlyr(forest_tws_15km) #12
-nlyr(tws_forest_15km) #12
-nlyr(all_urban_15km) #9
-
-# 4. PREPARE OCCURRENCES FOR ANALYSIS ------------------------------------------
-
-## 4.1. Convert occurrences to spatial data ------------------------------------
-
-# Convert occurrence records to sf 
+# Convert occurrences to sf and reproject to match CLC
 occurrences_sf <- st_as_sf(occurrences_norway,
                            coords = c("decimalLongitude", "decimalLatitude"),
-                           crs = 4326)
+                           crs = 4326) |>
+  st_transform(crs(reference_grid))
+ 
+## 3.2. Filter for the before and after periods for 2000-2006 ------------------
 
-# Re-project to match CORINE CRS
-occurrences_sf_reprojected <- st_transform(occurrences_sf,
-                                           st_crs(forest_tws_15km))
+# Filter occurrences and label the periods
+occurrences_sf_2000_2006 <- occurrences_sf |>
+  filter(year %in% c(1997:2000, 2006:2009)) |>
+  mutate(time_period = case_when(year %in% 1997:2000 ~ "1997-2000",
+                                 year %in% 2006:2009 ~ "2006-2009",
+                                 TRUE ~ NA_character_))
 
+# Check filtering results
+cat("Period 1 (2000-2006) occurrences:\n")
+cat("Total records:", nrow(occurrences_sf_2000_2006), "\n")
+cat("Before period (1997-2000):",
+    sum(occurrences_sf_2000_2006$time_period == "1997-2000"), "records\n")
+cat("After period (2006-2009):", 
+    sum(occurrences_sf_2000_2006$time_period == "2006-2009"), "records\n")
 
-## 4.2. Assign before and after period for each time period --------------------
+# 4. EXTRACT CELL ID -----------------------------------------------------------
 
-# Define time periods (2000-2006, 2006-2012, 2012-2018)
-occurrences_with_periods <- occurrences_sf_reprojected |>
-  mutate(period_2000_2006 = case_when(year %in% 1997:2000 ~ "1997-2000", #Before
-                                      year %in% 2006:2009 ~ "2006-2009", # After
-                                      TRUE ~ NA_character_),
-         period_2006_2012 = case_when(year %in% 2003:2006 ~ "2003-2006", #Before
-                                      year %in% 2012:2015 ~ "2012-2015", # After
-                                      TRUE ~ NA_character_),
-         period_2012_2018 = case_when(year %in% 2008:2012 ~ "2008-2012", #Before
-                                      year %in% 2015:2018 ~ "2015-2018", # After
-                                      TRUE ~ NA_character_)) |>
-  # Keep only rows with at least one period assigned
-  filter(!is.na(period_2000_2006) | !is.na(period_2006_2012) | !is.na(period_2012_2018))
+## 4.1. First period: 2000-2006 ------------------------------------------------
 
-## 4.3. Assign grid cell IDs to occurrences ------------------------------------
+# Extract cell IDs from the reference grid
+occurrences_sf_2000_2006$cell_ID <- terra::extract(reference_grid,
+                                                   st_coordinates(occurrences_sf_2000_2006))[, "cell_id"]
 
-# Extract cell IDs from CLC
-occurrences_with_cell <- occurrences_with_periods |>
-  mutate(cell_id = terra::extract(reference_grid_15km, 
-                                  st_coordinates(occurrences_with_periods))[, 1])
+# Remove occurrences that fall outside valid grid cells
+occurrences_sf_2000_2006_valid <- occurrences_sf_2000_2006 |>
+  filter(!is.na(cell_ID))
 
-# Check how many occurrences were successfully assigned to grid cells
-n_with_cell <- sum(!is.na(occurrences_with_cell$cell_id))
-n_total <- nrow(occurrences_with_cell)
-cat("Occurrences assigned to grid cells:", n_with_cell, 
-    "(", round(n_with_cell/n_total*100, 2), "% of total)\n")
+# Calculate proportion of records retained with valid cells
+rentention_rate_2000_2006 <- nrow(occurrences_sf_2000_2006_valid) / nrow(occurrences_sf_2000_2006) * 100
 
-# Filter out occurrences without cell assignment
-occurrences_with_cell <- occurrences_with_cell |>
-  filter(!is.na(cell_id))
+# Summarize spatial assignment results
+cat("Cell ID extraction results:\n")
+cat("Total occurrences processed:", nrow(occurrences_sf_2000_2006), "\n")
+cat("Occurrences assigned to valid grid cells:", nrow(occurrences_sf_2000_2006_valid), 
+    sprintf("(%.2f%%)\n", rentention_rate_2000_2006))
+cat("Number of unique cells with occurrences:", 
+    length(unique(occurrences_sf_2000_2006_valid$cell_ID)), "\n")
 
-# Verify spatial distribution of assigned cells
-if(n_with_cell > 0) {
-  # Count occurrences per cell as a quality check
-  cell_counts <- occurrences_with_cell |>
-    st_drop_geometry() |>
-    count(cell_id) |>
-    rename(occurrence_count = n)
-  
-  # Output summary statistics of occurrence distribution
-  cat("Cell assignment summary:\n")
-  cat("Number of cells with occurrences:", nrow(cell_counts), "\n")
-  cat("Min occurrences per cell:", min(cell_counts$occurrence_count), "\n")
-  cat("Max occurrences per cell:", max(cell_counts$occurrence_count), "\n")
-  cat("Median occurrences per cell:", median(cell_counts$occurrence_count), "\n")
-}
+# 5. GET SPECIES LISTS AND NUMBER OF OCCURRENCES FOR EACH CELL -----------------
 
-# 5. CALCULATE SPECIES TURNOVER AND RECORDER EFFORT ----------------------------
-## 5.1. Create long format dataset for turnover calculation --------------------
-# Transform to long format for easier analysis of temporal patterns
-periods_long <- occurrences_with_cell |>
-  # Select only needed columns for efficient processing
-  select(species, cell_id, period_2000_2006, period_2006_2012, period_2012_2018) |>
-  # Transform to long format
-  pivot_longer(
-    cols = starts_with("period_"),
-    names_to = "lc_change_period",
-    values_to = "time_period"
-  ) |>
-  # Remove NA values
-  filter(!is.na(time_period)) |>
-  # Extract the years from the lc_change_period for clearer identification
-  mutate(
-    lc_change_period = gsub("period_", "", lc_change_period)
-  )
+## 5.1. First period: 2000-2006 ------------------------------------------------
 
-## 5.2. Calculate Jaccard's dissimilarity index for each cell and period -------
-# List to store results for each period
-turnover_results <- list()
+# Create species list and total number of occurrences for each before and after period
+cell_2000_2006_summary <- occurrences_sf_2000_2006_valid |>
+  st_drop_geometry() |>
+  group_by(cell_ID, time_period) |>
+  summarize(species_list = list(unique(species)),
+            n_species = length(unique(species)),
+            n_occurrences = n(),
+            .group = "drop")
 
-# Define the period pairs based on our temporal analysis framework
-period_pairs <- list(
-  list(lc_period = "2000-2006", before = "1997-2000", after = "2006-2009"),
-  list(lc_period = "2006-2012", before = "2003-2006", after = "2012-2015"),
-  list(lc_period = "2012-2018", before = "2008-2012", after = "2015-2018")
-)
+# Reshape to wide formate to separate before and after columns
+cell_2000_2006_summary_wide <- cell_2000_2006_summary |>
+  # convert to wide format
+  pivot_wider(id_cols = cell_ID,
+              names_from = time_period,
+              values_from = c(species_list, n_species, n_occurrences)) |>
+  # rename columns 
+  rename(species_list_before = 'species_list_1997-2000',
+         species_list_after = 'species_list_2006-2009',
+         total_spp_before = 'n_species_1997-2000',
+         total_spp_after = 'n_species_2006-2009',
+         total_occ_before = 'n_occurrences_1997-2000',
+         total_occ_after = 'n_occurrences_2006-2009') |>
+  # replace NA values in occurrence columns with 0
+  mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
+         total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
+         total_occ_before = ifelse(is.na(total_occ_before), 0, total_occ_before),
+         total_occ_after = ifelse(is.na(total_occ_after), 0, total_occ_after)) |>
+  # add time period, recorder effort and delta recorder effort columns
+  mutate(lc_time_period = "2000-2006",
+         recorder_effort = total_occ_before + total_occ_after,
+         delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
 
-# Calculate turnover for each land cover change period
-for (pair in period_pairs) {
-  # Filter data for this period
-  period_data <- periods_long |>
-    filter(lc_change_period == pair$lc_period & 
-             time_period %in% c(pair$before, pair$after))
-  
-  # Group by cell and calculate species lists and counts
-  cell_turnover <- period_data |>
-    st_drop_geometry() |>  # Drop geometry for faster processing
-    group_by(cell_id, time_period) |>
-    summarize(
-      species_list = list(unique(species)),
-      n_species = length(unique(species)),
-      n_occurrences = n(),
-      .groups = "drop"
-    ) |>
-    # Pivot to get before and after columns
-    # Use names_transform to replace dashes with dots in column names
-    # This prevents R from interpreting dashes as subtraction operators
-    pivot_wider(
-      id_cols = cell_id,
-      names_from = time_period,
-      names_transform = list(time_period = ~gsub("-", ".", .)),
-      values_from = c(species_list, n_species, n_occurrences)
-    )
-  
-  # Create column names based on the specific periods
-  # Replace dashes with dots to avoid R syntax issues
-  before_species_col <- paste0("species_list_", gsub("-", ".", pair$before))
-  after_species_col <- paste0("species_list_", gsub("-", ".", pair$after))
-  before_count_col <- paste0("n_occurrences_", gsub("-", ".", pair$before))
-  after_count_col <- paste0("n_occurrences_", gsub("-", ".", pair$after))
-  before_species_count_col <- paste0("n_species_", gsub("-", ".", pair$before))
-  after_species_count_col <- paste0("n_species_", gsub("-", ".", pair$after))
-  
-  # Calculate Jaccard's dissimilarity and effort metrics
-  turnover_period <- cell_turnover |>
-    rowwise() |>
-    mutate(
-      # Only calculate Jaccard's dissimilarity when sufficient data exists
-      jaccard_dissimilarity = if (
-        exists(before_species_col) && 
-        exists(after_species_col) && 
-        length(!!sym(before_species_col)) > 0 &&
-        length(!!sym(after_species_col)) > 0
-      ) {
-        # Calculate Jaccard's dissimilarity
-        # Jaccard = 1 - (intersection size / union size)
-        1 - length(intersect(
-          !!sym(before_species_col),
-          !!sym(after_species_col)
-        )) / length(union(
-          !!sym(before_species_col), 
-          !!sym(after_species_col)
-        ))
-      } else {
-        NA_real_  # Can't calculate Jaccard's with missing data
-      },
-      
-      # Calculate standardized recorder effort change
-      # This measures the relative change in sampling intensity
-      delta_recorder_effort = if (
-        exists(before_count_col) && 
-        exists(after_count_col) &&
-        !is.na(!!sym(before_count_col)) &&
-        !is.na(!!sym(after_count_col)) &&
-        (!!sym(before_count_col) + !!sym(after_count_col)) > 0
-      ) {
-        (!!sym(before_count_col) - !!sym(after_count_col)) / 
-          (!!sym(before_count_col) + !!sym(after_count_col))
-      } else {
-        NA_real_
-      },
-      
-      # Calculate total recorder effort (sampling intensity)
-      recorder_effort = if (
-        exists(before_count_col) && 
-        exists(after_count_col) &&
-        !is.na(!!sym(before_count_col)) &&
-        !is.na(!!sym(after_count_col))
-      ) {
-        !!sym(before_count_col) + !!sym(after_count_col)
-      } else {
-        NA_real_
-      },
-      
-      # Record the time period for identification
-      time_period = pair$lc_period
-    ) |>
-    ungroup()
-  
-  # Store results for this period
-  turnover_results[[pair$lc_period]] <- turnover_period |>
-    select(cell_id, jaccard_dissimilarity, delta_recorder_effort, 
-           recorder_effort, time_period,
-           !!sym(before_species_count_col), !!sym(after_species_count_col))
-}
+# Replace NULL values in the species_list_columns
+cell_2000_2006_summary_wide <- cell_2000_2006_summary_wide |>
+  mutate(species_list_before = lapply(species_list_before, 
+                                      function(x) if(is.null(x)) character(0) else x),
+         species_list_after = lapply(species_list_after, 
+                                     function(x) if(is.null(x)) character(0) else x))
 
-# Combine all periods into a single dataframe for analysis
-all_turnover <- bind_rows(turnover_results)
+# 6. GET LC VALUES -------------------------------------------------------------
 
-# 6. PREPARE DATA FOR GLM ------------------------------------------------------
+## 6.1. First period: 2000-2006 ------------------------------------------------
 
-# Join turnover results with land cover transition values
-occurrences_for_model <- all_turnover |>
-  left_join(lc_values, by = "cell_id") |>
+# Check which layers are needed
+names(forest_tws_15km) #[[2]] = "2000-2006_Forest no change", [[3]] = "2000-2006_Forest to TWS"
+names(tws_forest_15km) #[[2]] = "2000-2006_TWS no change", [[3]] = "2000-2006_TWS to Forest"
+names(all_urban_15km) #[[1]] = "2000-2006_Urban_no_change", [[2]] = "2000-2006_all_to_urban"
+
+### 6.1.1. Forests -> TWS ------------------------------------------------------
+
+# Create df with raster layers of interest
+forest_tws_df <- as.data.frame(forest_tws_15km[[c(2,3)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+forest_tws_df$cell_ID <- terra::extract(reference_grid,
+                                        forest_tws_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+forest_tws_df <- forest_tws_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2000_2006_summary_wide_LC1 <- cell_2000_2006_summary_wide |>
+  left_join(forest_tws_df, by = "cell_ID")
+
+### 6.1.2. TWS -> Forests ------------------------------------------------------
+
+# Create df with raster values
+tws_forest_df <- as.data.frame(tws_forest_15km[[c(2,3)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+tws_forest_df$cell_ID <- terra::extract(reference_grid,
+                                        tws_forest_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+tws_forest_df <- tws_forest_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2000_2006_summary_wide_LC2 <- cell_2000_2006_summary_wide_LC1 |>
+  left_join(tws_forest_df |>
+              select(cell_ID, '2000-2006_TWS no change', '2000-2006_TWS to Forest'),
+            by = "cell_ID")
+
+### 6.1.3. All -> Urban --------------------------------------------------------
+
+# Create df with raster values
+all_urban_df <- as.data.frame(all_urban_15km[[c(1,2)]], xy = TRUE)
+
+# Extract cell IDs for each coordinate pair
+all_urban_df$cell_ID <- terra::extract(reference_grid,
+                                       all_urban_df[, c("x", "y")])[, "cell_id"]
+
+# Remove rows with NA cell_ID
+all_urban_df <- all_urban_df |>
+  filter(!is.na(cell_ID))
+
+# Merge these values with the occurrences df
+cell_2000_2006_summary_wide_LC3 <- cell_2000_2006_summary_wide_LC2 |>
+  left_join(all_urban_df |>
+              select(cell_ID, '2000-2006_Urban_no_change', '2000-2006_all_to_urban'),
+            by = "cell_ID")
+
+# 7. CALCULATE JACCARD'S DISSIMILARITY INDEX -----------------------------------
+
+# Filter cells with < 3 species in each time step
+cell_2000_2006_filtered <- cell_2000_2006_summary_wide_LC3 |>
+  filter(total_spp_before >= 3 & total_spp_after >= 3)
+
+# Calculate Jaccard's Dissimilarity Index
+turnover_2000_2006_lc <- cell_2000_2006_filtered |>
   rowwise() |>
-  mutate(land_cover_change = case_when(time_period == "2000-2006" ~ sum(c_across(matches("2000-2006.*to.*")), 
-                                                                       na.rm = TRUE), 
-                                      time_period == "2006-2012" ~ sum(c_across(matches("2006-2012.*to.*")), 
-                                                                       na.rm = TRUE),
-                                      time_period == "2012-2018" ~ sum(c_across(matches("2012-2018.*to.*")), 
-                                                                       na.rm = TRUE),
-                                      TRUE ~ NA_real_),
-         land_cover_no_change = case_when(time_period == "2000-2006" ~ sum(c_across(matches("2000-2006.*no_change")), 
-                                                                           na.rm = TRUE), 
-                                          time_period == "2006-2012" ~ sum(c_across(matches("2006-2012.*no_change")), 
-                                                                           na.rm = TRUE),
-                                          time_period == "2012-2018" ~ sum(c_across(matches("2012-2018.*no_change")), 
-                                                                           na.rm = TRUE),
-                                          TRUE ~ NA_real_),
-         forest_to_tws = case_when(
-           time_period == "2000-2006" ~ sum(c_across(matches("2000-2006.*Forest_to_TWS")), 
-                                            na.rm = TRUE),
-           time_period == "2006-2012" ~ sum(c_across(matches("2006-2012.*Forest_to_TWS")), 
-                                            na.rm = TRUE),
-           time_period == "2012-2018" ~ sum(c_across(matches("2012-2018.*Forest_to_TWS")), 
-                                            na.rm = TRUE),
-           TRUE ~ NA_real_),
-         tws_to_forest = case_when(
-           time_period == "2000-2006" ~ sum(c_across(matches("2000-2006.*TWS_to_Forest")), 
-                                            na.rm = TRUE),
-           time_period == "2006-2012" ~ sum(c_across(matches("2006-2012.*TWS_to_Forest")), 
-                                            na.rm = TRUE),
-           time_period == "2012-2018" ~ sum(c_across(matches("2012-2018.*TWS_to_Forest")), 
-                                            na.rm = TRUE),
-           TRUE ~ NA_real_),
-         to_urban = case_when(
-           time_period == "2000-2006" ~ sum(c_across(matches("2000-2006.*to_urban")), 
-                                            na.rm = TRUE),
-           time_period == "2006-2012" ~ sum(c_across(matches("2006-2012.*to_urban")), 
-                                            na.rm = TRUE),
-           time_period == "2012-2018" ~ sum(c_across(matches("2012-2018.*to_urban")), 
-                                            na.rm = TRUE),
-           TRUE ~ NA_real_)) |>
+  # calculate shared (intersection) and total (union) species
+  mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
+         union_size = length(union(species_list_before, species_list_after)),
+         JDI = 1 - (intersection_size / union_size)) |>
   ungroup()
 
-# Filter data to ensure quality
-occurrences_turnover_15km <- occurrences_for_model |>
-  # Remove rows with NA
-  filter(!is.na(jaccard_dissimilarity),
-         !is.na(land_cover_change),
-         !is.na(land_cover_no_change),
-         !is.na(delta_recorder_effort),
-         !is.na(recorder_effort)) |>
-  # Remove cells without a minimum recorder effort
-  filter(n_species_1997.2000 >= 3 | n_species_2003.2006 >= 3 | n_species_2008.2012 >= 3,
-         n_species_2006.2009 >= 3 | n_species_2015.2018 >= 3 | n_species_2012.2015 >= 3)
-
-# Save to file
-saveRDS(occurrences_turnover_15km,
-        here("data", "derived_data", "occurrences_turnover_15km.rds"))
+# Save df 
+save(turnover_2000_2006_lc,
+     file = here("data", "derived_data", "turnover_2000_2006_all_data.rda"))
