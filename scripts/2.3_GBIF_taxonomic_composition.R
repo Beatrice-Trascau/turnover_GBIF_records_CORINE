@@ -156,4 +156,46 @@ print(summary_bird_2012_2015$count) # 4 654 633
 
 # They are matching! Can try this with more combinations of years and groups.
 
+# 5. CHANGES IN NUMBERS THROUGH TIME -------------------------------------------
+
+## 5.1. Stacked area chart -----------------------------------------------------
+
+# Aggregate data by year and taxonomic group
+yearly_taxonomic_counts <- taxonomic_composition |>
+  filter(year >= 1997 & year <= 2018) |>
+  group_by(year, taxonomic_group) |>
+  summarise(count = n(), .groups = "drop") |>
+  # also calculate proportions per year
+  group_by(year) |>
+  mutate(total = sum(count), proportion = count/total) |>
+  ungroup()
+
+# Absolute counts stacked area chart
+yearly_count_plot <- ggplot(yearly_taxonomic_counts, 
+                            aes(x = year, y = count, fill = taxonomic_group)) +
+  geom_area(position = "stack") +
+  geom_vline(xintercept = c(2000, 2006, 2012, 2018), 
+             linetype = "dashed", 
+             color = "darkgray") +
+  annotate("text", x = c(2000, 2006, 2012, 2018), y = 0, 
+           label = c("2000", "2006", "2012", "2018"),
+           vjust = -0.5, angle = 90, size = 3, color = "darkgray") +
+  scale_fill_manual(values = taxonomic_colours) +
+  labs(x = "Year", 
+       y = "Number of Occurrences", 
+       fill = "Taxonomic Group") +
+  theme_classic() +
+  theme(legend.position = "right") +
+  scale_x_continuous(breaks = seq(1997, 2018, 2))  
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure3_occurrences_through_time.png"),
+       width = 10, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure3_occurrences_through_time.svg"),
+       width = 10, height = 8, dpi = 300)
+
+## 5.2. Panel for each taxonomic group -----------------------------------------
+
 # END OF SCRIPT ----------------------------------------------------------------
