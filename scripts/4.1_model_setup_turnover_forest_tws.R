@@ -6,8 +6,14 @@
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
+
+# Turnover data
 load(here("data", "derived_data", 
           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Forest -> TWS raster
+clc_status_15km_forest_tws_masked <- rast(here("data", "derived_data", 
+                                               "clc_status_15km_forest_tws_masked.tif"))
 
 # 2. PREPARE DATA FOR ANALYSIS -------------------------------------------------
 
@@ -59,8 +65,6 @@ glimpse(turnover_forest_tws_15km) # everything looks ok
 
 # 3. RUN BETA GLM --------------------------------------------------------------
 
-## 3.1. Run model --------------------------------------------------------------
-
 # Run model
 model1.1 <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change + 
                                delta_recorder_effort + recorder_effort + lc_time_period,
@@ -69,11 +73,45 @@ model1.1 <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change +
 # Get summary
 summary(model1.1)
 
-## 3.2. Check spatial autocorrelation of residuals -----------------------------
-
 # Extarct residuals from model
 model1.1_residuals <- residuals(model1.1)
 
 # Add residuals to df
 turnover_forest_tws_15km$residuals <- model1.1_residuals
 
+# 4. CHECK SPATIAL AUTOCORRELATION OF RESIDUALS --------------------------------
+
+## 4.1. Prepare data for testing of autocorrelation ----------------------------
+
+# Create reference grid
+reference_grid <- clc_status_15km_forest_tws_masked[[1]]
+
+# Convert turnover df to sf object
+turnover_sf <- st_as_sf(turnover_forest_tws_15km,
+                        coords = c("x", "y"),
+                        crs = st_crs(reference_grid))
+
+## 4.2. Create spatial neighbours ----------------------------------------------
+
+# Create a neighbour list using k-nearest neighbours (k = 5)
+coords_matrix <- st_coordinates(turnover_sf)
+neighbours <- knn2nb(knearneigh(coords_matrix, k = 5))
+
+# Convert to spatial weights matrix
+weights <- nb2listw(neighbours, style = "W")
+
+## 4.3. Calculate Moran's I ----------------------------------------------------
+
+# Compute Moran's I test for spatial autocorrelation
+moran_test <- moran.test(turnover_sf$residuals, listw = weights)
+
+# Print results
+print(moran_test) # strong spatial autocorrelation of residuals 
+
+# Create Moran scatterplot to visualise the relationship
+moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
+                         xlab = "Model Residuals", 
+                         ylab = "Spatially Lagged Residuals")
+
+
+## 4.4. Map of Moran's I values ------------------------------------------------
