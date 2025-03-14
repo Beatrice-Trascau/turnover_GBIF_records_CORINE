@@ -31,7 +31,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|-----------------------------------|---------------------------------------------------------------------------|
+|-----------------------|------------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -471,7 +471,7 @@ The previous method ran into several problems and became too complicated, likely
 At the end, we should have a dataframe with the following columns:
 
 | cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
-|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
 
 At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
@@ -517,6 +517,24 @@ $RecorderEffort_{before}$ = the total number of species occurrence records recor
 $LC_{Change}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells where the target land cover transition is detected
 
 $LC_{NoChange}$ = the % of 0.01$km^{2}$ cells contained in the 225$km^{2}$ cells where the target land cover is not changing
+
+## Update 14.03.2025
+
+Running one model per land cover transition type, i.e. we will have:
+
+1.  Model 1: Forest -\> TWS
+
+2.  Model 2: TWS -\> Forest
+
+3.  Model 3: All -\> Urban
+
+Since $JDI\in [0,1]$, the models will be run with a $\beta$ distribution. However, since the values touch 0 and 1 and the $\beta$ distribution assumes $JDI\in (0,1)$, the JDI values will be transformed according to the formula:
+
+$$\frac{Y*(N-1)+0.5}{N}$$
+
+where Y = the response variable and N = sample size.
+
+For more details on the use of $\beta$ distribution for (0,1) values, see: Beta regression in R. Cibrari-Neto & Zeileis. Journal of Statistical Software. April 2010, Volume 34, Issue 2.
 
 # Outstanding Issues & Next Steps
 
