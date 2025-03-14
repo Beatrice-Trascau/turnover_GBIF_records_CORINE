@@ -198,4 +198,63 @@ ggsave(filename = here("figures", "Figure3_occurrences_through_time.svg"),
 
 ## 5.2. Panel for each taxonomic group -----------------------------------------
 
+# Calculate maximum y axis value to keep scales consistent
+max_count_value <- max(yearly_taxonomic_counts$total)
+
+# Define function to create consistent plots for each group
+create_group_plot <- function(group_name) {
+  # filter data for the specific group
+  group_data <- yearly_taxonomic_counts |>
+    filter(taxonomic_group == group_name)
+  
+  # get the color for this group from your existing palette
+  group_color <- taxonomic_colours[group_name]
+  
+  # create the plot
+  plot <- ggplot(group_data, aes(x = year, y = count)) +
+    geom_area(fill = group_color) +
+    geom_vline(xintercept = c(2000, 2006, 2012, 2018), 
+               linetype = "dashed", 
+               color = "darkgray") +
+    labs(title = group_name,
+         x = "Year", 
+         y = "Number of Occurrences") +
+    theme_classic() +
+    theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+          axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+          axis.text.y = element_text(size = 8),
+          axis.title.x = element_text(size = 10),
+          axis.title.y = element_text(size = 10)) +
+    scale_x_continuous(breaks = seq(1997, 2018, 3)) +  
+    scale_y_continuous(limits = c(0, max_count_value))  
+  
+  return(plot)
+}
+
+# Create individual plots for each taxonomic group
+plants_plot <- create_group_plot("Plants")
+birds_plot <- create_group_plot("Birds")
+arthropods_plot <- create_group_plot("Arthropods")
+mammals_plot <- create_group_plot("Mammals")
+other_plot <- create_group_plot("Other")
+
+# Arrange the top row
+top_row <- plot_grid(plants_plot, birds_plot, arthropods_plot, 
+                     ncol = 3, align = "h", axis = "tb")
+
+# Arrange the bottom row
+bottom_row <- plot_grid(mammals_plot, other_plot, NULL,
+                        ncol = 3, align = "h", axis = "tb")
+
+# Combine the rows
+multi_panel_plot <- plot_grid(top_row, bottom_row, ncol = 1, rel_heights = c(1, 1))
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure4_occurrences_through_time_by_group.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure4_occurrences_through_time_by_group.svg"),
+       width = 12, height = 8, dpi = 300)
+
 # END OF SCRIPT ----------------------------------------------------------------
