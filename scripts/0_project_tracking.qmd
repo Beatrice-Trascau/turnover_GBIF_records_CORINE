@@ -542,6 +542,12 @@ Model output revealed significant effect of LC Change, LC No Change, $\Delta rec
 
 ![Figure 4: Distribution of Moran's I values for Forest -\> TWS beta GLM.](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png){width="462"}
 
+### Model 3: TWS -\> Forest ($\beta$ GLM)
+
+Model output revealed significant effect of LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods but no effect of LC Change. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
+
+![Figure 5: Distribution of Moran's I values for TWS -\> Forest beta GLM](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png){width="451"}
+
 # Outstanding Issues & Next Steps
 
 ## Current Challenges
