@@ -53,3 +53,27 @@ N <- nrow(turnover_forest_tws_15km)
 # Calculate new JDI values
 turnover_forest_tws_15km <- turnover_forest_tws_15km |>
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Check the rest of the values are what you expect them to be
+glimpse(turnover_forest_tws_15km) # everything looks ok
+
+# 3. RUN BETA GLM --------------------------------------------------------------
+
+## 3.1. Run model --------------------------------------------------------------
+
+# Run model
+model1.1 <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change + 
+                               delta_recorder_effort + recorder_effort + lc_time_period,
+                             data = turnover_forest_tws_15km)
+
+# Get summary
+summary(model1.1)
+
+## 3.2. Check spatial autocorrelation of residuals -----------------------------
+
+# Extarct residuals from model
+model1.1_residuals <- residuals(model1.1)
+
+# Add residuals to df
+turnover_forest_tws_15km$residuals <- model1.1_residuals
+
