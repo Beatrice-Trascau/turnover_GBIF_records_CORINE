@@ -581,3 +581,7 @@ Model output revealed significant effect of LC Change, LC No Change, $\Delta rec
 ## 2. Species Groups in Time Periods
 
 ![Figure 8. Proportion of occurrence records belonging to each group in each time period.](images/Figure2_taxonomic_composition_across_periods(1).png)
+
+![Figure 9. Number of occurrences for each group through time.](images/Figure3_occurrences_through_time.png){width="570"}
+
+![Figure 10. Number of occurrences through time broken down by group.](images/Figure4_occurrences_through_time_by_group-01.png)
