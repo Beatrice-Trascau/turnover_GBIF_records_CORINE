@@ -113,5 +113,91 @@ moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
                          xlab = "Model Residuals", 
                          ylab = "Spatially Lagged Residuals")
 
+# 5. PLOT MORAN'S I RESULTS ----------------------------------------------------
 
-## 4.4. Map of Moran's I values ------------------------------------------------
+## 5.1. Calculate local Moran's I values ---------------------------------------
+
+# Calculate local Moran's I wiht zero.policy
+local_moran <- localmoran(turnover_sf$residuals, weights, zero.policy = TRUE)
+
+# Add local Moran's I statistics to the spatial dataframe
+turnover_sf$local_moran_i <- local_moran[, 1] # I statistics
+turnover_sf$local_moran_p <- local_moran[, 5] # p-value
+
+## 5.2. Handle missing values --------------------------------------------------
+
+# Check for missing values in Moran's I column
+missing_values <- sum(is.na(turnover_sf$local_moran_i))
+cat("Number of cells with missing Local Moran's I values:", missing_values, "\n") #0
+
+# Filter out NA for mapping
+turnover_sf_clean <- turnover_sf |>
+  filter(!is.na(local_moran_i))
+
+## 5.3. Map of local Moran I values --------------------------------------------
+
+# Extract coordinates
+coords <- st_coordinates(turnover_sf)
+turnover_df <- cbind(st_drop_geometry(turnover_sf), coords)
+
+# Plot map
+plot1 <- ggplot(turnover_df |> 
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = local_moran_i)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "viridis", name = "Local Moran's I") +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
+
+# Save map
+# ggsave(here("figures", "SupplementaryFigure4a_Local_Moran_I_Forest_TWS_15km.png"),
+#        plot1, width = 10, height = 8)
+
+## 5.3. Map of significance of local Moran's I values --------------------------
+
+# Plot map
+plot2 <- ggplot(turnover_df |> 
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = local_moran_p < 0.05)) +
+  geom_tile() +
+  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey"),
+                    name = "Significant",
+                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.05")) +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+          axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.line = element_blank(),
+          axis.ticks = element_blank())
+
+# Save figure 
+# ggsave(here("figures", "SupplementaryFigure4b_Local_Moran_I_Significance_Forest_TWS_15km.png"),
+#        plot1, width = 10, height = 8)
+
+## 5.4. Combine into single plot -----------------------------------------------
+
+# Combine plots
+forest_tws_15km_local_morans_I <- plot_grid(plot1, plot2,
+                                            labels = c("a)", "b)"),
+                                            nrow = 1, align = "h")
+
+# Save to file
+ggsave(here("figures", "SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png"),
+       forest_tws_15km_local_morans_I, width = 10, height = 8)
+
+# 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
+
+# Calculate % of cells with significant spatial autocorrelation
+sig_percentage <- mean(turnover_sf$local_moran_p < 0.05, na.rm = TRUE) * 100
+
+# Print summary statistics
+cat("\n=== SPATIAL AUTOCORRELATION SUMMARY ===\n")
+cat("Global Moran's I:", round(moran_test$estimate[1], 4), "\n")
+cat("p-value:", format.pval(moran_test$p.value), "\n")
+cat("Percentage of cells with significant local autocorrelation:", round(sig_percentage, 2), "%\n")
+
+# END OF SCRIPT ----------------------------------------------------------------
