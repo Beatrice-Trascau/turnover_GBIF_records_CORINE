@@ -540,13 +540,19 @@ For more details on the use of $\beta$ distribution for (0,1) values, see: Beta 
 
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 18% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 4: Distribution of Moran's I values for Forest -\> TWS beta GLM.](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png){width="462"}
+![Figure 4: Distribution of Moran's I values for Forest -\> TWS beta GLM](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km-02.png){width="451"}
 
-### Model 3: TWS -\> Forest ($\beta$ GLM)
+### Model 2: TWS -\> Forest ($\beta$ GLM)
 
 Model output revealed significant effect of LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods but no effect of LC Change. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
 ![Figure 5: Distribution of Moran's I values for TWS -\> Forest beta GLM](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png){width="451"}
+
+### Model 3: All -\> Urban/Artificial Surfaces ($\beta$ GLM)
+
+Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
+
+![Figure 6: Distribution of Moran's I values for All -\> Urban beta GLM](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png){width="451"}
 
 # Outstanding Issues & Next Steps
 
