@@ -239,11 +239,13 @@ mammals_plot <- create_group_plot("Mammals")
 other_plot <- create_group_plot("Other")
 
 # Arrange the top row
-top_row <- plot_grid(plants_plot, birds_plot, arthropods_plot, 
+top_row <- plot_grid(plants_plot, birds_plot, arthropods_plot,
+                     labels = c('a)', 'b)', 'c)'),
                      ncol = 3, align = "h", axis = "tb")
 
 # Arrange the bottom row
 bottom_row <- plot_grid(mammals_plot, other_plot, NULL,
+                        labels = c('d)', 'e)'),
                         ncol = 3, align = "h", axis = "tb")
 
 # Combine the rows
