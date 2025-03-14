@@ -31,7 +31,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|-----------------------|------------------------------------------------|
+|------------------------|------------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -230,7 +230,7 @@ Across, Norway the distribution of the "edge" pixels is as follows:
 #knitr::include_graphics(here("figures", "SupplementaryFigure1_Edge_Pixels_15km.png"))
 ```
 
-![Figure 1: Distribution of edge pixels across Norway.](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
+![Figure 1. Distribution of edge pixels across Norway.](images/SupplementaryFigure1_Edge_Pixels_15km.png){width="515"}
 
 ```{r edge pixels summary}
 #| label: edge-pixels-summary
@@ -260,7 +260,7 @@ The percentages of areas falling outside of the Norway shapefile boundaries, are
 #knitr::include_graphics(here("figures", "SupplementaryFigure2_Edge_Pixels_15km_Histogram.png"))
 ```
 
-![Figure 2: Histogram of % area outside of Norway boundary of edge pixels.](images/SupplementaryFigure2_Edge_Pixels_15km_Histogram.png){width="531"}
+![Figure 2. Histogram of % area outside of Norway boundary of edge pixels.](images/SupplementaryFigure2_Edge_Pixels_15km_Histogram.png){width="531"}
 
 Data validation revealed that 426 cells were masked, instead of the expected 434. This meant that 8 cells were unaccounted for. Further exploration revealed that the specific 8 cells were already set to NA in the raster layers before the masking.
 
@@ -274,7 +274,7 @@ Further validation also revealed that the masking did not alter the values of th
 #knitr::include_graphics(here("figures", "SupplementaryFigure3_MaskingValidation.png"))
 ```
 
-![Figure 3: Validation results of spatial accuracy of masking.](images/SupplementaryFigure3_MaskingValidation.png){width="498"}
+![Figure 3. Validation results of spatial accuracy of masking.](images/SupplementaryFigure3_MaskingValidation.png){width="498"}
 
 ## Turnover Calculation (3.1)
 
@@ -540,28 +540,44 @@ For more details on the use of $\beta$ distribution for (0,1) values, see: Beta 
 
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 18% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 4: Distribution of Moran's I values for Forest -\> TWS beta GLM](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km-02.png){width="451"}
+![Figure 4. Distribution of Moran's I values for Forest -\> TWS beta GLM](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png){width="451"}
 
 ### Model 2: TWS -\> Forest ($\beta$ GLM)
 
 Model output revealed significant effect of LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods but no effect of LC Change. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 5: Distribution of Moran's I values for TWS -\> Forest beta GLM](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png){width="451"}
+![Figure 5. Distribution of Moran's I values for TWS -\> Forest beta GLM](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png){width="451"}
 
 ### Model 3: All -\> Urban/Artificial Surfaces ($\beta$ GLM)
 
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 6: Distribution of Moran's I values for All -\> Urban beta GLM](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png){width="451"}
+![Figure 6. Distribution of Moran's I values for All -\> Urban beta GLM](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png){width="451"}
 
 # Outstanding Issues & Next Steps
 
 ## Current Challenges
 
-1.  Change function that calculates turnover
-
 ## Planned Improvements
+
+-   Figure of the number of occurrences broken down by group through time
+
+-   Additional data exploration steps
+
+-   Add code validation steps for script 3.1
 
 ## Further Questions
 
-# 
+1.  How do turnover rates break down by major groups (plants, arthropods, birds, mammals)?
+
+2.  What are the ratios of species loss and gain for each group in each time period?
+
+# Preliminary Results
+
+# 1. Land Cover Change
+
+![Figure 7. Distribution of % of grid cell area undergoing Forest to Transitional Woodland Shrub in a) 200-2006, b) 2006-2012, c)2012-2018, Transitional Woodland Shrub to Forest in d) 2000-2006, e) 2006-2012, f) 2012-2018 or conversion to Artificial Surfaces in g) 2000-2006, h) 2006-2012, i) 2012-2018.](images/Figure1_landcover_transitions_15km.png)
+
+## 2. Species Groups in Time Periods
+
+![Figure 8. Proportion of occurrence records belonging to each group in each time period.](images/Figure2_taxonomic_composition_across_periods(1).png)
