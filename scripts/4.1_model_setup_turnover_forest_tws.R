@@ -187,7 +187,7 @@ forest_tws_15km_local_morans_I <- plot_grid(plot1, plot2,
 
 # Save to file
 ggsave(here("figures", "SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png"),
-       forest_tws_15km_local_morans_I, width = 10, height = 8)
+       forest_tws_15km_local_morans_I, width = 12, height = 8)
 
 # 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
 
