@@ -178,16 +178,40 @@ plot2 <- ggplot(turnover_df |>
 # ggsave(here("figures", "SupplementaryFigure4b_Local_Moran_I_Significance_Forest_TWS_15km.png"),
 #        plot1, width = 10, height = 8)
 
-## 5.4. Combine into single plot -----------------------------------------------
+## 5.4. Map of significant Moran's I with positive/negative residuals -----------
+
+# Create categorical variable that combines significance and residual sign
+turnover_df <- turnover_df |>
+  mutate(sig_residual_type = case_when(local_moran_p < 0.05 & residuals > 0 ~ "Significant Positive",
+                                       local_moran_p < 0.05 & residuals < 0 ~ "Significant Negative",
+                                       local_moran_p >= 0.05 ~ "Not Significant"))
+
+# Plot map of significant clusters with positive/negative residuals
+plot3 <- ggplot(turnover_df |>
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = sig_residual_type)) +
+  geom_tile() +
+  scale_fill_manual(values = c("Significant Positive" = "pink", 
+                               "Significant Negative" = "lightblue",
+                               "Not Significant" = "grey"),
+                    name = "Residual Type") +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
+
+## 5.5. Combine into single plot -----------------------------------------------
 
 # Combine plots
-tws_forest_15km_local_morans_I <- plot_grid(plot1, plot2,
-                                            labels = c("a)", "b)"),
+tws_forest_15km_local_morans_I <- plot_grid(plot1, plot2, plot3,
+                                            labels = c("a)", "b)", "c)"),
                                             nrow = 1, align = "h")
 
 # Save to file
 ggsave(here("figures", "SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png"),
-       tws_forest_15km_local_morans_I, width = 12, height = 8)
+       tws_forest_15km_local_morans_I, width = 18, height = 8)
 
 # 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
 
