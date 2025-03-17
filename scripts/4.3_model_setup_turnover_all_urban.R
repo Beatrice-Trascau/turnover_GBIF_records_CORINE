@@ -1,6 +1,6 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 4.4_model_setup_turnover_all_urban
+# 4.3_model_setup_turnover_all_urban
 # This script contains code which sets up the models exploring the imapct of 
 # Forest -> TWS land cover transition on temporal turnover
 ##----------------------------------------------------------------------------##
