@@ -31,7 +31,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|------------------------|-----------------------------------------------|
+|-----------------------------------|---------------------------------------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -471,7 +471,7 @@ The previous method ran into several problems and became too complicated, likely
 At the end, we should have a dataframe with the following columns:
 
 | cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
-|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
 | 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
 
 At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
@@ -540,19 +540,19 @@ For more details on the use of $\beta$ distribution for (0,1) values, see: Beta 
 
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 18% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 4. Distribution of Moran's I values for Forest -\> TWS beta GLM](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png){width="451"}
+![Figure 4. Distribution of Moran's I values for Forest -\> TWS beta GLM](images/SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km-01.png)
 
 ### Model 2: TWS -\> Forest ($\beta$ GLM)
 
 Model output revealed significant effect of LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods but no effect of LC Change. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 5. Distribution of Moran's I values for TWS -\> Forest beta GLM](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png){width="451"}
+![Figure 5. Distribution of Moran's I values for TWS -\> Forest beta GLM.](images/SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km-01.png)
 
 ### Model 3: All -\> Urban/Artificial Surfaces ($\beta$ GLM)
 
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
-![Figure 6. Distribution of Moran's I values for All -\> Urban beta GLM](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png){width="451"}
+![Figure 6. Distribution of Moran's I values for All -\> Urban beta GLM.](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km-01.png)
 
 ## Update 17.03.2025
 
