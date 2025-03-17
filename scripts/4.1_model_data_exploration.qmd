@@ -1,0 +1,269 @@
+---
+title: "Forest to TWS JDI Data Exploration"
+format: html
+editor: visual
+---
+
+# Aims
+
+This document outlines data exploration steps of the data used to model temporal turnover in land cover cells undergoing the Forest to Transitional Woodland Shrub transition.
+
+```{r libraries}
+#| label: packages
+#| echo: false
+#| include: false
+library(here)
+library(ggplot2)
+library(kableExtra)
+library(cowplot)
+library(dplyr)
+library(corrplot)
+```
+
+```{r data preparation}
+#| label: data-prep
+#| include: false
+
+# Load Turnover data
+load(here("data", "derived_data",
+          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Select only columns for Forest -> TWS model
+turnover_forest_tws_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  # determine which rows belong to which time period
+  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+                                      TRUE ~ NA_real_),
+         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+                                   TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
+         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
+
+# Transform JDI values for beta regression 
+
+# Get N
+N <- nrow(turnover_forest_tws_15km)
+
+# Calculate new JDI values
+turnover_forest_tws_15km <- turnover_forest_tws_15km |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+```
+
+# Summary Statistics
+
+```{r summary stats}
+#| label: summary-stats
+#| echo: false
+
+# Extract summary data
+summary_by_period <- turnover_forest_tws_15km |>
+  group_by(lc_time_period) |>
+  summarize(n_observations = n(),
+            mean_JDI = mean(JDI, na.rm = TRUE),
+            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_forest_to_tws = mean(forest_to_tws, na.rm = TRUE),
+            sd_forest_to_tws = sd(forest_to_tws, na.rm = TRUE),
+            mean_forest_no_change = mean(forest_no_change, na.rm = TRUE),
+            sd_forest_no_change = sd(forest_no_change, na.rm = TRUE),
+            mean_delta_recorder_effort = mean(delta_recorder_effort, na.rm = TRUE),
+            mean_recorder_effort = mean(recorder_effort, na.rm = TRUE))
+
+# Create table for period summary
+summary_period_table <- summary_by_period |>
+  kbl(caption = "Table 1: Summary Statistics by Time Period",
+      digits = 3,
+      align = c("l", rep("r", ncol(summary_by_period)-1))) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) |>
+  column_spec(1, bold = TRUE) |>
+  row_spec(0, bold = TRUE, background = "#E6F0FF") |>
+  add_header_above(c(" " = 1, 
+                     "Sample" = 1,
+                     "Turnover" = 2, 
+                     "Forest to TWS" = 2,
+                     "Forest No Change" = 2,
+                     "Recorder Effort" = 2))
+
+# Print the table
+summary_period_table
+
+```
+
+# Distribution of Variables
+
+```{r variables}
+#| label: variables-distributions
+#| echo: false
+
+# Jaccard's Dissimilarity Index
+jdi_hist <- ggplot(turnover_forest_tws_15km, aes(x = JDI)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Jaccard Dissimilarity Index",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Forest -> TWS
+forest_to_tws_hist <- ggplot(turnover_forest_tws_15km, aes(x = forest_to_tws)) +
+  geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Forest to TWS Transition (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Forest No Change
+forest_no_change_hist <- ggplot(turnover_forest_tws_15km, aes(x = forest_no_change)) +
+  geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Forest No Change (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Recorder effort
+recorder_effort_plot <- ggplot(turnover_forest_tws_15km, aes(x = recorder_effort)) +
+  geom_histogram(bins = 30, fill = "orange", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Delta recorder effort
+delta_recorder_effort_plot <- ggplot(turnover_forest_tws_15km, aes(x = delta_recorder_effort)) +
+  geom_histogram(bins = 30, fill = "coral", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Delta Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Combine plots
+plots <- plot_grid(jdi_hist, forest_to_tws_hist, forest_no_change_hist, recorder_effort_plot, delta_recorder_effort_plot, ncol = 1, labels = c("a)", "b)", "c)", "d)", "e)"))
+
+# Print plots
+jdi_hist
+forest_to_tws_hist
+forest_no_change_hist
+recorder_effort_plot
+delta_recorder_effort_plot
+```
+
+# Relationships
+
+## Correlation Matrix
+
+```{r variable relationships}
+#| label: variables-relationships
+#| echo: false
+
+# Correlation matrix for numeric variables
+numeric_vars <- turnover_forest_tws_15km |>
+  select(JDI, forest_to_tws, forest_no_change, 
+         intersection_size, union_size, 
+         total_spp_before, total_spp_after,
+         total_occ_before, total_occ_after,
+         recorder_effort, delta_recorder_effort)
+
+# Calculate correlation matrix
+cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
+
+# Create correlation plot
+cor_plot <- corrplot(cor_matrix, 
+                     method = "circle", 
+                     type = "upper", 
+                     tl.col = "black", 
+                     tl.srt = 45, 
+                     addCoef.col = "black", 
+                     number.cex = 0.7,
+                     diag = FALSE)
+```
+
+## JDI & Forest Cells
+
+```{r JDI values in Forest cells}
+#| label: JDI-Forest
+#| echo: false
+#| message: false
+
+# Scatterplot of JDI values in Forest -> TWS cells
+jdi_vs_forest_to_tws <- ggplot(turnover_forest_tws_15km, 
+                              aes(x = forest_to_tws, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "Forest to TWS Transition (pixel count)",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Scatterplot of JDI values in Forest No Change cells
+jdi_vs_forest_no_change <- ggplot(turnover_forest_tws_15km, 
+                                aes(x = forest_no_change, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "Forest No Change (pixel count)",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Display plots
+jdi_vs_forest_to_tws
+jdi_vs_forest_no_change
+```
+
+## JDI & Recorder Effort
+
+```{r}
+#| label: JDI-Recorder-Effort
+#| echo: false
+#| message: false
+
+# Scatterplots of JDI vs recorder effort 
+jdi_vs_recorder_effort <- ggplot(turnover_forest_tws_15km, 
+                               aes(x = recorder_effort, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "Recorder Effort",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_x_log10() +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Scatterplots of JDI vs delta recorder effort 
+jdi_vs_delta_recorder_effort <- ggplot(turnover_forest_tws_15km, 
+                                     aes(x = delta_recorder_effort, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Jaccard Dissimilarity Index vs Delta Recorder Effort",
+       x = "Delta Recorder Effort",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Display plots
+jdi_vs_recorder_effort
+jdi_vs_delta_recorder_effort
+```
