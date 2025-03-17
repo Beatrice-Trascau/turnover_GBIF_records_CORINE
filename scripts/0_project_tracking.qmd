@@ -31,7 +31,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|------------------------|------------------------------------------------|
+|------------------------|-----------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -553,6 +553,10 @@ Model output revealed significant effect of LC No Change, $\Delta recorder_{effo
 Model output revealed significant effect of LC Change, LC No Change, $\Delta recorder_{effort}$, $recorder_{effort}$, and the two time periods. Moran's I tests revealed significant spatial autocorrelation between the cells, with 17% of cells having significant local autocorrelation. Here is how that looked distributed across Norway:
 
 ![Figure 6. Distribution of Moran's I values for All -\> Urban beta GLM](images/SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png){width="451"}
+
+## Update 17.03.2025
+
+To determine best course of action regarding data analysis of temporal turnover, especially in light of the significant spatial autocorrelation of residuals detected, we must first follow some data exploration steps.
 
 # Outstanding Issues & Next Steps
 
