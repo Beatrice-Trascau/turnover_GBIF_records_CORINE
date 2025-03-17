@@ -1,0 +1,25 @@
+---
+title: "All to Urban JDI Data Exploration"
+format: html
+editor: visual
+---
+
+# Aims
+
+This document outlines data exploration steps of the data used to model temporal turnover in land cover cells undergoing the All to Urban/Artificial Surfaces transition.
+
+```{r libraries}
+#| label: packages
+#| echo: false
+#| include: false
+library(here)
+library(ggplot2)
+library(kableExtra)
+library(cowplot)
+library(dplyr)
+library(corrplot)
+```
+
+```{r data preparation}
+
+```
