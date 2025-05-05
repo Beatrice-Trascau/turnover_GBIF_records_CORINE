@@ -123,3 +123,128 @@ plants_sf_2012_2018$cell_ID <- terra::extract(reference_grid,
 # Remove occurrences that fall outside valid grid cells
 plants_sf_2012_2018_valid <- plants_sf_2012_2018 |>
   filter(!is.na(cell_ID))
+
+# 5. GET SPECIES LISTS AND NUMBER OF OCCURRENCES FOR EACH CELL -----------------
+
+## 5.1. First period: 2000-2006 ------------------------------------------------
+
+# Create species list and total number of occurrences for each before and after period
+cell_2000_2006_summary <- plants_sf_2000_2006_valid |>
+  st_drop_geometry() |>
+  group_by(cell_ID, time_period) |>
+  summarize(species_list = list(unique(species)),
+            n_species = length(unique(species)),
+            n_occurrences = n(),
+            .group = "drop")
+
+# Reshape to wide format to separate before and after columns
+cell_2000_2006_summary_wide <- cell_2000_2006_summary |>
+  # convert to wide format
+  pivot_wider(id_cols = cell_ID,
+              names_from = time_period,
+              values_from = c(species_list, n_species, n_occurrences)) |>
+  # rename columns 
+  rename(species_list_before = 'species_list_1997-2000',
+         species_list_after = 'species_list_2006-2009',
+         total_spp_before = 'n_species_1997-2000',
+         total_spp_after = 'n_species_2006-2009',
+         total_occ_before = 'n_occurrences_1997-2000',
+         total_occ_after = 'n_occurrences_2006-2009') |>
+  # replace NA values in occurrence columns with 0
+  mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
+         total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
+         total_occ_before = ifelse(is.na(total_occ_before), 0, total_occ_before),
+         total_occ_after = ifelse(is.na(total_occ_after), 0, total_occ_after)) |>
+  # add time period, recorder effort and delta recorder effort columns
+  mutate(lc_time_period = "2000-2006",
+         recorder_effort = total_occ_before + total_occ_after,
+         delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+
+# Replace NULL values in the species_list_columns
+cell_2000_2006_summary_wide <- cell_2000_2006_summary_wide |>
+  mutate(species_list_before = lapply(species_list_before, 
+                                      function(x) if(is.null(x)) character(0) else x),
+         species_list_after = lapply(species_list_after, 
+                                     function(x) if(is.null(x)) character(0) else x))
+
+## 5.2. Second period: 2006-2012 -----------------------------------------------
+
+# Create species list and total number of occurrences for each before and after period
+cell_2006_2012_summary <- plants_sf_2006_2012_valid |>
+  st_drop_geometry() |>
+  group_by(cell_ID, time_period) |>
+  summarize(species_list = list(unique(species)),
+            n_species = length(unique(species)),
+            n_occurrences = n(),
+            .group = "drop")
+
+# Reshape to wide formate to separate before and after columns
+cell_2006_2012_summary_wide <- cell_2006_2012_summary |>
+  # convert to wide format
+  pivot_wider(id_cols = cell_ID,
+              names_from = time_period,
+              values_from = c(species_list, n_species, n_occurrences)) |>
+  # rename columns 
+  rename(species_list_before = 'species_list_2003-2006',
+         species_list_after = 'species_list_2012-2015',
+         total_spp_before = 'n_species_2003-2006',
+         total_spp_after = 'n_species_2012-2015',
+         total_occ_before = 'n_occurrences_2003-2006',
+         total_occ_after = 'n_occurrences_2012-2015') |>
+  # replace NA values in occurrence columns with 0
+  mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
+         total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
+         total_occ_before = ifelse(is.na(total_occ_before), 0, total_occ_before),
+         total_occ_after = ifelse(is.na(total_occ_after), 0, total_occ_after)) |>
+  # add time period, recorder effort and delta recorder effort columns
+  mutate(lc_time_period = "2006-2012",
+         recorder_effort = total_occ_before + total_occ_after,
+         delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+
+# Replace NULL values in the species_list_columns
+cell_2006_2012_summary_wide <- cell_2006_2012_summary_wide |>
+  mutate(species_list_before = lapply(species_list_before, 
+                                      function(x) if(is.null(x)) character(0) else x),
+         species_list_after = lapply(species_list_after, 
+                                     function(x) if(is.null(x)) character(0) else x))
+
+## 5.3. Third period: 2012-2018 ------------------------------------------------
+
+# Create species list and total number of occurrences for each before and after period
+cell_2012_2018_summary <- plants_sf_2012_2018_valid |>
+  st_drop_geometry() |>
+  group_by(cell_ID, time_period) |>
+  summarize(species_list = list(unique(species)),
+            n_species = length(unique(species)),
+            n_occurrences = n(),
+            .group = "drop")
+
+# Reshape to wide formate to separate before and after columns
+cell_2012_2018_summary_wide <- cell_2012_2018_summary |>
+  # convert to wide format
+  pivot_wider(id_cols = cell_ID,
+              names_from = time_period,
+              values_from = c(species_list, n_species, n_occurrences)) |>
+  # rename columns 
+  rename(species_list_before = 'species_list_2009-2012',
+         species_list_after = 'species_list_2015-2018',
+         total_spp_before = 'n_species_2009-2012',
+         total_spp_after = 'n_species_2015-2018',
+         total_occ_before = 'n_occurrences_2009-2012',
+         total_occ_after = 'n_occurrences_2015-2018') |>
+  # replace NA values in occurrence columns with 0
+  mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
+         total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
+         total_occ_before = ifelse(is.na(total_occ_before), 0, total_occ_before),
+         total_occ_after = ifelse(is.na(total_occ_after), 0, total_occ_after)) |>
+  # add time period, recorder effort and delta recorder effort columns
+  mutate(lc_time_period = "2012-2018",
+         recorder_effort = total_occ_before + total_occ_after,
+         delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+
+# Replace NULL values in the species_list_columns
+cell_2012_2018_summary_wide <- cell_2012_2018_summary_wide |>
+  mutate(species_list_before = lapply(species_list_before, 
+                                      function(x) if(is.null(x)) character(0) else x),
+         species_list_after = lapply(species_list_after, 
+                                     function(x) if(is.null(x)) character(0) else x))
