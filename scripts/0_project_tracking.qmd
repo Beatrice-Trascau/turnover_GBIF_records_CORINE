@@ -494,6 +494,14 @@ Total number of occurrences = 11 492 996. Before = 4 847 584, After = 6 645 412.
 
 Total number of occurrences assigned to non-NA grid cells: 9 055 263/11 492 996 (78.79%). Occurrences were assigned to a total of 1462 unique non-NA cells.
 
+# Vascular Plant Turnover Calculation (3.2.)
+
+## Update 30.04.2025
+
+Created new script to calculate the temporal turnover of vascular plants in relation to land cover changes.
+
+From the main occurrence dataframe, I filtered out all records where phylum was not *Tracheophyta*.
+
 # Turnover Models (4.1)
 
 ## Update 06.03.2025
