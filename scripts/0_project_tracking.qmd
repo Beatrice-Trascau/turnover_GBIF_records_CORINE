@@ -1,6 +1,11 @@
 ---
 title: "Paper 2: CLC Land Cover Changes and Turnover of GBIF Records"
-format: html
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-location: left
+    css: custom.css
 editor: visual
 ---
 
@@ -29,7 +34,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name | Function |
-|------------------------|-----------------------------------------------|
+|-------------------------|-----------------------------------------------|
 | 0_setup | Sets up all the packages and functions needed for the project |
 | 1.1_CORINE_layers_preparation | Loads and prepares CORINE layers for further analysis |
 | 1.2_CORINE_aggregation | Aggregates original rasters to 15km |
@@ -609,6 +614,70 @@ summary_stats |>
 
 # Display figure
 gain_loss_forest_tws
+```
+
+## TWS -\> Forest
+
+```{r species change tws to forest}
+#| label: species-loss-gain-tws-forest-summary
+#| echo: false
+#| message: false
+#| warning: false
+
+# Display table
+summary_stats_tws_forest |>
+  kbl(caption = "Table 5: Summary of Species Gain and Loss in TWS to Forest cells",
+      col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
+                    "Median Change", "Max Change", "Total Cells", "%"),
+      align = c("l", "r")) |>
+  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+                full_width = FALSE) 
+```
+
+```{r species change plotting}
+#| label: species-loss-gain-tws-forest
+#| fig-cap: "Species loss and gain for vascular plants and birds in Transitional Woodland Shrub to Forest land cover conversions"
+#| fig-width: 7
+#| fig-height: 6
+#| out-width: "100%"
+#| echo: false
+#| message: false
+#| warning: false
+
+# Display figure
+gain_loss_tws_forest
+```
+
+## All -\> Urban
+
+```{r species change all urban summary}
+#| label: species-loss-gain-all-urban-summary
+#| echo: false
+#| message: false
+#| warning: false
+
+# Display table
+summary_stats_all_urban |>
+  kbl(caption = "Table 6: Summary of Species Gain and Loss in All to Urban cells",
+      col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
+                    "Median Change", "Max Change", "Total Cells", "%"),
+      align = c("l", "r")) |>
+  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+                full_width = FALSE) 
+```
+
+```{r species change all urban plotting}
+#| label: species-loss-gain-all-urban
+#| fig-cap: "Species loss and gain for vascular plants and birds in All to Urban land cover conversions"
+#| fig-width: 7
+#| fig-height: 6
+#| out-width: "100%"
+#| echo: false
+#| message: false
+#| warning: false
+
+# Display figure
+gain_loss_all_urban
 ```
 
 # Outstanding Issues & Next Steps
