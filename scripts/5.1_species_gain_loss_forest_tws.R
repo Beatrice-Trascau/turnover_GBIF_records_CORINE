@@ -27,7 +27,7 @@ tws_forest_15km <- rast(here("data", "derived_data",
 
 # All -> Urban raster
 all_urban_15km <- rast(here("data", "derived_data", 
-                            "clc_status_15km_all_urban_masked.tif"))
+                            "clc_status_15km_all_urban_combined_masked.tif"))
 
 # 2. PREPARE DATA FOR ANALYSIS -------------------------------------------------
 
@@ -245,7 +245,7 @@ jitter_species_change_plot <- ggplot(forest_tws_data,
         axis.text.y = element_text(angle=90))
 
 # Density plot for distribution of species change
-density_plot <- ggplot(combined_forest_tws, 
+density_plot <- ggplot(forest_tws_data, 
                        aes(x = species_change, fill = taxonomic_group)) +
   # add vertical line at x = 0
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
