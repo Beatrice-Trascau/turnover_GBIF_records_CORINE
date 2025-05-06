@@ -1,0 +1,66 @@
+/* Increase base font size throughout the document */
+body {
+  font-size: 1.1rem;
+}
+
+/* Increase font size in the navigation sidebar */
+#TOC {
+  font-size: 1.05rem;
+}
+
+/* Style headings with purple colors - darkest for h1, getting lighter for each level */
+h1 {
+  color: #4a148c; /* Very dark purple for h1 */
+  font-size: 2.5rem;
+}
+
+h2 {
+  color: #6a1b9a; /* Dark purple for h2 */
+  font-size: 2.1rem;
+}
+
+h3 {
+  color: #7b1fa2; /* Medium purple for h3 */
+  font-size: 1.8rem;
+}
+
+h4 {
+  color: #8e24aa; /* Lighter purple for h4 */
+  font-size: 1.5rem;
+}
+
+h5 {
+  color: #9c27b0; /* Even lighter purple for h5 */
+  font-size: 1.3rem;
+}
+
+/* Style the navigation sidebar */
+#TOC {
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+  padding: 1em;
+}
+
+/* Style the TOC links */
+#TOC a {
+  color: #7b1fa2; /* Medium purple for TOC links */
+  text-decoration: none;
+}
+
+#TOC a:hover {
+  color: #4a148c; /* Darker purple on hover */
+  text-decoration: underline;
+}
+
+/* Make the active TOC item stand out */
+#TOC .active {
+  font-weight: bold;
+}
+
+/* Style the TOC title */
+.sidebar-title {
+  font-weight: bold;
+  font-size: 1.3rem;
+  color: #4a148c; /* Very dark purple for the TOC title */
+  margin-bottom: 1em;
+}
