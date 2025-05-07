@@ -13,13 +13,258 @@ This document outlines data exploration steps of the data used to model temporal
 #| echo: false
 #| include: false
 library(here)
-library(ggplot2)
-library(kableExtra)
-library(cowplot)
-library(dplyr)
-library(corrplot)
+source(here("scripts", "0_setup.R"))
 ```
 
 ```{r data preparation}
 
+# Load Turnover data
+load(here("data", "derived_data",
+          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Prepare data
+turnover_all_urban_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  # determine which rows belong to which time period
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                   TRUE ~ NA_real_),
+         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                                   TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`, 
+         -`2006-2012_Urban_no_change`,-`2006-2012_all_to_urban`, 
+         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`)
+
+# Get N
+N <- nrow(turnover_all_urban_15km)
+
+# Calculate new JDI values
+turnover_all_urban_15km <- turnover_all_urban_15km |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 ```
+
+# Summary Statistics
+
+```{r summary stats}
+#| label: summary-stats
+#| echo: false
+
+# Extract summary data
+summary_by_period <- turnover_all_urban_15km  |>
+  group_by(lc_time_period) |>
+  summarize(n_observations = n(),
+            mean_JDI = mean(JDI, na.rm = TRUE),
+            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_all_to_urban = mean(all_to_urban, na.rm = TRUE),
+            sd_all_to_urban = sd(all_to_urban, na.rm = TRUE),
+            mean_urban_no_change = mean(urban_no_change, na.rm = TRUE),
+            sd_urban_no_change = sd(urban_no_change, na.rm = TRUE),
+            mean_delta_recorder_effort = mean(delta_recorder_effort, na.rm = TRUE),
+            mean_recorder_effort = mean(recorder_effort, na.rm = TRUE))
+
+# Create table for period summary
+summary_period_table <- summary_by_period |>
+  kbl(caption = "Table 1: Summary Statistics by Time Period",
+      digits = 3,
+      align = c("l", rep("r", ncol(summary_by_period)-1))) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) |>
+  column_spec(1, bold = TRUE) |>
+  row_spec(0, bold = TRUE, background = "#E6F0FF") |>
+  add_header_above(c(" " = 1, 
+                     "Sample" = 1,
+                     "Turnover" = 2, 
+                     "All to Urban" = 2,
+                     "Urban No Change" = 2,
+                     "Recorder Effort" = 2))
+
+# Print the table
+summary_period_table
+```
+
+# Distribution of Values
+
+Firstly, we look at the distribution of values across each of the response variables used in our model.
+
+```{r variables}
+#| label: variables-distributions
+#| echo: false
+
+# Jaccard's Dissimilarity Index
+jdi_hist <- ggplot(turnover_all_urban_15km, aes(x = JDI)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Jaccard Dissimilarity Index",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# All -> Urban
+all_to_urban_hist <- ggplot(turnover_all_urban_15km, aes(x = tws_to_forest)) +
+  geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "All to Urban Transition (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Urban No Change
+urban_no_change_hist <- ggplot(turnover_all_urban_15km, aes(x = tws_no_change)) +
+  geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Urban No Change (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Recorder effort
+recorder_effort_plot <- ggplot(turnover_all_urban_15km, aes(x = recorder_effort)) +
+  geom_histogram(bins = 30, fill = "orange", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Delta recorder effort
+delta_recorder_effort_plot <- ggplot(turnover_all_urban_15km, aes(x = delta_recorder_effort)) +
+  geom_histogram(bins = 30, fill = "coral", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Delta Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+
+# Print plots
+jdi_hist
+all_to_urban_hist
+urban_no_change_hist
+recorder_effort_plot
+delta_recorder_effort_plot
+```
+
+# Relationships
+
+## Correlation Matrix
+
+Then, we will also check the correlation between the variables used in the analysis.
+
+```{r variable relationship}
+#| label: variables-relationships
+#| echo: false
+
+# Correlation matrix for numeric variables
+numeric_vars <- turnover_all_urban_15km  |>
+  select(JDI, all_to_urban, urban_no_change, 
+         intersection_size, union_size, 
+         total_spp_before, total_spp_after,
+         total_occ_before, total_occ_after,
+         recorder_effort, delta_recorder_effort)
+
+# Calculate correlation matrix
+cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
+
+# Create correlation plot
+cor_plot <- corrplot(cor_matrix, 
+                     method = "circle", 
+                     type = "upper", 
+                     tl.col = "black", 
+                     tl.srt = 45, 
+                     addCoef.col = "black", 
+                     number.cex = 0.7,
+                     diag = FALSE)
+```
+
+Fortunately, we see no concerningly large correlations between variables used in the analysis.
+
+# JDI and Urban Cells
+
+```{r JDI & LC changes plots}
+# Scatterplot of JDI values in Forest -> TWS cells
+jdi_vs_all_urban <- ggplot(turnover_all_urban_15km , 
+                            aes(x = all_to_urban, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  labs(x = "All to Urban Transition (pixel count)",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()+
+  theme(legend.position = "none")
+
+# Scatterplot of JDI values in Forest No Change cells
+jdi_vs_urban_no_change <- ggplot(turnover_all_urban_15km, 
+                               aes(x = urban_no_change, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  labs(x = "Urban No Change (pixel count)",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Combine plots
+jdi_urban_combied <- plot_grid(jdi_vs_all_urban, jdi_vs_urban_no_change,
+                             labels = c("a)", "b)"))
+
+# Display combined plot
+jdi_urban_combied
+```
+
+JDI seems to have a non-linear but negative relationship with the amount of urban pixels that do not change and the number of pixels that are converted to urban areas. In the case of the 2006-2012 the relationship may be influenced by some relatively large pixel values which stand out as outliers.
+
+# JDI and Recorder Effort
+
+```{r}
+#| label: JDI-Recorder-Effort
+#| echo: false
+#| message: false
+
+# Scatterplots of JDI vs recorder effort 
+jdi_vs_recorder_effort <- ggplot(turnover_all_urban_15km , 
+                               aes(x = recorder_effort, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  labs(x = "Recorder Effort",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_x_continuous(labels = label_number()) +
+  scale_color_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+# Scatterplots of JDI vs delta recorder effort 
+jdi_vs_delta_recorder_effort <- ggplot(turnover_all_urban_15km , 
+                                     aes(x = delta_recorder_effort, y = JDI, color = lc_time_period)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  labs(x = "Delta Recorder Effort",
+       y = "Jaccard Dissimilarity Index",
+       color = "Time Period") +
+  scale_color_viridis_d() +
+  theme_classic()
+
+# Combine plots
+jdi_recordinf_combied <- plot_grid(jdi_vs_recorder_effort, jdi_vs_delta_recorder_effort,
+                                labels = c("a)", "b)"))
+
+# Display combined plot
+jdi_recordinf_combied
+```
+
+The relationships between JDI and recorder effort are non-linear across all three periods of change. In the case of the relationship between JDI and $\Delta Recorder_{effort}$, JDI increases non-linearly with increasing change inn recorder effort. However, the magnitude of increase differs depending on the period considered. The relationship with recorder effort is similar to the TWS -\> Forest and the Forest -\> TWS dataframes, meaning that the relatioship is consistent regardless of the land cover change class considered.
