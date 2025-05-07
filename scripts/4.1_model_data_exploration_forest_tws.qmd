@@ -281,8 +281,8 @@ jdi_vs_delta_recorder_effort <- ggplot(turnover_forest_tws_15km,
   theme_classic()
 
 # Display plots
-jdi_vs_recorder_effort
-jdi_vs_delta_recorder_effort
+# jdi_vs_recorder_effort
+# jdi_vs_delta_recorder_effort
 
 # Combine plots
 jdi_recordinf_combied <- plot_grid(jdi_vs_recorder_effort, jdi_vs_delta_recorder_effort,
