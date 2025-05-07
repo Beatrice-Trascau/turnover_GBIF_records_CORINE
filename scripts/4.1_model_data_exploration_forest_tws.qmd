@@ -13,11 +13,7 @@ This document outlines data exploration steps of the data used to model temporal
 #| echo: false
 #| include: false
 library(here)
-library(ggplot2)
-library(kableExtra)
-library(cowplot)
-library(dplyr)
-library(corrplot)
+source(here("scripts", "0_setup.R"))
 ```
 
 ```{r data preparation}
@@ -103,6 +99,8 @@ summary_period_table
 
 # Distribution of Variables
 
+Firstly, we look at the distribution of values across each of the response variables used in our model.
+
 ```{r variables}
 #| label: variables-distributions
 #| echo: false
@@ -172,6 +170,8 @@ delta_recorder_effort_plot
 
 ## Correlation Matrix
 
+Then, we will also check the correlation between the variables used in the analysis.
+
 ```{r variable relationships}
 #| label: variables-relationships
 #| echo: false
@@ -198,6 +198,8 @@ cor_plot <- corrplot(cor_matrix,
                      diag = FALSE)
 ```
 
+Fortunately, we see no concerningly large correlations between variables used in the analysis.
+
 ## JDI & Forest Cells
 
 ```{r JDI values in Forest cells}
@@ -209,18 +211,19 @@ cor_plot <- corrplot(cor_matrix,
 jdi_vs_forest_to_tws <- ggplot(turnover_forest_tws_15km, 
                               aes(x = forest_to_tws, y = JDI, color = lc_time_period)) +
   geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth() +
   labs(x = "Forest to TWS Transition (pixel count)",
        y = "Jaccard Dissimilarity Index",
        color = "Time Period") +
   scale_color_viridis_d() +
-  theme_classic()
+  theme_classic() +
+  theme(legend.position = "none")
 
 # Scatterplot of JDI values in Forest No Change cells
 jdi_vs_forest_no_change <- ggplot(turnover_forest_tws_15km, 
                                 aes(x = forest_no_change, y = JDI, color = lc_time_period)) +
   geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth() +
   labs(x = "Forest No Change (pixel count)",
        y = "Jaccard Dissimilarity Index",
        color = "Time Period") +
@@ -228,9 +231,20 @@ jdi_vs_forest_no_change <- ggplot(turnover_forest_tws_15km,
   theme_classic()
 
 # Display plots
-jdi_vs_forest_to_tws
-jdi_vs_forest_no_change
+# jdi_vs_forest_to_tws
+# jdi_vs_forest_no_change
+
+# Combine plots
+jdi_forest_combied <- plot_grid(jdi_vs_forest_to_tws, jdi_vs_forest_no_change,
+                                labels = c("a)", "b)"))
+
+# Display combined plot
+jdi_forest_combied
 ```
+
+Jaccard's Dissimilarity Index appears to have a non-linear relationship with the amount of pixels of forest that are changing to TWS in 2012-2018. For the 2000-2006 period, there seems to be a rather large outlier for Forest -\> TWS (\~2000 pixels), which could bias the results of the models.
+
+In the case of the relationship between JDI and the amount of forest that does not undergo any land cover changes, it appears that there is no relationship in the first two time periods, but a non-linear relationship in the 2012-2018 period.
 
 ## JDI & Recorder Effort
 
@@ -239,25 +253,28 @@ jdi_vs_forest_no_change
 #| echo: false
 #| message: false
 
+# Set a global option to prevent scientific notation
+options(scipen = 999)
+
 # Scatterplots of JDI vs recorder effort 
 jdi_vs_recorder_effort <- ggplot(turnover_forest_tws_15km, 
                                aes(x = recorder_effort, y = JDI, color = lc_time_period)) +
   geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth() +
   labs(x = "Recorder Effort",
        y = "Jaccard Dissimilarity Index",
        color = "Time Period") +
-  scale_x_log10() +
+  scale_x_continuous(labels = label_number()) +
   scale_color_viridis_d() +
-  theme_classic()
+  theme_classic()+
+  theme(legend.position = "none")
 
 # Scatterplots of JDI vs delta recorder effort 
 jdi_vs_delta_recorder_effort <- ggplot(turnover_forest_tws_15km, 
                                      aes(x = delta_recorder_effort, y = JDI, color = lc_time_period)) +
   geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = TRUE) +
-  labs(title = "Jaccard Dissimilarity Index vs Delta Recorder Effort",
-       x = "Delta Recorder Effort",
+  geom_smooth() +
+  labs(x = "Delta Recorder Effort",
        y = "Jaccard Dissimilarity Index",
        color = "Time Period") +
   scale_color_viridis_d() +
@@ -266,4 +283,15 @@ jdi_vs_delta_recorder_effort <- ggplot(turnover_forest_tws_15km,
 # Display plots
 jdi_vs_recorder_effort
 jdi_vs_delta_recorder_effort
+
+# Combine plots
+jdi_recordinf_combied <- plot_grid(jdi_vs_recorder_effort, jdi_vs_delta_recorder_effort,
+                                labels = c("a)", "b)"))
+
+# Display combined plot
+jdi_recordinf_combied
 ```
+
+The relationship between JDI and recorder effort appears complex and differs depending on time period. In the 2000-2006, we first see a decline in JDI with increasing recording effort, followed by an increase after \~100 000 records. For the second period, we see a non-linear decline with increasing recording effort. Lastly, in the 2012-2018, the relationship does not seems to differ much from 0, but the estimation of the effect is likely impacted by the large outlier (\> 400 000 records). This appears to be something that should be accounted for.
+
+When looking at the relationship between JDI and $\Delta Recorder_{effort}$, we generally see non-linear positive relationships between the two. In the case of the first and last periods, JDI tends to increase steeply with changes in recording effort greater than 0.5.
