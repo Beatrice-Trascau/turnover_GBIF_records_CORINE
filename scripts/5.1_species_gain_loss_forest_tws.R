@@ -77,7 +77,7 @@ plants_all_changes <- plants_turnover |>
          has_all_to_urban = !is.na(all_to_urban) & all_to_urban > 0) |>
   # Select relevant columns
   select(cell_ID, lc_time_period, x, y, taxonomic_group, species_change, 
-         change_type, abs_change, total_spp_before, total_spp_after,
+         change_type, abs_change, total_spp_before, total_spp_after, recorder_effort,
          forest_no_change, forest_to_tws, has_forest_to_tws,
          tws_no_change, tws_to_forest, has_tws_to_forest,
          urban_no_change, all_to_urban, has_all_to_urban)
@@ -127,7 +127,7 @@ birds_all_changes <- birds_turnover |>
          has_all_to_urban = !is.na(all_to_urban) & all_to_urban > 0) |>
   # select relevant columns
   select(cell_ID, lc_time_period, x, y, taxonomic_group, species_change, 
-         change_type, abs_change, total_spp_before, total_spp_after,
+         change_type, abs_change, total_spp_before, total_spp_after, recorder_effort,
          forest_no_change, forest_to_tws, has_forest_to_tws,
          tws_no_change, tws_to_forest, has_tws_to_forest,
          urban_no_change, all_to_urban, has_all_to_urban)
@@ -415,5 +415,43 @@ ggsave(filename = here("figures", "Figure5_birds_plants_species_changes_all_urba
 
 ggsave(filename = here("figures", "Figure5_birds_plants_species_changes_all_urban.svg"),
        plot = gain_loss_all_urban, width = 12, height = 15, dpi = 300)
+
+# 5. VISUALISE CHANGE & RECORDER EFFORT ----------------------------------------
+
+# Forest -> TWS
+rec_effort_forest_tws <- ggplot(forest_tws_data, 
+                                aes(x = recorder_effort, y = species_change)) +
+  geom_point(alpha = 0.6) +
+  scale_x_continuous(labels = comma) +
+  geom_smooth() +
+  labs(x = "Recorder Effort", 
+       y = "Species Change") +
+  theme_classic()
+
+# TWS -> Forest
+rec_effort_tws_forest <- ggplot(tws_forest_data, 
+                                aes(x = recorder_effort, y = species_change)) +
+  geom_point(alpha = 0.6) +
+  scale_x_continuous(labels = comma) +
+  geom_smooth() +
+  labs(x = "Recorder Effort", 
+       y = "Species Change") +
+  theme_classic()
+
+# All -> Urban
+rec_effort_all_urban <- ggplot(all_urban_data, 
+                               aes(x = recorder_effort, y = species_change)) +
+  geom_point(alpha = 0.6) +
+  scale_x_continuous(labels = comma) +
+  geom_smooth() +
+  labs(x = "Recorder Effort", 
+       y = "Species Change") +
+  theme_classic()
+
+# Combine into single figure
+rec_effort <- plot_grid(rec_effort_forest_tws,
+                        rec_effort_tws_forest,
+                        rec_effort_all_urban,
+                        labels = c("a)", "b)", "c)"), ncol = 1)
 
 # END OF SCRIPT ----------------------------------------------------------------
