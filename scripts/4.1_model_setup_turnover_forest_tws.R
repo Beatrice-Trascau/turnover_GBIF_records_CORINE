@@ -162,11 +162,11 @@ plot1 <- ggplot(turnover_df |>
 # Plot map
 plot2 <- ggplot(turnover_df |> 
                   filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = local_moran_p < 0.05)) +
+                aes(x = X, y = Y, fill = local_moran_p < 0.001)) +
   geom_tile() +
   scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey"),
                     name = "Significant",
-                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.05")) +
+                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.001")) +
   theme_classic() +
   theme(panel.grid = element_blank(),
           axis.title = element_blank(),
@@ -182,9 +182,9 @@ plot2 <- ggplot(turnover_df |>
 
 # Create categorical variable that combines significance and residual sign
 turnover_df <- turnover_df |>
-  mutate(sig_residual_type = case_when(local_moran_p < 0.05 & residuals > 0 ~ "Significant Positive",
-                                       local_moran_p < 0.05 & residuals < 0 ~ "Significant Negative",
-                                       local_moran_p >= 0.05 ~ "Not Significant"))
+  mutate(sig_residual_type = case_when(local_moran_p < 0.001 & residuals > 0 ~ "Significant Positive",
+                                       local_moran_p < 0.001 & residuals < 0 ~ "Significant Negative",
+                                       local_moran_p >= 0.001 ~ "Not Significant"))
 
 # Plot map of significant clusters with positive/negative residuals
 plot3 <- ggplot(turnover_df |>
@@ -217,7 +217,7 @@ ggsave(here("figures", "SupplementaryFigure4_Local_Moran_I_Forest_TWS_15km.png")
 # 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
 
 # Calculate % of cells with significant spatial autocorrelation
-sig_percentage <- mean(turnover_sf$local_moran_p < 0.05, na.rm = TRUE) * 100
+sig_percentage <- mean(turnover_sf$local_moran_p < 0.001, na.rm = TRUE) * 100
 
 # Print summary statistics
 cat("\n=== SPATIAL AUTOCORRELATION SUMMARY ===\n")
