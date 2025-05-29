@@ -28,6 +28,11 @@ all_urban_15km <- rast(here("data", "derived_data",
 occurrences_norway <- fread(here("data", "derived_data", 
                                  "clean_occurrences_15km.txt"))
 
+## 1.3. SSB ID Grid ------------------------------------------------------------
+
+# SSB ID Grid
+ssb_grid <- st_read(here("data", "raw_data", "SSB050KM", "ssb50km.shp"))
+
 # 2. CREATE A SPATIAL REFERENCE GRID WITH CELL IDS -----------------------------
 
 # Create a reference grid from the CLC rasters
@@ -488,10 +493,48 @@ turnover_2012_2018_lc <- cell_2012_2018_filtered |>
 
 ## 7.4 Combine all into single df ----------------------------------------------
 
-# Combine all periods into a single dataframe ----------------------------------
+# Combine all periods into a single dataframe 
 vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km <- bind_rows(turnover_2000_2006_lc,
                                                               turnover_2006_2012_lc,
                                                               turnover_2012_2018_lc)
+
+## 7.5. Add SSB ID Grid --------------------------------------------------------
+
+# Check column names in SSB ID grid
+names(ssb_grid)
+
+# Transform grid to match reference grid CRS
+ssb_grid_match_crs <- st_transform(ssb_grid, crs(reference_grid))
+
+# Convert the grid df to sf object
+grid_centroid <- st_as_sf(grid_df,
+                          coords = c("x", "y"),
+                          crs = crs(reference_grid))
+
+# Intersect the ssb grid and centroids of cells
+ssb_intersect <- st_intersection(grid_centroid, ssb_grid_match_crs)
+
+# Check geometries
+any(!st_is_valid(ssb_grid)) #FALSE
+
+# Create lookup table
+ssb_lookup <- data.frame(cell_ID = ssb_intersect$cell_id,
+                         ssb_id  = ssb_intersect$SSBID)
+
+# Check intersection was done correctly - only one SSB ID per cell ID
+cell_id_counts <- table(ssb_intersect$cell_id)
+cells_with_multiple_ssb <- cell_id_counts[cell_id_counts > 1]
+
+if(length(cells_with_multiple_ssb) > 0) {
+  cat("Warning: Some 15km cells intersect multiple SSB cells\n")
+  print(cells_with_multiple_ssb)
+} else {
+  cat("Good: Each 15km cell maps to exactly one SSB cell\n")
+}
+
+# Add SSB ID to final dataframe
+vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km |>
+  left_join(ssb_lookup, by = "cell_ID")
 
 # Save df to file
 save(vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km,
