@@ -30,7 +30,10 @@ occurrences_norway <- fread(here("data", "derived_data",
 
 ## 1.3. SSB ID Grid ------------------------------------------------------------
 
-# SSB ID Grid
+# SSB ID Grid - 50km
+ssb_grid_50km <- st_read(here("data", "raw_data", "SSB050KM", "ssb50km.shp"))
+
+# SSB ID Grid - 250km
 ssb_grid <- st_read(here("data", "raw_data", "SSB050KM", "ssb50km.shp"))
 
 # 2. CREATE A SPATIAL REFERENCE GRID WITH CELL IDS -----------------------------
@@ -568,10 +571,16 @@ all_periods_turnover_all_land_cover_chanegs_15km <- bind_rows(turnover_2000_2006
 # Check column names in SSB ID grid
 names(ssb_grid)
 
-# Transform grid to match reference grid CRS
+# Set crs of ssb grid to match that of the reference grid
+if(is.na(st_crs(ssb_grid))) {
+  st_crs(ssb_grid) <- crs(reference_grid)
+  cat("CRS was missing - set to match reference grid CRS\n")
+}
+
+# Transform ssb grid to match reference grid CRS
 ssb_grid_match_crs <- st_transform(ssb_grid, crs(reference_grid))
 
-# Convert the grid df to sf object
+# Convert the ssb grid df to sf object
 grid_centroid <- st_as_sf(grid_df,
                           coords = c("x", "y"),
                           crs = crs(reference_grid))
