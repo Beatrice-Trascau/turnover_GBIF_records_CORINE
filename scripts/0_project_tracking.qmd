@@ -33,17 +33,17 @@ The main objective of the project is to understand the effect of land cover chan
 
 ## File Structure
 
-| Name                              | Function                                                                  |
-|-----------------------------------|---------------------------------------------------------------------------|
-| 0_setup                           | Sets up all the packages and functions needed for the project             |
-| 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
-| 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
-| 1.3_CORINE_exploration            | Gets summary statistics for land cover transitions                        |
+| Name | Function |
+|------------------------|------------------------------------------------|
+| 0_setup | Sets up all the packages and functions needed for the project |
+| 1.1_CORINE_layers_preparation | Loads and prepares CORINE layers for further analysis |
+| 1.2_CORINE_aggregation | Aggregates original rasters to 15km |
+| 1.3_CORINE_exploration | Gets summary statistics for land cover transitions |
 | 1.4_CORINE_edge_pixel_exploration | Identifies pixels outside of Norway boundary and removes them from raster |
-| 2.1_GBIF_import                   | Imports and downloads GBIF occurrences                                    |
-| 2.2_GBIF_data_cleaning            | Cleans the downloaded occurrences                                         |
-| 2.3_GBIF_taxonomic_composition    | Explores taxonomic composition of occurrence records through time         |
-| 3.1_turnover_land_cover           | Calculates temporal turnover                                              |
+| 2.1_GBIF_import | Imports and downloads GBIF occurrences |
+| 2.2_GBIF_data_cleaning | Cleans the downloaded occurrences |
+| 2.3_GBIF_taxonomic_composition | Explores taxonomic composition of occurrence records through time |
+| 3.1_turnover_land_cover | Calculates temporal turnover |
 
 : Table 1: Analysis Script Structure
 
@@ -473,9 +473,9 @@ The previous method ran into several problems and became too complicated, likely
 
 At the end, we should have a dataframe with the following columns:
 
-| cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
-|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
-| 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
+| cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI | Time |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| 15678 | 40 | 60 | list() | list() | 467 | 897 | 1364 | 0.315 | 0.65 | 2000-2006 |
 
 At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
 
@@ -576,6 +576,115 @@ Model output revealed significant effect of LC Change, LC No Change, $\Delta rec
 ## Update 17.03.2025
 
 To determine best course of action regarding data analysis of temporal turnover, especially in light of the significant spatial autocorrelation of residuals detected, we must first follow some data exploration steps.
+
+## Update 09-23.06.2025
+
+Residuals from $\beta$ GLM models revealed significant spatial auto-correlation. To account for this, several options were tested:
+
+1.  GLMMs with 50km x 50km SSB ID grid as random effect:
+    -   The model had great issues in converging and the summary of the models showed NaNs for coefficients and p-values
+2.  GLMMs with 250km x 250km SSB ID grid as random effect:
+    -   The issues observed in the previous models persisted
+3.  GLMMs with 250km x 250km SSB ID grid as random effect and more conservative approach:
+    -   The below model was designed to be more conservative
+    -   Whilst the output produced was no longer NaN, validation of the model revealed significant issues
+
+```{r}
+#| label: conservative GLMM
+#| eval: false
+#| include: true
+model3_mixed <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change + 
+                            delta_recorder_effort + recorder_effort + lc_time_period + 
+                            (1|ssb_id),
+                          family = beta_family(),
+                          data = turnover_forest_tws_15km,
+                          control = glmmTMBControl(optimizer = optim,
+                                                   optArgs = list(method = "L-BFGS-B"),
+                                                   profile = TRUE,
+                                                   collect = FALSE))
+```
+
+4.   Ordered beta - with raw JDI values
+    -   Model had huge problems converging
+    -   Increasing the iterations and chains helped but the models still failed validation
+
+```{r}
+#| label: ordered beta
+#| eval: false
+#| include: true
+
+# Load package
+#library(ordbetareg)
+
+# Increase iterations and chains (to try to fix convergence issues)
+model5_ordbeta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change + 
+                                 delta_recorder_effort + recorder_effort + lc_time_period + 
+                                 (1|ssb_id),
+                               data = turnover_forest_tws_15km,
+                               cores = 4,
+                               iter = 4000,        # double the iterations
+                               chains = 4,
+                               control = list(adapt_delta = 0.95,  # more conservative sampling
+                                              max_treedepth = 12))
+```
+
+5.  GLS with exponential correlation structure for x and y coordinates
+    -   Since the dataframe contained the same cells at different time periods, the GLS considered them to be "duplicates" and did not run
+    -   To deal with this we added a small random jitter of 500m to the coordinates
+    -   However, validation of the model showed serious problems with the model and failed
+
+```{r}
+#| label: GLS 1
+#| eval: false
+#| include: true
+
+# Add small random jitter to coordinates to deal with the fact that you have the same cells at different time periods
+# which GLS detects as "duplicates"
+set.seed(43611)
+turnover_jittered <- turnover_forest_tws_15km_coords |>
+  mutate(x_jitter = x + runif(n(), -500, 500),  # jitter by ±500m
+         y_jitter = y + runif(n(), -500, 500))   # jitter by ±500m
+
+# Fit GLS
+model6_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+                    delta_recorder_effort + recorder_effort + lc_time_period,
+                  correlation = corExp(form = ~ x_jitter + y_jitter),
+                  data = turnover_jittered,
+                  method = "REML")
+```
+
+6.  GLS with exponential correlation structure for x and y coordinates and time_period
+    -   In the next model we accounted for the time_period in the correlation structure
+    -   Model validation revealed some issues with heteroscedasticity and issues with the QQ plots
+7.  GLS with exponential correlation structure for x and y coordinates and time_period and log recorder effort
+    -   We logged the recorder effort variable (there were no 0 recorder effort cells) to try and deal with the issues revealed in the validation of the previous model
+    -   Model validation showed that log-transforming the recorder effort dealt with the issues revealed before
+    -   This model is finally good to use!
+    -   The model ran was:
+
+```{r}
+#| label: GLS final
+#| eval: false
+#| include: true
+
+# Categorise time periods
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+
+# Log transform recorder effort values
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
+
+# Define GLS
+model8_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+                    delta_recorder_effort + log_recorder_effort + lc_time_period,
+                  correlation = corExp(form = ~ x + y | time_numeric),  
+                  data = turnover_forest_tws_15km_coords_time,
+                  method = "REML")
+
+```
 
 # Species Loss and Gain (5.1)
 
