@@ -26,7 +26,7 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
                  "webshot2", "rgbif", "CoordinateCleaner", "codyn",
                  "gratia", "lattice", "car", "kableExtra",
                  "betareg", "spdep", "corrplot", "leaflet",
-                 "viridis", "DT", "broom")
+                 "viridis", "DT", "broom", "nlme")
 
 # Execute the function
 sapply(package_vec, install_load_package)
