@@ -108,6 +108,8 @@ abline(h = 0, col = "red", lty = 2)
 
 # 4. GLS WITH LOG RECORDER EFFORT ----------------------------------------------
 
+## 4.1. Run gls ----------------------------------------------------------------
+
 # Check if there are any cells with recorder effort = 0
 a <- turnover_forest_tws_15km_coords_time |>
   filter(recorder_effort == 0)
@@ -135,7 +137,7 @@ save(model2_gls,
                  "gls_model2_all_occurrences_turnover_results.RData"))
 
 # Get summary
-summary(model2_gls)
+model2_gls_summary <- summary(model2_gls)
 
 # Extract correlation structure parameters
 print(model2_gls$modelStruct$corStruct)
@@ -169,5 +171,47 @@ plot(turnover_forest_tws_15km_coords_time$log_recorder_effort, residuals_gls,
      xlab = "Recorder Effort", ylab = "Normalized Residuals",
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
+
+## 4.2. Plot model output ------------------------------------------------------
+
+# Create dataframe of coeficients
+model2_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                             estimate = model_summary$tTable[, "Value"],
+                             std.error = model_summary$tTable[, "Std.Error"],
+                             statistic = model_summary$tTable[, "t-value"],
+                             p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+model2_coef_df_no_intercept <- model2_coef_df[model2_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
+
 
 # END OF SCRIPT ----------------------------------------------------------------
