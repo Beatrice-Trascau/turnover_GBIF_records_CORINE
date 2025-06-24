@@ -189,7 +189,7 @@ figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
   geom_point() +
   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
                      xmax = estimate + 1.96 * std.error)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
   scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
                               "forest_no_change" = "Forest No Change", 
                               "delta_recorder_effort" = "ΔRecorder Effort",
@@ -212,6 +212,5 @@ ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_tur
 # Save figure as .svg
 ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.svg"),
        width = 12, height = 8, dpi = 300)
-
 
 # END OF SCRIPT ----------------------------------------------------------------
