@@ -19,16 +19,14 @@ install_load_package <- function(x) {
 
 # Define list of packages
 package_vec <- c("here", "terra", "sf", "geodata", "mapview",
-                 "tidyverse", "dplyr", "ggplot2", "ggalluvial",
-                 "networkD3", "gt", "cowplot", "data.table",
-                 "tidyterra", "patchwork", "styler", "scales",
-                 "plotly", "lme4", "DHARMa", "glmmTMB", "mgcv",
-                 "tidyterra", "ggspatial", "htmlwidgets",
-                 "htmltools", "patchwork", "webshot2",
-                 "rgbif", "CoordinateCleaner", "codyn",
+                 "tidyverse", "dplyr", "ggplot2", "gt", "cowplot", 
+                 "data.table","tidyterra", "patchwork", "styler", 
+                 "scales","plotly", "lme4", "DHARMa", "glmmTMB", 
+                 "mgcv", "ggspatial", "htmlwidgets","htmltools",  
+                 "webshot2", "rgbif", "CoordinateCleaner", "codyn",
                  "gratia", "lattice", "car", "kableExtra",
-                 "betareg", "spdep", "corrplot", "leaflet", "
-                 htmlwidgets", "viridis", "plotly", "DT", "broom")
+                 "betareg", "spdep", "corrplot", "leaflet",
+                 "viridis", "DT", "broom")
 
 # Execute the function
 sapply(package_vec, install_load_package)
