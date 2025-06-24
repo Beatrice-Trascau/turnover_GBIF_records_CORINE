@@ -684,6 +684,7 @@ Moran's I test for spatial autocorrelation revealed that there is significant sp
 ### Option 1: GLMM with SSB ID as random effect
 
 ```{r glmm with ssb}
+#| label: glmm-ssb
 #| eval: false
 #| echo: false
 
@@ -704,6 +705,7 @@ The mixed models were attempted with both a 50km x 50km and 250km x 250km SSB ID
 ### Option 2: Ordered $\beta$
 
 ```{r ordered beta}
+#| label: ordered-beta
 #| eval: false
 #| echo: false
 
@@ -721,6 +723,7 @@ summary(model4_ordbeta) # model did not converge
 Ordered $\beta$ models allow for $JDI\in [0,1]$, therefore, the values no longer need to be adjusted. However, this model failed to converge until the number of interactions was doubled and sampling was changed to be more conservative. However, model validation revealed that residuals were overdispersed.
 
 ```{r conservative ordered beta}
+#| label: conservative-ordered-beta
 #| eval: false
 #| echo: false
 
@@ -747,6 +750,178 @@ plot(model5_ordbeta)
 
 General Least Squares (GLS) regression models with an exponential correlation structure around x and y were used. Since some cells are present in the dataframe at different time points, the GLS will interpret them as "duplicates", unless the time is also considered in the correlation structure.
 
-```{r gls raw}
+```{r gls raw diagnostics}
+#| label: raw-gls
+#| echo: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model 1"
+
+# Load model & data
+load(here("data", "models", "gls_model1_all_occurrences_turnover_results.RData"))
+
+# Extract data for plotting
+fitted_values <- fitted(model1_gls)
+residuals_norm <- residuals(model1_gls, type = "normalized")
+
+
+# Residuals vs Fitted plot
+p1 <- ggplot(data.frame(fitted = fitted_values, residuals = residuals_norm), 
+             aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", size = 1) +
+  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
+  labs(x = "Fitted Values", 
+       y = "Normalized Residuals",
+       title = "Residuals vs Fitted Values") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# QQ plot
+qq_data <- data.frame(theoretical = qqnorm(residuals_norm, plot.it = FALSE)$x,
+                      sample = qqnorm(residuals_norm, plot.it = FALSE)$y)
+
+p2 <- ggplot(qq_data, aes(x = theoretical, y = sample)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
+  labs(x = "Theoretical Quantiles", 
+       y = "Sample Quantiles",
+       title = "Normal Q-Q Plot") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Residuals vs Forest to TWS
+p3 <- ggplot(data.frame(residuals = residuals_norm), aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7, color = "white") +
+  geom_density(aes(y = after_stat(density) * length(residuals_norm) * (max(residuals_norm) - min(residuals_norm)) / 30), 
+               color = "red", size = 1) +
+  labs(x = "Normalized Residuals", 
+       y = "Frequency",
+       title = "Distribution of Residuals") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Residuals vs Recorder Effort
+p4 <- ggplot(data.frame(fitted = fitted_values, sqrt_abs_resid = sqrt(abs(residuals_norm))), 
+             aes(x = fitted, y = sqrt_abs_resid)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
+  labs(x = "Fitted Values", 
+       y = "√|Normalized Residuals|",
+       title = "Scale-Location Plot") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Combine plots
+gls1_plots <- plot_grid(p1, p2, p3, p4, ncol = 2, labels = c("a)", "b)", "c)", "d)"))
+
+# Dispaly combined plots
+gls1_plots
+```
+
+Inspection of the diagnostic plots revealed that:
+
+1.  Residuals vs Fitted:
+    -   Most residuals are centered around 0
+    -   But there is an uneven spread of residuals, with larger variance at higher fitted values
+    -   There is a clustered pattern around 0.8-0.9 fitted values
+    -   All of this suggests that there is some non-constant variance (i.e. hereoscedasticity) and possibly some non-linearity
+2.  QQ Plot:
+    -   The points mostly follow red line but depart from it at both ends
+    -   This might mean a departure from normality and outliers (which we know there are some large ones)
+3.  Residuals vs. Forest -\> TWS
+    -   Possible non-linear effect of Forest -\> TWS
+4.  Residuals vs. Recorder Effort
+    -   Some heteroscedastcity visible
+
+Therefore, from the diagnostic plots we can conclude that the model validation failed. A possible solution to improve model fit is to log-transform the recorder effort values. These makes sense in the context of our question of turnover and may deal with the large outliers observed in the data.
+
+### (Final)Option 4: GLS with log recorder effort and exponential correlation structure
+
+```{r gls log}
+#| label: gls-logged-values
+#| echo: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model 2"
+
+# Load model
+load(here("data", "models", "gls_model2_all_occurrences_turnover_results.RData"))
+
+# Extract data for plotting
+fitted_values_model2 <- fitted(model2_gls)
+residuals_norm_model2 <- residuals(model2_gls, type = "normalized")
+
+# Residuals vs Fitted plot
+q1 <- ggplot(data.frame(fitted = fitted_values_model2, residuals = residuals_norm_model2), 
+             aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", size = 1) +
+  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
+  labs(x = "Fitted Values", 
+       y = "Normalized Residuals",
+       title = "Residuals vs Fitted Values") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# QQ plot
+qq_data <- data.frame(theoretical = qqnorm(residuals_norm_model2, plot.it = FALSE)$x,
+                      sample = qqnorm(residuals_norm_model2, plot.it = FALSE)$y)
+
+q2 <- ggplot(qq_data, aes(x = theoretical, y = sample)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
+  labs(x = "Theoretical Quantiles", 
+       y = "Sample Quantiles",
+       title = "Normal Q-Q Plot") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+
+# Residuals vs Forest to TWS
+q3 <- ggplot(data.frame(residuals = residuals_norm_model2), aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7, color = "white") +
+  geom_density(aes(y = after_stat(density) * length(residuals_norm_model2) * (max(residuals_norm_model2) - min(residuals_norm_model2)) / 30), 
+               color = "red", size = 1) +
+  labs(x = "Normalized Residuals", 
+       y = "Frequency",
+       title = "Distribution of Residuals") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Residuals vs Log Recorder Effort
+q4 <- ggplot(data.frame(fitted = fitted_values_model2, sqrt_abs_resid = sqrt(abs(residuals_norm_model2))), 
+             aes(x = fitted, y = sqrt_abs_resid)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
+  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
+  labs(x = "Fitted Values", 
+       y = "√|Normalized Residuals|",
+       title = "Scale-Location Plot") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Combine plots
+gls2_plots <- plot_grid(q1, q2, q3, q4, ncol = 2, labels = c("a)", "b)", "c)", "d)"))
+
+# Dispaly combined plots
+gls2_plots
 
 ```
+
+The diagnostic plots for this model show that:
+
+1.  Residuals vs Fitted:
+    -   Most residuals are centered around 0
+    -   Spread is roughly constant across the fitted values
+    -   Some slight funneling (i.e. wider spread at lower fitted values) but not extreme
+2.  QQ Plot:
+    -   There is some deviation from the red line at both tails, suggesting that residuals are not perfectly normal
+    -   Our sample size is relatively large, and this is somewhat common with ecological data
+3.  Residuals vs. Forest -\> TWS
+    -   Possible non-linear effect of Forest -\> TWS or underfitting at very low values
+    -   But the majority of residuals look relatively well-centered
+4.  Residuals vs. Recorder Effort
+    -   Residuals are evenly spread across the range of log recorder effort
+    -   Residuals are centered around zero and there is no obvious pattern observed
+
+In conclusion, the model validation showed that log-transforming the recorder effort greatly improved the fit of the model, and this is now good to use. Hooray!
