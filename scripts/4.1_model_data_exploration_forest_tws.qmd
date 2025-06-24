@@ -1298,3 +1298,41 @@ Inspecting the diagnostic plots, we can conclude the following:
     -   Could indicate some heteroscedasticity
 
 The issue of non-linearity is the most concerning one, and therefore we will try a GAM and see if it is any better.
+
+### Option 2: GAM with spatial smoother
+
+```{r plants gam1}
+#| label: fig-plants-gam-check
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GAM model for vascular plant occurrences"
+
+# Load model
+load(here("data", "models", "gam_model4_plant_occurrences_turnover_forest_tws_results.RData"))
+
+# Diagnostic plots
+par(mfrow = c(2, 2))
+gam.check(plants_model4_gam)
+```
+
+The diagnostic plots reveal some mild deviances from expectations, but no major issues. Since there is some curvature to the relationship between residuals and Forest to TWS, I will also try a model that fits a smoother around that variable.
+
+### Option 3: GAM with Forest -\> TWS and spatial smoother
+
+```{r plants gam2}
+#| label: fig-plants-gam2-check
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for second GAM model for vascular plant occurrences"
+
+# Load model
+load(here("data", "models", "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
+
+# Diagnostic plots
+par(mfrow = c(2, 2))
+gam.check(plants_model5_gam)
+```
