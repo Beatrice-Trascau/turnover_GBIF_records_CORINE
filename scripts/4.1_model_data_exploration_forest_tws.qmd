@@ -1011,3 +1011,47 @@ fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual 
                                   round(model_summary$sigma, 4)))
 knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
 ```
+
+```{r gls model output plot}
+#| label: fig-gls-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from GLS"
+
+# Create dataframe of coeficients
+model2_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                             estimate = model_summary$tTable[, "Value"],
+                             std.error = model_summary$tTable[, "Std.Error"],
+                             statistic = model_summary$tTable[, "t-value"],
+                             p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+model2_coef_df_no_intercept <- model2_coef_df[model2_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure6_a
+```
