@@ -16,6 +16,8 @@ library(here)
 source(here("scripts", "0_setup.R"))
 ```
 
+# All GBIF Occurrences
+
 ```{r data preparation}
 #| label: data-prep
 #| include: false
@@ -57,7 +59,7 @@ turnover_forest_tws_15km <- turnover_forest_tws_15km |>
 
 ```
 
-# Summary Statistics
+## Summary Statistics
 
 ```{r summary stats}
 #| label: summary-stats
@@ -97,7 +99,7 @@ summary_period_table
 
 ```
 
-# Distribution of Variables
+## Distribution of Variables
 
 Firstly, we look at the distribution of values across each of the response variables used in our model.
 
@@ -156,17 +158,11 @@ delta_recorder_effort_plot <- ggplot(turnover_forest_tws_15km, aes(x = delta_rec
         strip.text = element_text(face = "bold"))
 
 # Combine plots
-plots <- plot_grid(jdi_hist, forest_to_tws_hist, forest_no_change_hist, recorder_effort_plot, delta_recorder_effort_plot, ncol = 1, labels = c("a)", "b)", "c)", "d)", "e)"))
+plots <- plot_grid(jdi_hist, forest_to_tws_hist, forest_no_change_hist, recorder_effort_plot, delta_recorder_effort_plot, ncol = 2, labels = c("a)", "b)", "c)", "d)", "e)"))
 
 # Print plots
-jdi_hist
-forest_to_tws_hist
-forest_no_change_hist
-recorder_effort_plot
-delta_recorder_effort_plot
+plots
 ```
-
-# Relationships
 
 ## Correlation Matrix
 
@@ -200,98 +196,277 @@ cor_plot <- corrplot(cor_matrix,
 
 Fortunately, we see no concerningly large correlations between variables used in the analysis.
 
-## JDI & Forest Cells
+## Outliers
 
-```{r JDI values in Forest cells}
-#| label: JDI-Forest
+Data exploration revealed that the data contains some large outliers.
+
+```{r outlier summary}
+#| label: outlier-summary
 #| echo: false
-#| message: false
 
-# Scatterplot of JDI values in Forest -> TWS cells
-jdi_vs_forest_to_tws <- ggplot(turnover_forest_tws_15km, 
-                              aes(x = forest_to_tws, y = JDI, color = lc_time_period)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth() +
-  labs(x = "Forest to TWS Transition (pixel count)",
-       y = "Jaccard Dissimilarity Index",
-       color = "Time Period") +
-  scale_color_viridis_d() +
-  theme_classic() +
-  theme(legend.position = "none")
+# Load the forest -> TWS raster for spatial reference
+clc_status_15km_forest_tws_masked <- rast(here("data", "derived_data", 
+                                               "clc_status_15km_forest_tws_masked.tif"))
 
-# Scatterplot of JDI values in Forest No Change cells
-jdi_vs_forest_no_change <- ggplot(turnover_forest_tws_15km, 
-                                aes(x = forest_no_change, y = JDI, color = lc_time_period)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth() +
-  labs(x = "Forest No Change (pixel count)",
-       y = "Jaccard Dissimilarity Index",
-       color = "Time Period") +
-  scale_color_viridis_d() +
-  theme_classic()
+# 1. IDENTIFY OUTLIERS ---------------------------------------------------------
 
-# Display plots
-# jdi_vs_forest_to_tws
-# jdi_vs_forest_no_change
+# Calculate quartiles and IQR for forest_to_tws
+q1_forest <- quantile(turnover_forest_tws_15km$forest_to_tws, 0.25, na.rm = TRUE)
+q3_forest <- quantile(turnover_forest_tws_15km$forest_to_tws, 0.75, na.rm = TRUE)
+iqr_forest <- q3_forest - q1_forest
+upper_forest <- q3_forest + 1.5 * iqr_forest
+lower_forest <- q1_forest - 1.5 * iqr_forest
 
-# Combine plots
-jdi_forest_combied <- plot_grid(jdi_vs_forest_to_tws, jdi_vs_forest_no_change,
-                                labels = c("a)", "b)"))
+# Calculate quartiles and IQR for recorder_effort
+q1_effort <- quantile(turnover_forest_tws_15km$recorder_effort, 0.25, na.rm = TRUE)
+q3_effort <- quantile(turnover_forest_tws_15km$recorder_effort, 0.75, na.rm = TRUE)
+iqr_effort <- q3_effort - q1_effort
+upper_effort <- q3_effort + 1.5 * iqr_effort
+lower_effort <- q1_effort - 1.5 * iqr_effort
 
-# Display combined plot
-jdi_forest_combied
+# Flag outliers
+turnover_forest_tws_15km <- turnover_forest_tws_15km |>
+  mutate(forest_outlier = forest_to_tws > upper_forest | forest_to_tws < lower_forest,
+         effort_outlier = recorder_effort > upper_effort | recorder_effort < lower_effort,
+         any_outlier = forest_outlier | effort_outlier,
+         outlier_type = case_when(forest_outlier & effort_outlier ~ "Both",
+                                  forest_outlier ~ "Forest->TWS",
+                                  effort_outlier ~ "Recorder Effort",
+                                  TRUE ~ "None"))
+
+# Print outlier summary
+cat("=== OUTLIER SUMMARY ===\n")
+cat("Forest->TWS outliers:", sum(turnover_forest_tws_15km$forest_outlier, na.rm = TRUE), "\n")
+cat("Recorder Effort outliers:", sum(turnover_forest_tws_15km$effort_outlier, na.rm = TRUE), "\n")
+cat("Total cells with any outlier:", sum(turnover_forest_tws_15km$any_outlier, na.rm = TRUE), "\n")
+cat("Forest->TWS threshold:", round(upper_forest, 2), "\n")
+cat("Recorder Effort threshold:", round(upper_effort, 2), "\n")
 ```
 
-Jaccard's Dissimilarity Index appears to have a non-linear relationship with the amount of pixels of forest that are changing to TWS in 2012-2018. For the 2000-2006 period, there seems to be a rather large outlier for Forest -\> TWS (\~2000 pixels), which could bias the results of the models.
-
-In the case of the relationship between JDI and the amount of forest that does not undergo any land cover changes, it appears that there is no relationship in the first two time periods, but a non-linear relationship in the 2012-2018 period.
-
-## JDI & Recorder Effort
-
-```{r}
-#| label: JDI-Recorder-Effort
+```{r outlier interactive map}
+#| label: outlier-map
 #| echo: false
-#| message: false
 
-# Set a global option to prevent scientific notation
-options(scipen = 999)
+# 2. CONVERT TO SPATIAL DATA ---------------------------------------------------
 
-# Scatterplots of JDI vs recorder effort 
-jdi_vs_recorder_effort <- ggplot(turnover_forest_tws_15km, 
-                               aes(x = recorder_effort, y = JDI, color = lc_time_period)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth() +
-  labs(x = "Recorder Effort",
-       y = "Jaccard Dissimilarity Index",
-       color = "Time Period") +
-  scale_x_continuous(labels = label_number()) +
-  scale_color_viridis_d() +
-  theme_classic()+
-  theme(legend.position = "none")
+# Convert to sf object for mapping
+turnover_sf <- st_as_sf(turnover_forest_tws_15km,
+                        coords = c("x", "y"),
+                        crs = st_crs(clc_status_15km_forest_tws_masked))
 
-# Scatterplots of JDI vs delta recorder effort 
-jdi_vs_delta_recorder_effort <- ggplot(turnover_forest_tws_15km, 
-                                     aes(x = delta_recorder_effort, y = JDI, color = lc_time_period)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth() +
-  labs(x = "Delta Recorder Effort",
-       y = "Jaccard Dissimilarity Index",
-       color = "Time Period") +
-  scale_color_viridis_d() +
-  theme_classic()
+# Transform to WGS84 for leaflet
+turnover_sf_wgs84 <- st_transform(turnover_sf, crs = 4326)
 
-# Display plots
-# jdi_vs_recorder_effort
-# jdi_vs_delta_recorder_effort
+# 3. CREATE INTERACTIVE MAPS --------------------------------------------------- 
 
-# Combine plots
-jdi_recordinf_combied <- plot_grid(jdi_vs_recorder_effort, jdi_vs_delta_recorder_effort,
-                                labels = c("a)", "b)"))
+# Create color palette for forest_to_tws
+forest_pal <- colorNumeric(palette = viridis::viridis(100),
+                           domain = turnover_sf_wgs84$forest_to_tws,
+                           na.color = "transparent")
 
-# Display combined plot
-jdi_recordinf_combied
+# Create base map
+forest_map <- leaflet() |>
+  addProviderTiles("CartoDB.Positron") |>
+  setView(lng = 10.7522, lat = 64.1, zoom = 5)
+
+# Add each time period as a separate layer group
+for(period in unique(turnover_sf_wgs84$lc_time_period)) {
+  period_data <- turnover_sf_wgs84[turnover_sf_wgs84$lc_time_period == period, ]
+  
+  forest_map <- forest_map |>
+    addCircleMarkers(data = period_data, group = period, radius = 3,
+                     fillColor = ~forest_pal(forest_to_tws),
+                     color = "white", weight = 0.5, opacity = 1,
+                     fillOpacity = 0.8, 
+                     popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                                     "<b>Period:</b> ", lc_time_period, "<br>",
+                                     "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                                     "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                                     "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                                     "<b>Outlier Type:</b> ", outlier_type),
+                     label = ~paste0("Forest->TWS: ", round(forest_to_tws, 2), " (", lc_time_period, ")"))
+}
+
+# Add layer control and legend
+forest_map <- forest_map |>
+  addLayersControl(overlayGroups = unique(turnover_sf_wgs84$lc_time_period),
+                   options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend(pal = forest_pal, values = turnover_sf_wgs84$forest_to_tws,
+            title = "Forest -> TWS<br>(100m pixels)",position = "bottomright")
+
+# Create colour pallete for recorder effort
+effort_pal <- colorNumeric(palette = viridis::plasma(100),
+                           domain = turnover_sf_wgs84$recorder_effort,
+                           na.color = "transparent")
+
+# Create bse map for recorder effort
+effort_map <- leaflet() |>
+  addProviderTiles("CartoDB.Positron") |>
+  setView(lng = 10.7522, lat = 64.1, zoom = 5)
+
+# Add each time period as a separate layer group
+for(period in unique(turnover_sf_wgs84$lc_time_period)) {
+  period_data <- turnover_sf_wgs84[turnover_sf_wgs84$lc_time_period == period, ]
+  
+  effort_map <- effort_map |>
+    addCircleMarkers(data = period_data, group = period, radius = 3,
+      fillColor = ~effort_pal(recorder_effort), color = "white", weight = 0.5,
+      opacity = 1, fillOpacity = 0.8,
+      popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                      "<b>Period:</b> ", lc_time_period, "<br>",
+                      "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                      "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                      "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                      "<b>Outlier Type:</b> ", outlier_type),
+      label = ~paste0("Recorder Effort: ", recorder_effort, " (", lc_time_period, ")"))
+}
+
+# Add layer control and legend to recorder effort map
+effort_map <- effort_map |>
+  addLayersControl(overlayGroups = unique(turnover_sf_wgs84$lc_time_period),
+                   options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend(pal = effort_pal,
+            values = turnover_sf_wgs84$recorder_effort,
+            title = "Recorder Effort<br>(total occurrences)",
+            position = "bottomright")
+
+# Outlier Map with outlier type control 
+outlier_colors <- c("Forest->TWS" = "red", 
+                    "Recorder Effort" = "blue", 
+                    "Both" = "purple",
+                    "None" = "lightgrey")
+
+# Add base map for outliers
+outlier_map <- leaflet() |>
+  addProviderTiles("CartoDB.Positron") |>
+  setView(lng = 10.7522, lat = 64.1, zoom = 5)
+
+
+# Add Forest->TWS outliers as one layer
+forest_outliers <- turnover_sf_wgs84[turnover_sf_wgs84$forest_outlier == TRUE, ]
+outlier_map <- outlier_map |>
+  addCircleMarkers(data = forest_outliers,
+                   group = "Forest->TWS Outliers",
+                   fillColor = "red",
+                   color = "white",
+                   weight = 0.5,
+                   opacity = 1,
+                   fillOpacity = 0.9,
+                   popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                                   "<b>Period:</b> ", lc_time_period, "<br>",
+                                   "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                                   "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                                   "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                                   "<b>Outlier Type:</b> ", outlier_type, "<br>",
+                                   "<b>SSB ID:</b> ", ssb_id),
+                   label = ~paste0("Forest->TWS Outlier: ", round(forest_to_tws, 2), " (", lc_time_period, ")"))
+
+# Add Recorder Effort outliers as another layer
+effort_outliers <- turnover_sf_wgs84[turnover_sf_wgs84$effort_outlier == TRUE, ]
+outlier_map <- outlier_map |>
+  addCircleMarkers(data = effort_outliers, group = "Recorder Effort Outliers",
+                   radius = 5, fillColor = "blue", color = "white", weight = 0.5,
+                   opacity = 1, fillOpacity = 0.9,
+                   popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                                   "<b>Period:</b> ", lc_time_period, "<br>",
+                                   "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                                   "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                                   "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                                   "<b>Outlier Type:</b> ", outlier_type, "<br>",
+                                   "<b>SSB ID:</b> ", ssb_id),
+                   label = ~paste0("Recorder Effort Outlier: ", recorder_effort, " (", lc_time_period, ")"))
+
+# Add cells with both types of outliers
+both_outliers <- turnover_sf_wgs84[turnover_sf_wgs84$outlier_type == "Both", ]
+outlier_map <- outlier_map |>
+  addCircleMarkers(data = both_outliers, group = "Both Types", radius = 6,
+                   fillColor = "purple", color = "white", weight = 0.5,
+                   opacity = 1, fillOpacity = 0.9,
+                   popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                                   "<b>Period:</b> ", lc_time_period, "<br>",
+                                   "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                                   "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                                   "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                                   "<b>Outlier Type:</b> ", outlier_type, "<br>",
+                                   "<b>SSB ID:</b> ", ssb_id),
+                   label = ~paste0("Both Outliers (", lc_time_period, ")"))
+
+# Add non-outliers as a background layer (optional, lighter/smaller)
+non_outliers <- turnover_sf_wgs84[turnover_sf_wgs84$any_outlier == FALSE, ]
+outlier_map <- outlier_map |>
+  addCircleMarkers(data = non_outliers, group = "Non-outliers", radius = 1.5,
+                   fillColor = "lightgrey", color = "white", weight = 0.3,
+                   opacity = 0.7, fillOpacity = 0.3, 
+                   popup = ~paste0("<b>Cell ID:</b> ", cell_ID, "<br>",
+                                   "<b>Period:</b> ", lc_time_period, "<br>",
+                                   "<b>Forest->TWS:</b> ", round(forest_to_tws, 2), "<br>",
+                                   "<b>Recorder Effort:</b> ", recorder_effort, "<br>",
+                                   "<b>JDI:</b> ", round(JDI, 3), "<br>",
+                                   "<b>Outlier Type:</b> ", outlier_type, "<br>",
+                                   "<b>SSB ID:</b> ", ssb_id),
+                   label = ~paste0("Normal cell (", lc_time_period, ")"))
+
+# Add layer controls for outlier types
+outlier_type_map <- outlier_map |>
+  addLayersControl(overlayGroups = c("Forest->TWS Outliers", "Recorder Effort Outliers", 
+                      "Both Types", "Non-outliers"),
+                   options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend(colors = c("red", "blue", "purple", "lightgrey"),
+            labels = c("Forest->TWS Outliers", "Recorder Effort Outliers", 
+               "Both Types", "Non-outliers"),
+            title = "Outlier Categories",
+            position = "bottomright")
+
+# Print map
+outlier_type_map
 ```
 
-The relationship between JDI and recorder effort appears complex and differs depending on time period. In the 2000-2006, we first see a decline in JDI with increasing recording effort, followed by an increase after \~100 000 records. For the second period, we see a non-linear decline with increasing recording effort. Lastly, in the 2012-2018, the relationship does not seems to differ much from 0, but the estimation of the effect is likely impacted by the large outlier (\> 400 000 records). This appears to be something that should be accounted for.
+```{r outlier table}
+#| label: outlier-table
+#| echo: false
 
-When looking at the relationship between JDI and $\Delta Recorder_{effort}$, we generally see non-linear positive relationships between the two. In the case of the first and last periods, JDI tends to increase steeply with changes in recording effort greater than 0.5.
+# 6. CREATE OUTLIER DATA TABLE ------------------------------------------------
+
+# Create a detailed table of outliers
+outlier_table <- turnover_forest_tws_15km |>
+  filter(any_outlier) |>
+  select(cell_ID, lc_time_period, forest_to_tws, recorder_effort, JDI, 
+         outlier_type, ssb_id, x, y) |>
+  arrange(desc(forest_to_tws))
+
+# Display interactive table 
+DT::datatable(outlier_table, 
+              options = list(pageLength = 20, scrollX = TRUE),
+              caption = "Outlier Cells Summary") |>
+  DT::formatRound(columns = c("forest_to_tws", "JDI", "x", "y"), digits = 3)
+
+```
+
+```{r top outliers}
+#| label: top-outlier
+#| echo: false
+
+# 7. PRINT TOP OUTLIERS -------------------------------------------------------
+
+# Top 10 Forest -> TWS Outliers
+top_forest_outliers <- turnover_forest_tws_15km |>
+  filter(forest_outlier) |>
+  arrange(desc(forest_to_tws)) |>
+  slice_head(n = 10) |>
+  select(cell_ID, lc_time_period, forest_to_tws, recorder_effort, JDI)
+
+knitr::kable(top_forest_outliers, 
+             caption = "Top 10 Forest->TWS Outliers",
+             digits = 3)
+
+# Top 10 Recorder Effort Outliers
+top_effort_outliers <- turnover_forest_tws_15km |>
+  filter(effort_outlier) |>
+  arrange(desc(recorder_effort)) |>
+  slice_head(n = 10) |>
+  select(cell_ID, lc_time_period, forest_to_tws, recorder_effort, JDI)
+
+knitr::kable(top_effort_outliers,
+             caption = "Top 10 Recorder Effort Outliers", 
+             digits = 3)
+```
