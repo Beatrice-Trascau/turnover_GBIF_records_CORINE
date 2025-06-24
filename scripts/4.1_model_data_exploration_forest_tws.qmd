@@ -2,6 +2,10 @@
 title: "Forest to TWS JDI Data Exploration"
 format: html
 editor: visual
+number-sections: true
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
 ---
 
 # Aims
@@ -12,6 +16,7 @@ This document outlines data exploration steps of the data used to model temporal
 #| label: packages
 #| echo: false
 #| include: false
+
 library(here)
 source(here("scripts", "0_setup.R"))
 ```
@@ -62,8 +67,9 @@ turnover_forest_tws_15km <- turnover_forest_tws_15km |>
 ## Summary Statistics
 
 ```{r summary stats}
-#| label: summary-stats
+#| label: tbl-summary-stats
 #| echo: false
+#| tbl-cap: "Summary Statistics of Jaccard Dissimilarity Index (JDI) by Time Period"
 
 # Extract summary data
 summary_by_period <- turnover_forest_tws_15km |>
@@ -80,8 +86,7 @@ summary_by_period <- turnover_forest_tws_15km |>
 
 # Create table for period summary
 summary_period_table <- summary_by_period |>
-  kbl(caption = "Table 1: Summary Statistics by Time Period",
-      digits = 3,
+  kbl(digits = 3,
       align = c("l", rep("r", ncol(summary_by_period)-1))) |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = TRUE) |>
@@ -104,7 +109,8 @@ summary_period_table
 Firstly, we look at the distribution of values across each of the response variables used in our model.
 
 ```{r variables}
-#| label: variables-distributions
+#| label: fig-variables-distributions
+#| fig-cap: "Distribution of a) Jaccard Dissimilarity Index, b) Forest to TWS transition pixel count, c) Forest No Change pixel count, d) Recorder Effort e) Change in Recorder Effort"
 #| echo: false
 
 # Jaccard's Dissimilarity Index
@@ -169,8 +175,11 @@ plots
 Then, we will also check the correlation between the variables used in the analysis.
 
 ```{r variable relationships}
-#| label: variables-relationships
+#| label: fig-variables-relationships
 #| echo: false
+#| fig-cap: "Correlation matrix of variables used in models"
+#| fig-width: 12
+#| fig-height: 8
 
 # Correlation matrix for numeric variables
 numeric_vars <- turnover_forest_tws_15km |>
@@ -244,8 +253,10 @@ cat("Recorder Effort threshold:", round(upper_effort, 2), "\n")
 ```
 
 ```{r outlier interactive map}
-#| label: outlier-map
+#| label: fig-outlier-map
 #| echo: false
+#| fig-cap: "Map of Recorder Effort and Forest to TWS Outliers across Norway"
+
 
 # 2. CONVERT TO SPATIAL DATA ---------------------------------------------------
 
@@ -422,7 +433,7 @@ outlier_type_map
 ```
 
 ```{r outlier table}
-#| label: outlier-table
+#| label: outlier-summary-table
 #| echo: false
 
 # 6. CREATE OUTLIER DATA TABLE ------------------------------------------------
@@ -436,15 +447,15 @@ outlier_table <- turnover_forest_tws_15km |>
 
 # Display interactive table 
 DT::datatable(outlier_table, 
-              options = list(pageLength = 20, scrollX = TRUE),
-              caption = "Outlier Cells Summary") |>
+              options = list(pageLength = 10, scrollX = TRUE)) |>
   DT::formatRound(columns = c("forest_to_tws", "JDI", "x", "y"), digits = 3)
 
 ```
 
-```{r top outliers}
-#| label: top-outlier
+```{r top outliers forest tws}
+#| label: tbl-top-outlier-forest-tws
 #| echo: false
+#| tbl-cap: "Top 10 Forest to TWS Outliers"
 
 # 7. PRINT TOP OUTLIERS -------------------------------------------------------
 
@@ -455,9 +466,13 @@ top_forest_outliers <- turnover_forest_tws_15km |>
   slice_head(n = 10) |>
   select(cell_ID, lc_time_period, forest_to_tws, recorder_effort, JDI)
 
-knitr::kable(top_forest_outliers, 
-             caption = "Top 10 Forest->TWS Outliers",
-             digits = 3)
+knitr::kable(top_forest_outliers, digits = 3)
+```
+
+```{r top outliers recorder effort}
+#| label: tbl-top-outlier-recorder-effort
+#| echo: false
+#| tbl-cap: "Top 10 Recorder Effort Outliers"
 
 # Top 10 Recorder Effort Outliers
 top_effort_outliers <- turnover_forest_tws_15km |>
@@ -466,9 +481,7 @@ top_effort_outliers <- turnover_forest_tws_15km |>
   slice_head(n = 10) |>
   select(cell_ID, lc_time_period, forest_to_tws, recorder_effort, JDI)
 
-knitr::kable(top_effort_outliers,
-             caption = "Top 10 Recorder Effort Outliers", 
-             digits = 3)
+knitr::kable(top_effort_outliers, digits = 3)
 ```
 
 ## Modeling
@@ -486,8 +499,9 @@ For more details on the use of $\beta$ distribution for (0,1) values, see: Beta 
 The following $\beta$ regression was run:
 
 ```{r beta regression}
-#| label: beta-regression
+#| label: tbl-beta-regression
 #| echo: false
+#| tbl-cap: "Beta Regression Results Forest->TWS Land Cover Change"
 
 # 1. TRANSFORM JDI VALUES FOR BETA REGRESSION -------------------------------
 
@@ -515,20 +529,26 @@ turnover_forest_tws_15km$residuals <- model1.1_residuals
 model_summary <- tidy(model1.1, conf.int = TRUE)
 
 # Display summary
-knitr::kable(model_summary,
-             caption = "Beta Regression Results: Forest->TWS Land Cover Change",
-             digits = 4)
+knitr::kable(model_summary, digits = 4)
+```
+
+```{r beta regression model fit}
+#| label: tbl-beta-regression-model-fit
+#| echo: false
+#| warning: false
+#| tbl-cap: "Beta Regression Results Model Fit Statistics"
 
 # Dispaly model fit statistics
 model_glance <- glance(model1.1)
-knitr::kable(model_glance,
-             caption = "Model Fit Statistics",
-             digits = 4)
+knitr::kable(model_glance, digits = 4)
 ```
 
-```{r Morans I}
-#| label: morans-i
+```{r Morans I table}
+#| label: tbl-morans-i
 #| echo: false
+#| tbl-cap: "Moran's I Test for Spatial Autocorrelation of Model Residuals"
+#| fig-width: 12
+#| fig-height: 8
 
 # 4. CHECK SPATIAL AUTOCORRELATION OF RESIDUALS --------------------------------
 
@@ -564,15 +584,21 @@ moran_results <- data.frame(Statistic = c("Moran I", "Expectation", "Variance", 
                                       moran_test$statistic,
                                       moran_test$p.value))
 # Display output
-knitr::kable(moran_results,
-             caption = "Moran's I Test for Spatial Autocorrelation of Model Residuals",
-             digits = 6,
+knitr::kable(moran_results, digits = 6,
              col.names = c("Test Statistic", "Value"))
 
 # Create Moran scatterplot to visualise the relationship
 # moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
 #                          xlab = "Model Residuals", 
 #                          ylab = "Spatially Lagged Residuals")
+```
+
+```{r Morans I figure}
+#| label: fig-morans-i
+#| echo: false
+#| fig-cap: "Distribution of a) Local Moran's I, b,c) Significant Spatial Autocorrelation Values"
+#| fig-width: 12
+#| fig-height: 8
 
 # 5. PLOT MORAN'S I RESULTS ----------------------------------------------------
 
@@ -688,7 +714,6 @@ Moran's I test for spatial autocorrelation revealed that there is significant sp
 #| eval: false
 #| echo: false
 
-
 # Run model
 model1.1_mixed <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change + 
                             delta_recorder_effort + recorder_effort + lc_time_period + 
@@ -751,8 +776,10 @@ plot(model5_ordbeta)
 General Least Squares (GLS) regression models with an exponential correlation structure around x and y were used. Since some cells are present in the dataframe at different time points, the GLS will interpret them as "duplicates", unless the time is also considered in the correlation structure.
 
 ```{r gls raw diagnostics}
-#| label: raw-gls
+#| label: fig-raw-gls
 #| echo: false
+#| message: false
+#| warning: false
 #| fig-width: 12
 #| fig-height: 8
 #| fig-cap: "Diagnostic plots for GLS model 1"
@@ -839,8 +866,9 @@ Therefore, from the diagnostic plots we can conclude that the model validation f
 ### (Final)Option 4: GLS with log recorder effort and exponential correlation structure
 
 ```{r gls log}
-#| label: gls-logged-values
+#| label: fig-gls-logged-values
 #| echo: false
+#| message: false
 #| fig-width: 12
 #| fig-height: 8
 #| fig-cap: "Diagnostic plots for GLS model 2"
@@ -925,3 +953,61 @@ The diagnostic plots for this model show that:
     -   Residuals are centered around zero and there is no obvious pattern observed
 
 In conclusion, the model validation showed that log-transforming the recorder effort greatly improved the fit of the model, and this is now good to use. Hooray!
+
+```{r gls summary}
+#| label: tbl-gls-logged-values-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients Forest → TWS Effects on Biodiversity Turnover"
+
+# Extract model summary
+model_summary <- summary(model1_gls)
+coef_table <- model_summary$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs <- data.frame(Variable = rownames(coef_table),
+                          Estimate = round(coef_table[, "Value"], 4),
+                          `Std Error` = round(coef_table[, "Std.Error"], 4),
+                          `t value` = round(coef_table[, "t-value"], 3),
+                          `p value` = coef_table[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs$Significance <- case_when(model_coefs$`p value` < 0.001 ~ "***",
+                                      model_coefs$`p value` < 0.01 ~ "**", 
+                                      model_coefs$`p value` < 0.05 ~ "*",
+                                      model_coefs$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls2 model fit statistics}
+#| label: tbl-gls-model-fit
+#| echo: false
+#| tbl-cap: "GLS Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(model1_gls$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({model_summary$dims$N
+}, error = function(e) {
+  nobs(model1_gls)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(model1_gls), 2),
+                                  round(BIC(model1_gls), 2), 
+                                  round(as.numeric(logLik(model1_gls)), 2),
+                                  round(model_summary$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
