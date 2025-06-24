@@ -331,11 +331,23 @@ abline(h = 0, col = "red", lty = 2)
 
 ## 3.3. GAM with spatial smooth ------------------------------------------------
 
-# Fir GAM with spatial smooth that is separate per time period
-plants_model4_gam <- gam(JDI ~ forest_to_tws + forest_no_change + delta_recorder_effort +
+# Convert lc_time_period to factor
+plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
+  mutate(lc_time_period = as.factor(lc_time_period))
+
+# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
+# get N
+N <- nrow(plants_turnover_forest_tws_15km_coords_time)
+# calculate new JDI values
+plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Fit GAM with spatial smooth that is separate per time period
+plants_model4_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
                            log_recorder_effort + lc_time_period +
-                           s(x, y, by = lc_time_period),
-                         data = plant_turnover_data,
+                           s(x, y, by = lc_time_period, k = 120),
+                         data = plants_turnover_forest_tws_15km_coords_time,
+                         family = betar(link = "logit"),
                          method = "REML")
 
 # View model summary
@@ -350,29 +362,26 @@ save(plants_model4_gam,
 par(mfrow = c(2, 2))
 gam.check(plants_model4_gam)
 
-## 3.4. GAMM with close strucutre to the GLS -----------------------------------
+## 3.4. GAM with forest -> tws and spatial smooth ------------------------------
 
-# Fit GAMM with spatial correltion and time-perioud rand
-plants_model5_gamm <- gamm(JDI ~ forest_to_tws + forest_no_change + delta_recorder_effort + 
-                             log_recorder_effort + lc_time_period,
-                           correlation = corExp(form = ~ x + y | time_numeric), 
-                           data = plants_turnover_forest_tws_15km_coords_time,
-                           method = "REML")
+# Define model
+plants_model5_gam <- gam(JDI_beta ~ s(forest_to_tws) + forest_no_change + delta_recorder_effort +
+                           log_recorder_effort + lc_time_period +
+                           s(x, y, by = lc_time_period, k = 120),
+                         data = plants_turnover_forest_tws_15km_coords_time,
+                         family = betar(link = "logit"),
+                         method = "REML")
 
 # View model summary
-summary(plants_model5_gamm$gam)
+summary(plants_model5_gam)
 
 # Save model output
-save(plants_model5_gamm, 
+save(plants_model5_gam, 
      file = here("data", "models", 
-                 "gamm_model5_plant_occurrences_turnover_forest_tws_results.RData"))
+                 "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
 
 # Run diagnostics
-resid_gamm <- resid(plants_model5_gamm$lme, type = "normalized")
-fitted_gamm <- fitted(plants_model5_gamm$lme)
-
-plot(fitted_gamm, resid_gamm)
-qqnorm(resid_gamm); qqline(resid_gamm)
-
+par(mfrow = c(2, 2))
+gam.check(plants_model5_gam)
 
 # END OF SCRIPT ----------------------------------------------------------------
