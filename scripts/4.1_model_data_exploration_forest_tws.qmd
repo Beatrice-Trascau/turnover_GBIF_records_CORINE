@@ -1195,7 +1195,7 @@ plant_plots
 
 ## Correlation Matrix
 
-```{r}
+```{r plant correlation matrix}
 #| label: fig-variables-relationships-plants
 #| echo: false
 #| fig-cap: "Correlation matrix of variables used in the vascular plant models"
@@ -1299,7 +1299,7 @@ Inspecting the diagnostic plots, we can conclude the following:
 
 The issue of non-linearity is the most concerning one, and therefore we will try a GAM and see if it is any better.
 
-### Option 2: GAM with spatial smoother
+### (Final)Option 2: GAM with spatial smoother
 
 ```{r plants gam1}
 #| label: fig-plants-gam-check
@@ -1335,4 +1335,272 @@ load(here("data", "models", "gam_model5_plant_occurrences_turnover_forest_tws_re
 # Diagnostic plots
 par(mfrow = c(2, 2))
 gam.check(plants_model5_gam)
+```
+
+# Bird Occurrences
+
+```{r prepare bird data}
+#| label: bird-data-prep
+#| include: false
+
+# Load data
+load(here("data", "derived_data", 
+          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Select only columns for Forest -> TWS model
+birds_turnover_forest_tws_15km <- birds_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  # determine which rows belong to which time period
+  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+                                      TRUE ~ NA_real_),
+         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+                                   TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
+         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
+```
+
+## Summary Statistics
+
+```{r bird summary statistics}
+#| label: tbl-summary-stats-birds
+#| echo: false
+#| tbl-cap: "Summary Statistics of Jaccard Dissimilarity Index (JDI) by Time Period for Bird Records"
+
+# Extract summary data
+birds_summary_by_period <- birds_turnover_forest_tws_15km |>
+  group_by(lc_time_period) |>
+  summarize(n_observations = n(),
+            mean_JDI = mean(JDI, na.rm = TRUE),
+            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_forest_to_tws = mean(forest_to_tws, na.rm = TRUE),
+            sd_forest_to_tws = sd(forest_to_tws, na.rm = TRUE),
+            mean_forest_no_change = mean(forest_no_change, na.rm = TRUE),
+            sd_forest_no_change = sd(forest_no_change, na.rm = TRUE),
+            mean_delta_recorder_effort = mean(delta_recorder_effort, na.rm = TRUE),
+            mean_recorder_effort = mean(recorder_effort, na.rm = TRUE))
+
+# Create table for period summary
+birds_summary_by_period <- birds_summary_by_period |>
+  kbl(digits = 3,
+      align = c("l", rep("r", ncol(birds_summary_by_period)-1))) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) |>
+  column_spec(1, bold = TRUE) |>
+  row_spec(0, bold = TRUE, background = "#E6F0FF") |>
+  add_header_above(c(" " = 1, 
+                     "Sample" = 1,
+                     "Turnover" = 2, 
+                     "Forest to TWS" = 2,
+                     "Forest No Change" = 2,
+                     "Recorder Effort" = 2))
+
+# Print the table
+birds_summary_by_period
+```
+
+## Distribution of Values
+
+```{r bird values}
+#| label: fig-variables-distributions-birds
+#| fig-cap: "Distribution of a) Jaccard Dissimilarity Index, b) Forest to TWS transition pixel count, c) Forest No Change pixel count, d) Recorder Effort e) Change in Recorder Effort in Subser with Only Bird Records"
+#| echo: false
+
+# Jaccard's Dissimilarity Index
+bird_jdi_hist <- ggplot(birds_turnover_forest_tws_15km, aes(x = JDI)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Jaccard Dissimilarity Index",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Forest -> TWS
+bird_forest_to_tws_hist <- ggplot(birds_turnover_forest_tws_15km, aes(x = forest_to_tws)) +
+  geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Forest to TWS Transition (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Forest No Change
+bird_forest_no_change_hist <- ggplot(birds_turnover_forest_tws_15km, aes(x = forest_no_change)) +
+  geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Forest No Change (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Recorder effort
+bird_recorder_effort_plot <- ggplot(birds_turnover_forest_tws_15km, aes(x = recorder_effort)) +
+  geom_histogram(bins = 30, fill = "orange", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Delta recorder effort
+bird_delta_recorder_effort_plot <- ggplot(birds_turnover_forest_tws_15km, aes(x = delta_recorder_effort)) +
+  geom_histogram(bins = 30, fill = "coral", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Delta Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Combine plots
+bird_plots <- plot_grid(bird_jdi_hist, bird_forest_to_tws_hist, bird_forest_no_change_hist, bird_recorder_effort_plot, bird_delta_recorder_effort_plot, ncol = 2, labels = c("a)", "b)", "c)", "d)", "e)"))
+
+# Print plots
+bird_plots
+```
+
+## Correlation Matrix
+
+```{r bird correlation matrix}
+#| label: fig-variables-relationships-birds
+#| echo: false
+#| fig-cap: "Correlation matrix of variables used in the bird models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Correlation matrix for numeric variables
+bird_numeric_vars <- birds_turnover_forest_tws_15km |>
+  select(JDI, forest_to_tws, forest_no_change, 
+         intersection_size, union_size, 
+         total_spp_before, total_spp_after,
+         total_occ_before, total_occ_after,
+         recorder_effort, delta_recorder_effort)
+
+# Calculate correlation matrix
+bird_cor_matrix <- cor(bird_numeric_vars, use = "pairwise.complete.obs")
+
+# Create correlation plot
+bird_cor_plot <- corrplot(bird_cor_matrix, 
+                     method = "circle", 
+                     type = "upper", 
+                     tl.col = "black", 
+                     tl.srt = 45, 
+                     addCoef.col = "black", 
+                     number.cex = 0.7,
+                     diag = FALSE)
+```
+
+## Modeling
+
+### Option 1: GLS
+
+```{r bird gls}
+#| label: fig-bird-gls-output
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model for bird occurrences"
+
+# Load model
+load(here("data", "models", "gls_model6_birds_occurrences_turnover_forest_tws_results.RData"))
+
+# Remove rows that might have NA for x or y & categorise time periods
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+
+# Log transform recorder effort values
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
+
+# Check log transformed values
+summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
+any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort))
+
+# Extract residuals
+birds_residuals_gls <- residuals(birds_model6_gls, type = "normalized")
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_model6_gls), birds_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(birds_residuals_gls, main = "Normal Q-Q Plot")
+qqline(birds_residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(birds_turnover_forest_tws_15km_coords_time$forest_to_tws, birds_residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(birds_turnover_forest_tws_15km_coords_time$log_recorder_effort, birds_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The diagnostic plots suggest that:
+
+1.  Residuals vs Fitted:
+    -   There is a downward slope and fan shape =\> suggests non-constant variance and possible misspecification of the model
+2.  QQ Plot:
+    -   Relatively linear but with deviations at both ends
+3.  Residuals vs Forest to TWS
+    -   Some banding at low values but not too strong
+4.  Residuals vs Recorder Effort
+    -   Some funneling =\> might be concerning
+
+### Option 2: GAM with spatial smoother
+
+```{r birds gam}
+#| label: fig-birds-gam-check
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GAM model for bird occurrences"
+
+# Load model
+load(here("data", "models", "gam_model7_birds_occurrences_turnover_forest_tws_results.RData"))
+
+# Diagnostic plots
+par(mfrow = c(2, 2))
+gam.check(birds_model7_gam)
+```
+
+Although this looks better than GLS and does not reveal any serious issues, the validation using DHARMa revealed that there are still some serious issues to be considered/acknowledged.
+
+```{r birds DHARMa}
+#| label: fig-birds-gam-DHARMa
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "DHARMa diagnostic plots for GAM model for bird occurrences"
+
+# Simulate residuals
+res <- simulateResiduals(fittedModel = birds_model7_gam, plot = TRUE)
 ```
