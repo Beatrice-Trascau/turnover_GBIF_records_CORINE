@@ -476,5 +476,37 @@ plot(birds_turnover_forest_tws_15km_coords_time$log_recorder_effort, birds_resid
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
 
+## 4.3. GAM with spatial smooth ------------------------------------------------
+
+# Convert lc_time_period to factor
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
+  mutate(lc_time_period = as.factor(lc_time_period))
+
+# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
+# get N
+N <- nrow(birds_turnover_forest_tws_15km_coords_time)
+# calculate new JDI values
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Fit GAM with spatial smooth that is separate per time period
+birds_model7_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
+                           log_recorder_effort + lc_time_period +
+                           s(x, y, by = lc_time_period, k = 120),
+                         data = birds_turnover_forest_tws_15km_coords_time,
+                         family = betar(link = "logit"),
+                         method = "REML")
+
+# View model summary
+summary(birds_model7_gam)
+
+# Save model output
+save(birds_model7_gam, 
+     file = here("data", "models", 
+                 "gam_model7_birds_occurrences_turnover_forest_tws_results.RData"))
+
+# Run diagnostics
+par(mfrow = c(2, 2))
+gam.check(birds_model7_gam)
 
 # END OF SCRIPT ----------------------------------------------------------------
