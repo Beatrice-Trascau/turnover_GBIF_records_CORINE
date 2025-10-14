@@ -6,13 +6,16 @@
 
 # 1. IMPORT GBIF DOWNLOAD ------------------------------------------------------
 
-# Download key: "0016426-240626123714530"
+# Download key: "0009294-250802193616735"
+# Download link: https://api.gbif.org/v1/occurrence/download/request/0009294-250802193616735.zip
+# Download date: 04.08.2025
+# DOI: 10.15468/dl.tcgps5
 
 # Import
-occurrence_a <- occ_download_get("0016426-240626123714530") |>
+occurrence <- occ_download_get("0009294-250802193616735") |>
   occ_download_import()
 
 # 2. SAVE TO FILE --------------------------------------------------------------
 
 # Save file
-save(occurrence_a, file = here::here("data","raw_data","occurrence_a.rda"))
+save(occurrence, file = here::here("data","raw_data","occurrence_redownload_4August2025.txt"))
