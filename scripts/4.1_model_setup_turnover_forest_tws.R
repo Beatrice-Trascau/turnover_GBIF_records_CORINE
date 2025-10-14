@@ -55,7 +55,7 @@ head(turnover_forest_tws_15km)
 
 # Prepare data for GLS: remove rows with missing x or y and categorise time periods
 turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km |>
-  filter(!is.na(x) & !is.na(y))
+  filter(!is.na(x) & !is.na(y)) |>
   mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
                                   lc_time_period == "2006-2012" ~ 2,
                                   lc_time_period == "2012-2018" ~ 3))
@@ -215,6 +215,39 @@ ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_tur
 # Save figure as .svg
 ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.svg"),
        width = 12, height = 8, dpi = 300)
+
+## 2.5. GAM with delta recorder effort and spatial smooth ----------------------
+
+# Convert lc_time_period to factor
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
+  mutate(lc_time_period = as.factor(lc_time_period))
+
+# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
+# get N
+N <- nrow(turnover_forest_tws_15km_coords_time)
+# calculate new JDI values
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Define model
+model5_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + s(delta_recorder_effort) +
+                           log_recorder_effort + lc_time_period +
+                           s(x, y, by = lc_time_period, k = 120),
+                         data = turnover_forest_tws_15km_coords_time,
+                         family = betar(link = "logit"),
+                         method = "REML")
+
+# View model summary
+summary(model5_gam)
+
+# Save model output
+# save(plants_model5_gam, 
+#      file = here("data", "models", 
+#                  "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
+
+# Run diagnostics
+par(mfrow = c(2, 2))
+gam.check(model5_gam)
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
