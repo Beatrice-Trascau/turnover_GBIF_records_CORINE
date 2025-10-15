@@ -107,9 +107,9 @@ cat("After period (2012-2015):",
 
 # Filter occurrences and label the periods
 occurrences_sf_2012_2018 <- occurrences_sf |>
-  filter(year %in% c(2009:2012, 2015:2018)) |>
+  filter(year %in% c(2009:2012, 2018:2021)) |>
   mutate(time_period = case_when(year %in% 2009:2012 ~ "2009-2012",
-                                 year %in% 2015:2018 ~ "2015-2018",
+                                 year %in% 2018:2021 ~ "2018-2021",
                                  TRUE ~ NA_character_))
 
 # Check filtering results
@@ -117,8 +117,8 @@ cat("Period 3 (2012-2018) occurrences:\n")
 cat("Total records:", nrow(occurrences_sf_2012_2018), "\n")
 cat("Before period (2009-2012):",
     sum(occurrences_sf_2012_2018$time_period == "2009-2012"), "records\n")
-cat("After period (2015-2018):", 
-    sum(occurrences_sf_2012_2018$time_period == "2015-2018"), "records\n")
+cat("After period (2018-2021):", 
+    sum(occurrences_sf_2012_2018$time_period == "2018-2021"), "records\n")
 
 # 4. EXTRACT CELL ID -----------------------------------------------------------
 
@@ -290,11 +290,11 @@ cell_2012_2018_summary_wide <- cell_2012_2018_summary |>
               values_from = c(species_list, n_species, n_occurrences)) |>
   # rename columns 
   rename(species_list_before = 'species_list_2009-2012',
-         species_list_after = 'species_list_2015-2018',
+         species_list_after = 'species_list_2018-2021',
          total_spp_before = 'n_species_2009-2012',
-         total_spp_after = 'n_species_2015-2018',
+         total_spp_after = 'n_species_2018-2021',
          total_occ_before = 'n_occurrences_2009-2012',
-         total_occ_after = 'n_occurrences_2015-2018') |>
+         total_occ_after = 'n_occurrences_2018-2021') |>
   # replace NA values in occurrence columns with 0
   mutate(total_spp_before = ifelse(is.na(total_spp_before), 0, total_spp_before),
          total_spp_after = ifelse(is.na(total_spp_after), 0, total_spp_after),
