@@ -62,6 +62,16 @@ N <- nrow(turnover_forest_tws_15km)
 turnover_forest_tws_15km <- turnover_forest_tws_15km |>
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 
+# Prepare data for GLS: remove rows with missing x or y and categorise time periods
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+
+# Log transform recorder effort values
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 ```
 
 ## Summary Statistics
@@ -181,13 +191,23 @@ Then, we will also check the correlation between the variables used in the analy
 #| fig-width: 6
 #| fig-height: 4
 
+# Check if there are any cells with recorder effort = 0
+a <- turnover_forest_tws_15km |>
+  filter(recorder_effort == 0)
+length(a) #0 - Good!
+
+# Log transform recorder effort values
+turnover_forest_tws_15km <- turnover_forest_tws_15km |>
+  mutate(log_recorder_effort = log(recorder_effort))
+
 # Correlation matrix for numeric variables
 numeric_vars <- turnover_forest_tws_15km |>
   select(JDI, forest_to_tws, forest_no_change, 
          intersection_size, union_size, 
          total_spp_before, total_spp_after,
          total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort)
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
 
 # Calculate correlation matrix
 cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
@@ -487,7 +507,7 @@ knitr::kable(top_effort_outliers, digits = 3)
 
 ## Modeling
 
-### $\beta$ regression
+### Trial 1: $\beta$ regression
 
 The models will be run with a $\beta$ distribution. However, since the raw $JDI\in [0,1]$ and the $\beta$ distribution assumes $JDI\in (0,1)$, the JDI values will be transformed according to the formula:
 
@@ -504,30 +524,19 @@ The following $\beta$ regression was run:
 #| echo: false
 #| tbl-cap: "Beta Regression Results Forest->TWS Land Cover Change"
 
-# 1. TRANSFORM JDI VALUES FOR BETA REGRESSION -------------------------------
-
-# Get N
-N <- nrow(turnover_forest_tws_15km)
-
-# Calculate new JDI values
-turnover_forest_tws_15km <- turnover_forest_tws_15km |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
-
-# 2. RUN BETA GLM --------------------------------------------------------------
-
-# Run model
-model1.1 <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change + 
-                               delta_recorder_effort + recorder_effort + lc_time_period,
-                             data = turnover_forest_tws_15km)
+# Load model
+load(here("data", "models", "exploratory", 
+                 "FTWS_turnover_model1_beta_regression.RData"))
 
 # Extarct residuals from model
-model1.1_residuals <- residuals(model1.1)
+model1.1_residuals <- residuals(FTWS_turnover_model1_beta_regression)
 
 # Add residuals to df
 turnover_forest_tws_15km$residuals <- model1.1_residuals
 
 # Get summary
-model_summary <- tidy(model1.1, conf.int = TRUE)
+model_summary <- tidy(FTWS_turnover_model1_beta_regression,
+                      conf.int = TRUE)
 
 # Display summary
 knitr::kable(model_summary, digits = 4)
@@ -540,7 +549,7 @@ knitr::kable(model_summary, digits = 4)
 #| tbl-cap: "Beta Regression Results Model Fit Statistics"
 
 # Dispaly model fit statistics
-model_glance <- glance(model1.1)
+model_glance <- glance(FTWS_turnover_model1_beta_regression)
 knitr::kable(model_glance, digits = 4)
 ```
 
@@ -708,19 +717,16 @@ forest_tws_15km_local_morans_I
 
 Moran's I test for spatial autocorrelation revealed that there is significant spatial autocorrelation. Therefore, this needs to be accounted for to improve model predictions.
 
-### Option 1: GLMM with SSB ID as random effect
+### Trial 2: GLMM with SSB ID as random effect
 
 ```{r glmm with ssb}
 #| label: glmm-ssb
 #| eval: false
 #| echo: false
 
-# Run model
-model1.1_mixed <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change + 
-                            delta_recorder_effort + recorder_effort + lc_time_period + 
-                            (1|ssb_id),
-                          family = beta_family(),
-                          data = turnover_forest_tws_15km)
+# Load model
+load(here("data", "models", "exploratory", 
+          "FTWS_turnover_model2_GLMM.RData"))
 
 # Check output
 summary(model1.1_mixed) #NaNs
@@ -728,51 +734,11 @@ summary(model1.1_mixed) #NaNs
 
 The mixed models were attempted with both a 50km x 50km and 250km x 250km SSB ID grid. However, the output for the model was NaN across all estimates.
 
-### Option 2: Ordered $\beta$
+### Trial 3: Ordered $\beta$
 
-```{r ordered beta}
-#| label: ordered-beta
-#| eval: false
-#| echo: false
+Ordered $\beta$ models allow for $JDI\in [0,1]$, therefore, the values no longer need to be adjusted. This model failed to converge, even when we increased the number of iterations and chains.
 
-# Ordered beta regression with random effects
-model4_ordbeta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change + 
-                                 delta_recorder_effort + recorder_effort + lc_time_period + 
-                                 (1|ssb_id),
-                               data = turnover_forest_tws_15km,
-                               cores = 4)
-
-# Get summary
-summary(model4_ordbeta) # model did not converge
-```
-
-Ordered $\beta$ models allow for $JDI\in [0,1]$, therefore, the values no longer need to be adjusted. However, this model failed to converge until the number of interactions was doubled and sampling was changed to be more conservative. However, model validation revealed that residuals were overdispersed.
-
-```{r conservative ordered beta}
-#| label: conservative-ordered-beta
-#| eval: false
-#| echo: false
-
-
-# Increase iterations and chains (to try to fix convergence issues)
-model5_ordbeta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change + 
-                                 delta_recorder_effort + recorder_effort + lc_time_period + 
-                                 (1|ssb_id),
-                               data = turnover_forest_tws_15km,
-                               cores = 4,
-                               iter = 4000,        # double the iterations
-                               chains = 4,
-                               control = list(adapt_delta = 0.95,  # more conservative sampling
-                                              max_treedepth = 12))
-
-# Check convergence
-summary(model5_ordbeta)
-
-# Plot output
-plot(model5_ordbeta)
-```
-
-### Option 3: GLS with exponential correlation structure
+### Trial 4: GLS with raw data and exponential correlation structure
 
 General Least Squares (GLS) regression models with an exponential correlation structure around x and y were used. Since some cells are present in the dataframe at different time points, the GLS will interpret them as "duplicates", unless the time is also considered in the correlation structure.
 
@@ -786,11 +752,21 @@ General Least Squares (GLS) regression models with an exponential correlation st
 #| fig-cap: "Diagnostic plots for GLS model 1"
 
 # Load model & data
-load(here("data", "models", "gls_model1_all_occurrences_turnover_results.RData"))
+load(here("data", "models", "exploratory",
+                 "FTWS_turnover_model4_gls_raw.RData"))
+
+# Get summary
+summary(FTWS_turnover_model4_gls_raw)
+
+# Extract correlation structure parameters
+print(FTWS_turnover_model4_gls_raw$modelStruct$corStruct)
+
+# Get range parameter
+range_param <- coef(FTWS_turnover_model4_gls_raw$modelStruct$corStruct, unconstrained = FALSE)
 
 # Extract data for plotting
-fitted_values <- fitted(model1_gls)
-residuals_norm <- residuals(model1_gls, type = "normalized")
+fitted_values <- fitted(FTWS_turnover_model4_gls_raw)
+residuals_norm <- residuals(FTWS_turnover_model4_gls_raw, type = "normalized")
 
 
 # Residuals vs Fitted plot
@@ -864,7 +840,23 @@ Inspection of the diagnostic plots revealed that:
 
 Therefore, from the diagnostic plots we can conclude that the model validation failed. A possible solution to improve model fit is to log-transform the recorder effort values. These makes sense in the context of our question of turnover and may deal with the large outliers observed in the data.
 
-### (Final)Option 4: GLS with log recorder effort and exponential correlation structure
+### (Final)Trial 5: GLS with log recorder effort and exponential correlation structure
+
+```{r gls log correlation}
+#| label: gls-logged-corr-structure
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "final",
+                 "FTWS_turnover_model5_gls_log.RData"))
+
+# Extract correlation structure parameters
+print(FTWS_turnover_model5_gls_log$modelStruct$corStruct)
+
+# Get range parameter
+range_param <- coef(FTWS_turnover_model5_gls_log$modelStruct$corStruct, unconstrained = FALSE)
+```
 
 ```{r gls log}
 #| label: fig-gls-logged-values
@@ -874,66 +866,36 @@ Therefore, from the diagnostic plots we can conclude that the model validation f
 #| fig-height: 8
 #| fig-cap: "Diagnostic plots for GLS model 2"
 
-# Load model
-load(here("data", "models", "gls_model2_all_occurrences_turnover_results.RData"))
 
-# Extract data for plotting
-fitted_values_model2 <- fitted(model2_gls)
-residuals_norm_model2 <- residuals(model2_gls, type = "normalized")
+# Extract residuals
+residuals_gls <- residuals(FTWS_turnover_model5_gls_log, type = "normalized")
 
-# Residuals vs Fitted plot
-q1 <- ggplot(data.frame(fitted = fitted_values_model2, residuals = residuals_norm_model2), 
-             aes(x = fitted, y = residuals)) +
-  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", size = 1) +
-  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
-  labs(x = "Fitted Values", 
-       y = "Normalized Residuals",
-       title = "Residuals vs Fitted Values") +
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+# Get the model frame to ensure we're using the exact same data
+model_data <- getData(FTWS_turnover_model5_gls_log)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(FTWS_turnover_model5_gls_log), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
 
 # QQ plot
-qq_data <- data.frame(theoretical = qqnorm(residuals_norm_model2, plot.it = FALSE)$x,
-                      sample = qqnorm(residuals_norm_model2, plot.it = FALSE)$y)
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
 
-q2 <- ggplot(qq_data, aes(x = theoretical, y = sample)) +
-  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
-  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
-  labs(x = "Theoretical Quantiles", 
-       y = "Sample Quantiles",
-       title = "Normal Q-Q Plot") +
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+# Residuals vs predictors
+plot(model_data$forest_to_tws, residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
 
-
-# Residuals vs Forest to TWS
-q3 <- ggplot(data.frame(residuals = residuals_norm_model2), aes(x = residuals)) +
-  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7, color = "white") +
-  geom_density(aes(y = after_stat(density) * length(residuals_norm_model2) * (max(residuals_norm_model2) - min(residuals_norm_model2)) / 30), 
-               color = "red", size = 1) +
-  labs(x = "Normalized Residuals", 
-       y = "Frequency",
-       title = "Distribution of Residuals") +
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-
-# Residuals vs Log Recorder Effort
-q4 <- ggplot(data.frame(fitted = fitted_values_model2, sqrt_abs_resid = sqrt(abs(residuals_norm_model2))), 
-             aes(x = fitted, y = sqrt_abs_resid)) +
-  geom_point(alpha = 0.6, color = "steelblue", size = 1.2) +
-  geom_smooth(method = "loess", se = TRUE, color = "darkred", alpha = 0.2) +
-  labs(x = "Fitted Values", 
-       y = "√|Normalized Residuals|",
-       title = "Scale-Location Plot") +
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-
-# Combine plots
-gls2_plots <- plot_grid(q1, q2, q3, q4, ncol = 2, labels = c("a)", "b)", "c)", "d)"))
-
-# Dispaly combined plots
-gls2_plots
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
 
 ```
 
@@ -961,7 +923,7 @@ In conclusion, the model validation showed that log-transforming the recorder ef
 #| tbl-cap: "GLS Model Coefficients Forest → TWS Effects on Biodiversity Turnover"
 
 # Extract model summary
-model_summary <- summary(model1_gls)
+model_summary <- summary(FTWS_turnover_model5_gls_log)
 coef_table <- model_summary$tTable
 
 # Create coefficient table without confidence intervals initially
@@ -992,23 +954,23 @@ knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0),
 
 # Model information
 cat("Model Specifications:\n")
-cat("- Formula:", deparse(model1_gls$call$model), "\n")
+cat("- Formula:", deparse(FTWS_turnover_model5_gls_log$call$model), "\n")
 cat("- Correlation Structure: Exponential spatial correlation\n") 
 cat("- Method: REML\n")
 
 # Try to get sample size safely
 n_obs <- tryCatch({model_summary$dims$N
 }, error = function(e) {
-  nobs(model1_gls)
+  nobs(FTWS_turnover_model5_gls_log)
 })
 
 cat("- Number of observations:", n_obs, "\n")
 
 # Model fit statistics
 fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
-                        Value = c(round(AIC(model1_gls), 2),
-                                  round(BIC(model1_gls), 2), 
-                                  round(as.numeric(logLik(model1_gls)), 2),
+                        Value = c(round(AIC(FTWS_turnover_model5_gls_log), 2),
+                                  round(BIC(FTWS_turnover_model5_gls_log), 2), 
+                                  round(as.numeric(logLik(FTWS_turnover_model5_gls_log)), 2),
                                   round(model_summary$sigma, 4)))
 knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
 ```
@@ -1022,18 +984,21 @@ knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
 #| fig-height: 4
 #| fig-cap: "Coefficient Estimates from GLS"
 
+# Get summary of the model
+model_summary <- summary(FTWS_turnover_model5_gls_log)
+
 # Create dataframe of coeficients
-model2_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
-                             estimate = model_summary$tTable[, "Value"],
-                             std.error = model_summary$tTable[, "Std.Error"],
-                             statistic = model_summary$tTable[, "t-value"],
-                             p.value = model_summary$tTable[, "p-value"])
+FTWS_turnover_model5_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
 
 # Remove the intercept
-model2_coef_df_no_intercept <- model2_coef_df[model2_coef_df$term != "(Intercept)", ]
+FTWS_turnover_model5_gls_log_coef_df_no_intercept <- FTWS_turnover_model5_gls_log_coef_df[FTWS_turnover_model5_gls_log_coef_df$term != "(Intercept)", ]
 
 # Create coefficient plot
-figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
+figure6_a <- ggplot(FTWS_turnover_model5_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
   geom_point() +
   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
                      xmax = estimate + 1.96 * std.error)) +
@@ -1055,6 +1020,27 @@ figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
 
 # Display plot
 figure6_a
+```
+
+## Trial 6: GAM with $\Delta$ recorder_effort
+
+Although the model in Trial 5 looked good enough to use, I ran a GAM to check if the fit would be even better.
+
+```{r GAM with recorder effort}
+#| label: gam-recorder-effort
+#| eval: false
+#| echo: false
+
+# Load model
+here("data", "models", "exploratory",
+                 "FTWS_turnover_model6_GAM.RData")
+
+# Check output
+summary(model5_gam)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(model5_gam)
 ```
 
 # Vascular Plant Occurrences
@@ -1088,6 +1074,17 @@ plants_turnover_forest_tws_15km <- vascular_plants_all_periods_turnover_all_land
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
          -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
          -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
+
+# Remove rows that might have NA for x or y and categorise time periods for GLS
+plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+
+# Log transform recorder effort values
+plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 ```
 
 ## Summary Statistics
@@ -1202,13 +1199,23 @@ plant_plots
 #| fig-width: 6
 #| fig-height: 4
 
+# Check if there are any cells with recorder effort = 0
+b <- plants_turnover_forest_tws_15km |>
+  filter(recorder_effort == 0)
+length(b) #0 - Good!
+
+# Log transform recorder effort values
+plants_turnover_forest_tws_15km <- plants_turnover_forest_tws_15km |>
+  mutate(log_recorder_effort = log(recorder_effort))
+
 # Correlation matrix for numeric variables
 plant_numeric_vars <- plants_turnover_forest_tws_15km |>
   select(JDI, forest_to_tws, forest_no_change, 
          intersection_size, union_size, 
          total_spp_before, total_spp_after,
          total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort)
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
 
 # Calculate correlation matrix
 plant_cor_matrix <- cor(plant_numeric_vars, use = "pairwise.complete.obs")
@@ -1226,7 +1233,25 @@ plant_cor_plot <- corrplot(plant_cor_matrix,
 
 ## Modeling
 
-### Option 1: GLS
+### (Final) Trial1: GLS
+
+```{r gls plants}
+#| label: fig-gls-plants
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "final", "plants_FTWS_model1_gls.RData"))
+
+# Extract correlation structure parameters
+print(plants_FTWS_model1_gls$modelStruct$corStruct)
+
+# Get range parameter
+range_param <- coef(plants_FTWS_model1_gls$modelStruct$corStruct, unconstrained = FALSE)
+
+# Get summary
+plants_FTWS_model1_gls_summary <- summary(plants_FTWS_model1_gls)
+```
 
 A GLS with the same set-up and parameters as the one in Option 4 was run for the sub-set of data containing only vascular plant occurrences.
 
@@ -1238,31 +1263,17 @@ A GLS with the same set-up and parameters as the one in Option 4 was run for the
 #| fig-height: 8
 #| fig-cap: "Diagnostic plots for GLS model for vascular plant occurrences"
 
-# Load model
-load(here("data", "models", "gls_model3_plant_occurrences_turnover_forest_tws_results.RData"))
-
-# Remove rows that might have NA for x or y
-plants_turnover_forest_tws_15km_coords <- plants_turnover_forest_tws_15km |>
-  filter(!is.na(x) & !is.na(y))
-
-# Categorise time periods
-plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3))
-
-# Log transform recorder effort values
-plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
-  mutate(log_recorder_effort = log(recorder_effort))
-
 # Extract residuals
-plant_residuals_gls <- residuals(plants_model3_gls, type = "normalized")
+plant_residuals_gls <- residuals(plants_FTWS_model1_gls, type = "normalized")
+
+# Get the data actually used in the model
+plants_model_data <- getData(plants_FTWS_model1_gls)
 
 # Basic residual plots
 par(mfrow = c(2, 2))
 
 # Residuals vs fitted
-plot(fitted(plants_model3_gls), plant_residuals_gls,
+plot(fitted(plants_FTWS_model1_gls), plant_residuals_gls,
      xlab = "Fitted Values", ylab = "Normalized Residuals",
      main = "Residuals vs Fitted")
 abline(h = 0, col = "red", lty = 2)
@@ -1272,12 +1283,12 @@ qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
 qqline(plant_residuals_gls, col = "red")
 
 # Residuals vs predictors
-plot(plants_turnover_forest_tws_15km_coords_time$forest_to_tws, plant_residuals_gls,
+plot(plants_model_data$forest_to_tws, plant_residuals_gls,
      xlab = "Forest to TWS", ylab = "Normalized Residuals",
      main = "Residuals vs Forest to TWS")
 abline(h = 0, col = "red", lty = 2)
 
-plot(plants_turnover_forest_tws_15km_coords_time$log_recorder_effort, plant_residuals_gls,
+plot(plants_model_data$log_recorder_effort, plant_residuals_gls,
      xlab = "Recorder Effort", ylab = "Normalized Residuals",
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
@@ -1286,20 +1297,120 @@ abline(h = 0, col = "red", lty = 2)
 Inspecting the diagnostic plots, we can conclude the following:
 
 1.  Residuals vs Fitted
-    -   There is a clear curve, with residuals becoming more negative with increasing fitted values, which suggests a non-linear relationship
+    -   There is a some curving, with residuals becoming more negative with increasing fitted values, which suggests a non-linear relationship
 2.  QQ plot
     -   Residuals deviate slightly from the line at both ends, but no wild behaviour
 3.  Residuals vs Forest to TWS
     -   Clumping at low values, which is expected if many cells have little or no change (which is the case for us)
     -   No clear trend
 4.  Residuals vs Recorder Effort
-    -   Slight positive skew in residuals with increasing effort
-    -   Wider spread at higher effort
-    -   Could indicate some heteroscedasticity
+    -   Relatively even spread
+    -   No clear pattern
 
-The issue of non-linearity is the most concerning one, and therefore we will try a GAM and see if it is any better.
+The issue of the funneling in the Residuals vs Fitted plot is the more concerning one. We have tried several other models to explore how they would perform. However, for the sake of keeping all turnover analyses consistent, we chose to use the output of this model.
 
-### (Final)Option 2: GAM with spatial smoother
+```{r gls plants summary}
+#| label: tbl-gls-plantss-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients Forest → TWS Effects on Vascular Plant Turnover"
+
+# Create coefficient table
+coef_table_plants <- plants_FTWS_model1_gls_summary$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs_plants <- data.frame(Variable = rownames(coef_table_plants),
+                          Estimate = round(coef_table_plants[, "Value"], 4),
+                          `Std Error` = round(coef_table_plants[, "Std.Error"], 4),
+                          `t value` = round(coef_table_plants[, "t-value"], 3),
+                          `p value` = coef_table_plants[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs_plants$Significance <- case_when(model_coefs_plants$`p value` < 0.001 ~ "***",
+                                      model_coefs_plants$`p value` < 0.01 ~ "**", 
+                                      model_coefs_plants$`p value` < 0.05 ~ "*",
+                                      model_coefs_plants$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs_plants, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls plants model fit statistics}
+#| label: tbl-gls-plants-model-fit
+#| echo: false
+#| tbl-cap: "GLS Plants Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(plants_FTWS_model1_gls$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({plants_FTWS_model1_gls_summary$dims$N
+}, error = function(e) {
+  nobs(plants_FTWS_model1_gls)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(plants_FTWS_model1_gls), 2),
+                                  round(BIC(plants_FTWS_model1_gls), 2), 
+                                  round(as.numeric(logLik(plants_FTWS_model1_gls)), 2),
+                                  round(plants_FTWS_model1_gls_summary$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
+
+```{r gls plants model output plot}
+#| label: fig-gls-plants-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from Vascular Plants GLS"
+
+# Create dataframe of coeficients
+plants_FTWS_model1_gls_coef_df <- data.frame(term = names(plants_FTWS_model1_gls_summary$tTable[, "Value"]),
+                                             estimate = plants_FTWS_model1_gls_summary$tTable[, "Value"],
+                                                   std.error = plants_FTWS_model1_gls_summary$tTable[, "Std.Error"],
+                                                   statistic = plants_FTWS_model1_gls_summary$tTable[, "t-value"],
+                                                   p.value = plants_FTWS_model1_gls_summary$tTable[, "p-value"])
+
+# Remove the intercept
+plants_FTWS_model1_gls_coef_df_no_intercept <- plants_FTWS_model1_gls_coef_df[plants_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure6_b <- ggplot(plants_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure6_b
+```
+
+### Trial 2: GAM with spatial smoother
 
 ```{r plants gam1}
 #| label: fig-plants-gam-check
@@ -1310,14 +1421,17 @@ The issue of non-linearity is the most concerning one, and therefore we will try
 #| fig-cap: "Diagnostic plots for GAM model for vascular plant occurrences"
 
 # Load model
-load(here("data", "models", "gam_model4_plant_occurrences_turnover_forest_tws_results.RData"))
+load(here("data", "models", "exploratory", "plants_FTWS_model2_GAM.RData"))
+
+# Check model summary
+summary(plants_FTWS_model2_GAM)
 
 # Diagnostic plots
 par(mfrow = c(2, 2))
-gam.check(plants_model4_gam)
+gam.check(plants_FTWS_model2_GAM)
 ```
 
-The diagnostic plots reveal some mild deviances from expectations, but no major issues. Since there is some curvature to the relationship between residuals and Forest to TWS, I will also try a model that fits a smoother around that variable.
+The diagnostic plots reveal some deviances from expectations which might prove problematic. Since there is some curvature to the relationship between residuals and Forest to TWS, I will also try a model that fits a smoother around that variable.
 
 ### Option 3: GAM with Forest -\> TWS and spatial smoother
 
@@ -1330,11 +1444,14 @@ The diagnostic plots reveal some mild deviances from expectations, but no major 
 #| fig-cap: "Diagnostic plots for second GAM model for vascular plant occurrences"
 
 # Load model
-load(here("data", "models", "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
+load(here("data", "models", "exploratory", "plants_FTWS_model3_GAM_extra_smooth.RData"))
+
+# Extract summary
+summary(plants_FTWS_model3_GAM_extra_smooth)
 
 # Diagnostic plots
 par(mfrow = c(2, 2))
-gam.check(plants_model5_gam)
+gam.check(plants_FTWS_model3_GAM_extra_smooth)
 ```
 
 # Bird Occurrences
@@ -1368,6 +1485,17 @@ birds_turnover_forest_tws_15km <- birds_all_periods_turnover_all_land_cover_chan
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
          -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
          -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
+
+# Remove rows that might have NA for x or y & categorise time periods
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+
+# Log transform recorder effort values
+birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 ```
 
 ## Summary Statistics
@@ -1482,13 +1610,24 @@ bird_plots
 #| fig-width: 6
 #| fig-height: 4
 
+# Check if there are any cells with recorder effort = 0
+c <- birds_turnover_forest_tws_15km |>
+  filter(recorder_effort == 0)
+length(c) #0 - Good!
+
+# Log transform recorder effort values
+birds_turnover_forest_tws_15km <- birds_turnover_forest_tws_15km |>
+  mutate(log_recorder_effort = log(recorder_effort))
+
+
 # Correlation matrix for numeric variables
 bird_numeric_vars <- birds_turnover_forest_tws_15km |>
   select(JDI, forest_to_tws, forest_no_change, 
          intersection_size, union_size, 
          total_spp_before, total_spp_after,
          total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort)
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
 
 # Calculate correlation matrix
 bird_cor_matrix <- cor(bird_numeric_vars, use = "pairwise.complete.obs")
@@ -1506,42 +1645,45 @@ bird_cor_plot <- corrplot(bird_cor_matrix,
 
 ## Modeling
 
-### Option 1: GLS
+### (Final) Trial 1: GLS
 
 ```{r bird gls}
-#| label: fig-bird-gls-output
+#| label: bird-gls-output
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_FTWS_model1_gls.RData"))
+
+# Extract summary
+birds_FTWS_model1_gls_summary <- summary(birds_FTWS_model1_gls)
+
+# Extract correlation structure parameters
+print(birds_FTWS_model1_gls$modelStruct$corStruct)
+
+# Get range parameter
+birds_range_param <- coef(birds_FTWS_model1_gls$modelStruct$corStruct, unconstrained = FALSE)
+```
+
+```{r gls birds log}
+#| label: fig-birds-gls-logged-values
 #| echo: false
 #| message: false
 #| fig-width: 12
 #| fig-height: 8
-#| fig-cap: "Diagnostic plots for GLS model for bird occurrences"
-
-# Load model
-load(here("data", "models", "gls_model6_birds_occurrences_turnover_forest_tws_results.RData"))
-
-# Remove rows that might have NA for x or y & categorise time periods
-birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3))
-
-# Log transform recorder effort values
-birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
-  mutate(log_recorder_effort = log(recorder_effort))
-
-# Check log transformed values
-summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
-any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort))
+#| fig-cap: "Diagnostic plots for Bird GLS"
 
 # Extract residuals
-birds_residuals_gls <- residuals(birds_model6_gls, type = "normalized")
+birds_residuals_gls <- residuals(birds_FTWS_model1_gls, type = "normalized")
+
+# Get the data actually used in the model
+birds_model_data <- getData(birds_FTWS_model1_gls)
 
 # Basic residual plots
 par(mfrow = c(2, 2))
 
 # Residuals vs fitted
-plot(fitted(birds_model6_gls), birds_residuals_gls,
+plot(fitted(birds_FTWS_model1_gls), birds_residuals_gls,
      xlab = "Fitted Values", ylab = "Normalized Residuals",
      main = "Residuals vs Fitted")
 abline(h = 0, col = "red", lty = 2)
@@ -1551,12 +1693,12 @@ qqnorm(birds_residuals_gls, main = "Normal Q-Q Plot")
 qqline(birds_residuals_gls, col = "red")
 
 # Residuals vs predictors
-plot(birds_turnover_forest_tws_15km_coords_time$forest_to_tws, birds_residuals_gls,
+plot(birds_model_data$forest_to_tws, birds_residuals_gls,
      xlab = "Forest to TWS", ylab = "Normalized Residuals",
      main = "Residuals vs Forest to TWS")
 abline(h = 0, col = "red", lty = 2)
 
-plot(birds_turnover_forest_tws_15km_coords_time$log_recorder_effort, birds_residuals_gls,
+plot(birds_model_data$log_recorder_effort, birds_residuals_gls,
      xlab = "Recorder Effort", ylab = "Normalized Residuals",
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
@@ -1573,7 +1715,156 @@ The diagnostic plots suggest that:
 4.  Residuals vs Recorder Effort
     -   Some funneling =\> might be concerning
 
-### Option 2: GAM with spatial smoother
+Despite some of the issues in the diagnostic plots, this is the model we will use to keep consistent across analyses.
+
+```{r gls birds summary}
+#| label: tbl-gls-birds-values-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients Forest → TWS Effects on Birds Turnover"
+
+# Extract model summary
+model_summary_birds <- summary(birds_FTWS_model1_gls)
+coef_table_birds <- model_summary_birds$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs_birds <- data.frame(Variable = rownames(coef_table_birds),
+                          Estimate = round(coef_table_birds[, "Value"], 4),
+                          `Std Error` = round(coef_table_birds[, "Std.Error"], 4),
+                          `t value` = round(coef_table_birds[, "t-value"], 3),
+                          `p value` = coef_table_birds[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs_birds$Significance <- case_when(model_coefs_birds$`p value` < 0.001 ~ "***",
+                                      model_coefs_birds$`p value` < 0.01 ~ "**", 
+                                      model_coefs_birds$`p value` < 0.05 ~ "*",
+                                      model_coefs_birds$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs_birds, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls birds model fit statistics}
+#| label: tbl-gls-birds-model-fit
+#| echo: false
+#| tbl-cap: "GLS Birds Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(birds_FTWS_model1_gls$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({model_summary_birds$dims$N
+}, error = function(e) {
+  nobs(birds_FTWS_model1_gls)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(birds_FTWS_model1_gls), 2),
+                                  round(BIC(birds_FTWS_model1_gls), 2), 
+                                  round(as.numeric(logLik(birds_FTWS_model1_gls)), 2),
+                                  round(model_summary_birds$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
+
+```{r gls birds model output plot}
+#| label: fig-gls-birds-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from Birds GLS"
+
+# Create dataframe of coeficients
+birds_FTWS_model1_gls_coef_df <- data.frame(term = names(model_summary_birds$tTable[, "Value"]),
+                                             estimate = model_summary_birds$tTable[, "Value"],
+                                                   std.error = model_summary_birds$tTable[, "Std.Error"],
+                                                   statistic = model_summary_birds$tTable[, "t-value"],
+                                                   p.value = model_summary_birds$tTable[, "p-value"])
+
+# Remove the intercept
+birds_FTWS_model1_gls_coef_df_no_intercept <- birds_FTWS_model1_gls_coef_df[birds_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure6_c <- ggplot(birds_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure6_c
+```
+
+### Trail 2: Weighted GLS
+
+```{r weighted gls  diagnostics}
+#| label: fig-birds-weighted-gls
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for birds weighted GLS model 2"
+
+# Load model & data
+load(here("data", "models", "exploratory",
+          "birds_FTWS_model2_weighted_gls.RData"))
+
+# Extract residuals
+birds_residuals_weighted_gls <- residuals(birds_FTWS_model2_weighted_gls, type = "normalized")
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_FTWS_model2_weighted_gls), birds_residuals_weighted_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(birds_residuals_weighted_gls, main = "Normal Q-Q Plot")
+qqline(birds_residuals_weighted_gls, col = "red")
+
+# Residuals vs predictors
+plot(birds_turnover_forest_tws_15km_coords_time$forest_to_tws, birds_residuals_weighted_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(birds_turnover_forest_tws_15km_coords_time$log_recorder_effort, birds_residuals_weighted_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+Model diagnostic are showing the same issues as the unweighted version of the model. Will try a GAM just to see as well.
+
+### Trial 3: GAM with spatial smoother
 
 ```{r birds gam}
 #| label: fig-birds-gam-check
@@ -1584,23 +1875,11 @@ The diagnostic plots suggest that:
 #| fig-cap: "Diagnostic plots for GAM model for bird occurrences"
 
 # Load model
-load(here("data", "models", "gam_model7_birds_occurrences_turnover_forest_tws_results.RData"))
+load(here("data", "models", "exploratory", "birds_FTWS_model3_GAM.RData"))
 
 # Diagnostic plots
 par(mfrow = c(2, 2))
-gam.check(birds_model7_gam)
+gam.check(birds_FTWS_model3_GAM)
 ```
 
-Although this looks better than GLS and does not reveal any serious issues, the validation using DHARMa revealed that there are still some serious issues to be considered/acknowledged.
-
-```{r birds DHARMa}
-#| label: fig-birds-gam-DHARMa
-#| echo: false
-#| message: false
-#| fig-width: 12
-#| fig-height: 8
-#| fig-cap: "DHARMa diagnostic plots for GAM model for bird occurrences"
-
-# Simulate residuals
-res <- simulateResiduals(fittedModel = birds_model7_gam, plot = TRUE)
-```
+The model diagnostics show serious issues upon closer inspection. Best way to proceed is with the GLS.
