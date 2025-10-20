@@ -60,58 +60,74 @@ turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km |>
                                   lc_time_period == "2006-2012" ~ 2,
                                   lc_time_period == "2012-2018" ~ 3))
 
-## 2.2. GLS with raw data ---------------------------------------------------------
+## 2.2. Beta regression --------------------------------------------------------
+
+# Get N
+N <- nrow(turnover_forest_tws_15km)
+
+# Transform JDI values so they do not touch [0,1] anymore
+turnover_forest_tws_15km <- turnover_forest_tws_15km |>
+  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Run model
+FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change + 
+                               delta_recorder_effort + recorder_effort + lc_time_period,
+                             data = turnover_forest_tws_15km)
+
+# Save model
+save(FTWS_turnover_model1_beta_regression,
+     file = here("data", "models", "exploratory", 
+                 "FTWS_turnover_model1_beta_regression.RData"))
+
+
+## 2.3. GLMM with SSB ID as random effect --------------------------------------
+
+# Run model
+FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change + 
+                            delta_recorder_effort + recorder_effort + lc_time_period + 
+                            (1|ssb_id),
+                          family = beta_family(),
+                          data = turnover_forest_tws_15km)
+
+# Save model
+save(FTWS_turnover_model2_GLMM,
+     file = here("data", "models", "exploratory", 
+                 "FTWS_turnover_model2_GLMM.RData"))
+
+## 2.4. Ordered beta regression ------------------------------------------------
+
+# Run model
+# FTWS_turnover_model3_ordered_beta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change + 
+#                                                   delta_recorder_effort + recorder_effort + lc_time_period + 
+#                                                   (1|ssb_id),
+#                                                 data = turnover_forest_tws_15km,
+#                                                 cores = 4,
+#                                                 iter = 4000, # double the iterations
+#                                                 chains = 4,
+#                                                 control = list(adapt_delta = 0.95,  # more conservative sampling
+#                                                                max_treedepth = 12))
+
+# Save model
+# save(FTWS_turnover_model3_ordered_beta,
+#      file = here("data", "models", "exploratory", 
+#                  "FTWS_turnover_model3_ordered_beta.RData"))
+
+## 2.5. GLS with raw data and exponential structure ----------------------------
 
 # Fit gls
-model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+FTWS_turnover_model4_gls_raw <- gls(JDI ~ forest_to_tws + forest_no_change + 
                     delta_recorder_effort + recorder_effort + lc_time_period,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
 # Save model output to file
-save(model1_gls, 
-     file = here("data", "models", 
-                 "gls_model1_all_occurrences_turnover_results.RData"))
+save(FTWS_turnover_model4_gls_raw, 
+     file = here("data", "models", "exploratory",
+                 "FTWS_turnover_model4_gls_raw.RData"))
 
-# Get summary
-summary(model1_gls)
 
-# Extract correlation structure parameters
-print(model1_gls$modelStruct$corStruct)
-
-# Get range parameter
-range_param <- coef(model1_gls$modelStruct$corStruct, unconstrained = FALSE)
-
-# Extract residuals
-residuals_gls <- residuals(model1_gls, type = "normalized")
-
-# Basic residual plots
-par(mfrow = c(2, 2))
-
-# Residuals vs fitted
-plot(fitted(model1_gls), residuals_gls,
-     xlab = "Fitted Values", ylab = "Normalized Residuals",
-     main = "Residuals vs Fitted")
-abline(h = 0, col = "red", lty = 2)
-
-# QQ plot
-qqnorm(residuals_gls, main = "Normal Q-Q Plot")
-qqline(residuals_gls, col = "red")
-
-# Residuals vs Forest to TWS 
-plot(turnover_forest_tws_15km_coords_time$forest_to_tws, residuals_gls,
-     xlab = "Forest to TWS", ylab = "Normalized Residuals",
-     main = "Residuals vs Forest to TWS")
-abline(h = 0, col = "red", lty = 2)
-
-# Residuals vs Recorder Effort
-plot(turnover_forest_tws_15km_coords_time$recorder_effort, residuals_gls,
-     xlab = "Recorder Effort", ylab = "Normalized Residuals",
-     main = "Residuals vs Recorder Effort")
-abline(h = 0, col = "red", lty = 2)
-
-## 2.3. GLS with logged recorder effort ----------------------------------------
+## 2.6. GLS with logged recorder effort ----------------------------------------
 
 # Check if there are any cells with recorder effort = 0
 a <- turnover_forest_tws_15km_coords_time |>
@@ -126,69 +142,37 @@ turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
 summary(turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
-
 # Define GLS
-model2_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+FTWS_turnover_model5_gls_log <- gls(JDI ~ forest_to_tws + forest_no_change + 
                     delta_recorder_effort + log_recorder_effort + lc_time_period,
                   correlation = corExp(form = ~ x + y | time_numeric),  
                   data = turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
+# Model validation looks ok => THIS IS THE FINAL MODEL WE WILL USE
+
 # Save model output to file
-save(model2_gls, 
-     file = here("data", "models", 
-                 "gls_model2_all_occurrences_turnover_results.RData"))
-
-# Get summary
-model2_gls_summary <- summary(model2_gls)
-
-# Extract correlation structure parameters
-print(model2_gls$modelStruct$corStruct)
-
-# Get range parameter
-range_param <- coef(model2_gls$modelStruct$corStruct, unconstrained = FALSE)
-
-# Extract residuals
-residuals_gls <- residuals(model2_gls, type = "normalized")
-
-# Basic residual plots
-par(mfrow = c(2, 2))
-
-# Residuals vs fitted
-plot(fitted(model2_gls), residuals_gls,
-     xlab = "Fitted Values", ylab = "Normalized Residuals",
-     main = "Residuals vs Fitted")
-abline(h = 0, col = "red", lty = 2)
-
-# QQ plot
-qqnorm(residuals_gls, main = "Normal Q-Q Plot")
-qqline(residuals_gls, col = "red")
-
-# Residuals vs predictors
-plot(turnover_forest_tws_15km_coords_time$forest_to_tws, residuals_gls,
-     xlab = "Forest to TWS", ylab = "Normalized Residuals",
-     main = "Residuals vs Forest to TWS")
-abline(h = 0, col = "red", lty = 2)
-
-plot(turnover_forest_tws_15km_coords_time$log_recorder_effort, residuals_gls,
-     xlab = "Recorder Effort", ylab = "Normalized Residuals",
-     main = "Residuals vs Recorder Effort")
-abline(h = 0, col = "red", lty = 2)
+save(FTWS_turnover_model5_gls_log, 
+     file = here("data", "models", "final",
+                 "FTWS_turnover_model5_gls_log.RData"))
 
 ## 2.4. Plot model output ------------------------------------------------------
 
+# Get summary of the model
+model_summary <- summary(FTWS_turnover_model5_gls_log)
+
 # Create dataframe of coeficients
-model2_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
-                             estimate = model_summary$tTable[, "Value"],
-                             std.error = model_summary$tTable[, "Std.Error"],
-                             statistic = model_summary$tTable[, "t-value"],
-                             p.value = model_summary$tTable[, "p-value"])
+FTWS_turnover_model5_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
 
 # Remove the intercept
-model2_coef_df_no_intercept <- model2_coef_df[model2_coef_df$term != "(Intercept)", ]
+FTWS_turnover_model5_gls_log_coef_df_no_intercept <- FTWS_turnover_model5_gls_log_coef_df[FTWS_turnover_model5_gls_log_coef_df$term != "(Intercept)", ]
 
 # Create coefficient plot
-figure6_a <- ggplot(model2_coef_df_no_intercept, aes(x = estimate, y = term)) +
+figure6_a <- ggplot(FTWS_turnover_model5_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
   geom_point() +
   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
                      xmax = estimate + 1.96 * std.error)) +
@@ -230,24 +214,17 @@ turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 
 # Define model
-model5_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + s(delta_recorder_effort) +
+FTWS_turnover_model6_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + s(delta_recorder_effort) +
                            log_recorder_effort + lc_time_period +
                            s(x, y, by = lc_time_period, k = 120),
                          data = turnover_forest_tws_15km_coords_time,
                          family = betar(link = "logit"),
                          method = "REML")
 
-# View model summary
-summary(model5_gam)
-
 # Save model output
-# save(plants_model5_gam, 
-#      file = here("data", "models", 
-#                  "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
-
-# Run diagnostics
-par(mfrow = c(2, 2))
-gam.check(model5_gam)
+save(FTWS_turnover_model6_GAM,
+     file = here("data", "models", "exploratory",
+                 "FTWS_turnover_model6_GAM.RData"))
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
@@ -305,54 +282,66 @@ summary(plants_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(plants_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-plants_model3_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
                     delta_recorder_effort + log_recorder_effort + lc_time_period,
                   correlation = corExp(form = ~ x + y | time_numeric),  
                   data = plants_turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
+# Model validation revealed that this model is ok to use
+  # despite some deviances, we will use this model to keep things consistent
+
 # Save model output to file
-save(plants_model3_gls, 
-     file = here("data", "models", 
-                 "gls_model3_plant_occurrences_turnover_forest_tws_results.RData"))
+save(plants_FTWS_model1_gls, 
+     file = here("data", "models", "final",
+                 "plants_FTWS_model1_gls.RData"))
 
-# Get summary
-plants_model3_gls_summary <- summary(plants_model3_gls)
+## 3.3. Plot model output ------------------------------------------------------
 
-# Extract correlation structure parameters
-print(plants_model3_gls$modelStruct$corStruct)
+# Get model summary
+plants_FTWS_model1_gls_summary <- summary(plants_FTWS_model1_gls)
 
-# Get range parameter
-range_param <- coef(plants_model3_gls$modelStruct$corStruct, unconstrained = FALSE)
+# Create dataframe of coeficients
+plants_FTWS_model1_gls_coef_df <- data.frame(term = names(plants_FTWS_model1_gls_summary$tTable[, "Value"]),
+                                             estimate = plants_FTWS_model1_gls_summary$tTable[, "Value"],
+                                             std.error = plants_FTWS_model1_gls_summary$tTable[, "Std.Error"],
+                                             statistic = plants_FTWS_model1_gls_summary$tTable[, "t-value"],
+                                             p.value = plants_FTWS_model1_gls_summary$tTable[, "p-value"])
 
-# Extract residuals
-plant_residuals_gls <- residuals(plants_model3_gls, type = "normalized")
+# Remove the intercept
+plants_FTWS_model1_gls_coef_df_no_intercept <- plants_FTWS_model1_gls_coef_df[plants_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
 
-# Basic residual plots
-par(mfrow = c(2, 2))
+# Create coefficient plot
+figure6_b <- ggplot(plants_FTWS_model1_gls_coef_df_no_intercept, 
+                    aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
 
-# Residuals vs fitted
-plot(fitted(plants_model3_gls), plant_residuals_gls,
-     xlab = "Fitted Values", ylab = "Normalized Residuals",
-     main = "Residuals vs Fitted")
-abline(h = 0, col = "red", lty = 2)
+# Save figure as .png
+ggsave(filename = here("figures", "Figure6b_gls_model_output_plants_turnover.png"),
+       width = 12, height = 8, dpi = 300)
 
-# QQ plot
-qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
-qqline(plant_residuals_gls, col = "red")
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure6b_gls_model_output_plants_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
 
-# Residuals vs predictors
-plot(plants_turnover_forest_tws_15km_coords_time$forest_to_tws, plant_residuals_gls,
-     xlab = "Forest to TWS", ylab = "Normalized Residuals",
-     main = "Residuals vs Forest to TWS")
-abline(h = 0, col = "red", lty = 2)
-
-plot(plants_turnover_forest_tws_15km_coords_time$log_recorder_effort, plant_residuals_gls,
-     xlab = "Recorder Effort", ylab = "Normalized Residuals",
-     main = "Residuals vs Recorder Effort")
-abline(h = 0, col = "red", lty = 2)
-
-## 3.3. GAM with spatial smooth ------------------------------------------------
+## 3.4. GAM with spatial smooth ------------------------------------------------
 
 # Convert lc_time_period to factor
 plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
@@ -366,46 +355,33 @@ plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_c
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 
 # Fit GAM with spatial smooth that is separate per time period
-plants_model4_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
+plants_FTWS_model2_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
                            log_recorder_effort + lc_time_period +
                            s(x, y, by = lc_time_period, k = 120),
                          data = plants_turnover_forest_tws_15km_coords_time,
                          family = betar(link = "logit"),
                          method = "REML")
 
-# View model summary
-summary(plants_model4_gam)
-
 # Save model output
-save(plants_model4_gam, 
-     file = here("data", "models", 
-                 "gam_model4_plant_occurrences_turnover_forest_tws_results.RData"))
+save(plants_FTWS_model2_GAM, 
+     file = here("data", "models", "exploratory", 
+                 "plants_FTWS_model2_GAM.RData"))
 
-# Run diagnostics
-par(mfrow = c(2, 2))
-gam.check(plants_model4_gam)
-
-## 3.4. GAM with forest -> tws and spatial smooth ------------------------------
+## 3.5. GAM with forest -> tws and spatial smooth ------------------------------
 
 # Define model
-plants_model5_gam <- gam(JDI_beta ~ s(forest_to_tws) + forest_no_change + delta_recorder_effort +
-                           log_recorder_effort + lc_time_period +
-                           s(x, y, by = lc_time_period, k = 120),
-                         data = plants_turnover_forest_tws_15km_coords_time,
-                         family = betar(link = "logit"),
-                         method = "REML")
+plants_FTWS_model3_GAM_extra_smooth <- gam(JDI_beta ~ s(forest_to_tws) + forest_no_change + delta_recorder_effort +
+                                             log_recorder_effort + lc_time_period +
+                                             s(x, y, by = lc_time_period, k = 120),
+                                           data = plants_turnover_forest_tws_15km_coords_time,
+                                           family = betar(link = "logit"),
+                                           method = "REML")
 
-# View model summary
-summary(plants_model5_gam)
 
 # Save model output
-save(plants_model5_gam, 
-     file = here("data", "models", 
-                 "gam_model5_plant_occurrences_turnover_forest_tws_results.RData"))
-
-# Run diagnostics
-par(mfrow = c(2, 2))
-gam.check(plants_model5_gam)
+save(plants_FTWS_model3_GAM_extra_smooth, 
+     file = here("data", "models", "exploratory",
+                 "plants_FTWS_model3_GAM_extra_smooth.RData"))
 
 # 4. BIRD OCCURRENCES ONLY -----------------------------------------------------
 
@@ -451,7 +427,7 @@ birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km |>
 # Check if there are any cells with recorder effort = 0
 c <- birds_turnover_forest_tws_15km_coords_time |>
   filter(recorder_effort == 0)
-length(a) #0 - Good!
+length(c) #0 - Good!
 
 # Log transform recorder effort values
 birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
@@ -462,54 +438,72 @@ summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-birds_model6_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
                            delta_recorder_effort + log_recorder_effort + lc_time_period,
                          correlation = corExp(form = ~ x + y | time_numeric),  
                          data = birds_turnover_forest_tws_15km_coords_time,
                          method = "REML")
 
 # Save model output to file
-save(birds_model6_gls, 
-     file = here("data", "models", 
-                 "gls_model6_birds_occurrences_turnover_forest_tws_results.RData"))
+save(birds_FTWS_model1_gls, 
+     file = here("data", "models", "final",
+                 "birds_FTWS_model1_gls.RData"))
+
+## 4.3. Plot model output ------------------------------------------------------
 
 # Get summary
-birds_model6_gls_summary <- summary(birds_model6_gls)
+model_summary_birds <- summary(birds_FTWS_model1_gls)
 
-# Extract correlation structure parameters
-print(birds_model6_gls$modelStruct$corStruct)
+# Create dataframe of coeficients
+birds_FTWS_model1_gls_coef_df <- data.frame(term = names(model_summary_birds$tTable[, "Value"]),
+                                            estimate = model_summary_birds$tTable[, "Value"],
+                                            std.error = model_summary_birds$tTable[, "Std.Error"],
+                                            statistic = model_summary_birds$tTable[, "t-value"],
+                                            p.value = model_summary_birds$tTable[, "p-value"])
 
-# Get range parameter
-birds_range_param <- coef(birds_model6_gls$modelStruct$corStruct, unconstrained = FALSE)
+# Remove the intercept
+birds_FTWS_model1_gls_coef_df_no_intercept <- birds_FTWS_model1_gls_coef_df[birds_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
 
-# Extract residuals
-birds_residuals_gls <- residuals(birds_model6_gls, type = "normalized")
+# Create coefficient plot
+figure6_c <- ggplot(birds_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+                              "forest_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "forest_no_change",
+                              "forest_to_tws")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
 
-# Basic residual plots
-par(mfrow = c(2, 2))
+# Display plot
+figure6_c
 
-# Residuals vs fitted
-plot(fitted(birds_model6_gls), birds_residuals_gls,
-     xlab = "Fitted Values", ylab = "Normalized Residuals",
-     main = "Residuals vs Fitted")
-abline(h = 0, col = "red", lty = 2)
+## 4.4. Weighted GLS -----------------------------------------------------------
 
-# QQ plot
-qqnorm(birds_residuals_gls, main = "Normal Q-Q Plot")
-qqline(birds_residuals_gls, col = "red")
+# Define model
+birds_FTWS_model2_weighted_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
+                                        delta_recorder_effort + log_recorder_effort + lc_time_period,
+                                      weights = varPower(form = ~ fitted(.)),
+                                      correlation = corExp(form = ~ x + y | time_numeric),
+                                      data = birds_turnover_forest_tws_15km_coords_time,
+                                      method = "REML")
 
-# Residuals vs predictors
-plot(birds_turnover_forest_tws_15km_coords_time$forest_to_tws, birds_residuals_gls,
-     xlab = "Forest to TWS", ylab = "Normalized Residuals",
-     main = "Residuals vs Forest to TWS")
-abline(h = 0, col = "red", lty = 2)
+# Save model
+save(birds_FTWS_model2_weighted_gls, 
+     file = here("data", "models", "exploratory",
+                 "birds_FTWS_model2_weighted_gls.RData"))
 
-plot(birds_turnover_forest_tws_15km_coords_time$log_recorder_effort, birds_residuals_gls,
-     xlab = "Recorder Effort", ylab = "Normalized Residuals",
-     main = "Residuals vs Recorder Effort")
-abline(h = 0, col = "red", lty = 2)
-
-## 4.3. GAM with spatial smooth ------------------------------------------------
+## 4.5. GAM with spatial smooth ------------------------------------------------
 
 # Convert lc_time_period to factor
 birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
@@ -523,7 +517,7 @@ birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coo
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 
 # Fit GAM with spatial smooth that is separate per time period
-birds_model7_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
+birds_FTWS_model3_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
                            log_recorder_effort + lc_time_period +
                            s(x, y, by = lc_time_period, k = 120),
                          data = birds_turnover_forest_tws_15km_coords_time,
@@ -531,15 +525,11 @@ birds_model7_gam <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_reco
                          method = "REML")
 
 # View model summary
-summary(birds_model7_gam)
+summary(birds_FTWS_model3_GAM)
 
 # Save model output
-save(birds_model7_gam, 
-     file = here("data", "models", 
-                 "gam_model7_birds_occurrences_turnover_forest_tws_results.RData"))
-
-# Run diagnostics
-par(mfrow = c(2, 2))
-gam.check(birds_model7_gam)
+save(birds_FTWS_model3_GAM, 
+     file = here("data", "models", "exploratory",
+                 "birds_FTWS_model3_GAM.RData"))
 
 # END OF SCRIPT ----------------------------------------------------------------
