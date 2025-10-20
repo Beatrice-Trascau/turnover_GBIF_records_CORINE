@@ -33,17 +33,17 @@ The main objective of the project is to understand the effect of land cover chan
 
 ## File Structure
 
-| Name | Function |
-|------------------------|------------------------------------------------|
-| 0_setup | Sets up all the packages and functions needed for the project |
-| 1.1_CORINE_layers_preparation | Loads and prepares CORINE layers for further analysis |
-| 1.2_CORINE_aggregation | Aggregates original rasters to 15km |
-| 1.3_CORINE_exploration | Gets summary statistics for land cover transitions |
+| Name                              | Function                                                                  |
+|-----------------------------------|---------------------------------------------------------------------------|
+| 0_setup                           | Sets up all the packages and functions needed for the project             |
+| 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
+| 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
+| 1.3_CORINE_exploration            | Gets summary statistics for land cover transitions                        |
 | 1.4_CORINE_edge_pixel_exploration | Identifies pixels outside of Norway boundary and removes them from raster |
-| 2.1_GBIF_import | Imports and downloads GBIF occurrences |
-| 2.2_GBIF_data_cleaning | Cleans the downloaded occurrences |
-| 2.3_GBIF_taxonomic_composition | Explores taxonomic composition of occurrence records through time |
-| 3.1_turnover_land_cover | Calculates temporal turnover |
+| 2.1_GBIF_import                   | Imports and downloads GBIF occurrences                                    |
+| 2.2_GBIF_data_cleaning            | Cleans the downloaded occurrences                                         |
+| 2.3_GBIF_taxonomic_composition    | Explores taxonomic composition of occurrence records through time         |
+| 3.1_turnover_land_cover           | Calculates temporal turnover                                              |
 
 : Table 1: Analysis Script Structure
 
@@ -473,9 +473,9 @@ The previous method ran into several problems and became too complicated, likely
 
 At the end, we should have a dataframe with the following columns:
 
-| cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI | Time |
-|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| 15678 | 40 | 60 | list() | list() | 467 | 897 | 1364 | 0.315 | 0.65 | 2000-2006 |
+| cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
+|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
+| 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
 
 At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
 
@@ -604,9 +604,7 @@ model3_mixed <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change +
                                                    collect = FALSE))
 ```
 
-4.   Ordered beta - with raw JDI values
-    -   Model had huge problems converging
-    -   Increasing the iterations and chains helped but the models still failed validation
+4.  Ordered beta - with raw JDI values - Model had huge problems converging - Increasing the iterations and chains helped but the models still failed validation
 
 ```{r}
 #| label: ordered beta
