@@ -1,8 +1,9 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
 # 4.2_model_setup_turnover_tws_forest
-# This script contains code which sets up the models exploring the imapct of 
-# Forest -> TWS land cover transition on temporal turnover
+# This script contains code which sets up the models exploring the impact of 
+# Forest -> TWS land cover transition on temporal turnover for all occurrences,
+# plant-only occurrences and bird-only occurrences
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
@@ -11,9 +12,17 @@
 load(here("data", "derived_data", 
           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
-# Forest -> TWS raster
-clc_status_15km_tws_forest_masked <- rast(here("data", "derived_data", 
-                                               "clc_status_15km_tws_forest_masked.tif"))
+# Turnover data for all occurrences
+load(here("data", "derived_data", 
+          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Turnover data for plants
+load(here("data", "derived_data", 
+          "vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Turnover data for birds
+load(here("data", "derived_data", 
+          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
 # 2. PREPARE DATA FOR ANALYSIS -------------------------------------------------
 
@@ -47,7 +56,7 @@ turnover_tws_forest_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
 # Check transformation went ok
 head(turnover_tws_forest_15km)
 
-## 2.2. Transform JDI values for beta regression -------------------------------
+## 2.2. Beta regression --------------------------------------------------------
 
 # JDI is in [0,1] but beta regression requires that values do not touch 0 and 1
 # so we will transform the JDI values according to this formula: 
@@ -63,165 +72,55 @@ turnover_tws_forest_15km <- turnover_tws_forest_15km |>
 # Check the rest of the values are what you expect them to be
 glimpse(turnover_tws_forest_15km) # everything looks ok
 
-# 3. RUN BETA GLM --------------------------------------------------------------
-
 # Run model
-model2.1 <- betareg::betareg(JDI_beta ~ tws_to_forest + tws_no_change + 
+TWSF_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ tws_to_forest + tws_no_change + 
                                delta_recorder_effort + recorder_effort + lc_time_period,
                              data = turnover_tws_forest_15km)
 
-# Get summary
-summary(model2.1)
+# Save model output
+save(TWSF_turnover_model1_beta_regression,
+     file = here("data", "models", "exploratory", 
+                 "TWSF_turnover_model1_beta_regression.RData"))
 
-# Extarct residuals from model
-model2.1_residuals <- residuals(model2.1)
+## 2.3. GLS with logged recorder effort ----------------------------------------
 
-# Add residuals to df
-turnover_tws_forest_15km$residuals <- model2.1_residuals
+# Prepare data for GLS: remove rows with missing x or y and categorise time periods
+turnover_tws_forest_15km_coords_time <- turnover_tws_forest_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
 
-# 4. CHECK SPATIAL AUTOCORRELATION OF RESIDUALS --------------------------------
+# Check if there are any cells with recorder effort = 0
+b <- turnover_tws_forest_15km_coords_time |>
+  filter(recorder_effort == 0)
+length(b) #0 - Good!
 
-## 4.1. Prepare data for testing of autocorrelation ----------------------------
+# Log transform recorder effort values
+turnover_tws_forest_15km_coords_time <- turnover_tws_forest_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 
-# Create reference grid
-reference_grid <- clc_status_15km_tws_forest_masked[[1]]
+# Check log transformed values
+summary(turnover_tws_forest_15km_coords_time$log_recorder_effort)
+any(!is.finite(turnover_tws_forest_15km_coords_time$log_recorder_effort)) # FALSE = no infinite values - Good!
 
-# Convert turnover df to sf object
-turnover_sf <- st_as_sf(turnover_tws_forest_15km,
-                        coords = c("x", "y"),
-                        crs = st_crs(reference_grid))
+# Define GLS
+TWSF_turnover_model2_gls_log <- gls(JDI ~ tws_to_forest + tws_no_change + 
+                                      delta_recorder_effort + log_recorder_effort + lc_time_period,
+                                    correlation = corExp(form = ~ x + y | time_numeric),  
+                                    data = turnover_tws_forest_15km_coords_time,
+                                    method = "REML")
 
-## 4.2. Create spatial neighbours ----------------------------------------------
+# Save model output to file
+save(TWSF_turnover_model2_gls_log, 
+     file = here("data", "models", "exploratory",
+                 "TWSF_turnover_model2_gls_log.RData"))
 
-# Create a neighbour list using k-nearest neighbours (k = 5)
-coords_matrix <- st_coordinates(turnover_sf)
-neighbours <- knn2nb(knearneigh(coords_matrix, k = 5))
+# Model passed the validation - diagnostic plots looked good!
+  # save model in the final folder as well
+save(TWSF_turnover_model2_gls_log, 
+     file = here("data", "models", "final",
+                 "TWSF_turnover_model2_gls_log.RData"))
 
-# Convert to spatial weights matrix
-weights <- nb2listw(neighbours, style = "W")
-
-## 4.3. Calculate Moran's I ----------------------------------------------------
-
-# Compute Moran's I test for spatial autocorrelation
-moran_test <- moran.test(turnover_sf$residuals, listw = weights)
-
-# Print results
-print(moran_test) # strong spatial autocorrelation of residuals 
-
-# Create Moran scatterplot to visualise the relationship
-moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
-                         xlab = "Model Residuals", 
-                         ylab = "Spatially Lagged Residuals")
-
-# 5. PLOT MORAN'S I RESULTS ----------------------------------------------------
-
-## 5.1. Calculate local Moran's I values ---------------------------------------
-
-# Calculate local Moran's I wiht zero.policy
-local_moran <- localmoran(turnover_sf$residuals, weights, zero.policy = TRUE)
-
-# Add local Moran's I statistics to the spatial dataframe
-turnover_sf$local_moran_i <- local_moran[, 1] # I statistics
-turnover_sf$local_moran_p <- local_moran[, 5] # p-value
-
-## 5.2. Handle missing values --------------------------------------------------
-
-# Check for missing values in Moran's I column
-missing_values <- sum(is.na(turnover_sf$local_moran_i))
-cat("Number of cells with missing Local Moran's I values:", missing_values, "\n") #0
-
-# Filter out NA for mapping
-turnover_sf_clean <- turnover_sf |>
-  filter(!is.na(local_moran_i))
-
-## 5.3. Map of local Moran I values --------------------------------------------
-
-# Extract coordinates
-coords <- st_coordinates(turnover_sf)
-turnover_df <- cbind(st_drop_geometry(turnover_sf), coords)
-
-# Plot map
-plot1 <- ggplot(turnover_df |> 
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = local_moran_i)) +
-  geom_tile() +
-  scale_fill_viridis_c(option = "viridis", name = "Local Moran's I") +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
-
-# Save map
-# ggsave(here("figures", "SupplementaryFigure4a_Local_Moran_I_Forest_TWS_15km.png"),
-#        plot1, width = 10, height = 8)
-
-## 5.3. Map of significance of local Moran's I values --------------------------
-
-# Plot map
-plot2 <- ggplot(turnover_df |> 
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = local_moran_p < 0.01)) +
-  geom_tile() +
-  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey"),
-                    name = "Significant",
-                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.01")) +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
-
-# Save figure 
-# ggsave(here("figures", "SupplementaryFigure4b_Local_Moran_I_Significance_Forest_TWS_15km.png"),
-#        plot1, width = 10, height = 8)
-
-## 5.4. Map of significant Moran's I with positive/negative residuals -----------
-
-# Create categorical variable that combines significance and residual sign
-turnover_df <- turnover_df |>
-  mutate(sig_residual_type = case_when(local_moran_p < 0.01 & residuals > 0 ~ "Significant Positive",
-                                       local_moran_p < 0.01 & residuals < 0 ~ "Significant Negative",
-                                       local_moran_p >= 0.01 ~ "Not Significant"))
-
-# Plot map of significant clusters with positive/negative residuals
-plot3 <- ggplot(turnover_df |>
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = sig_residual_type)) +
-  geom_tile() +
-  scale_fill_manual(values = c("Significant Positive" = "pink", 
-                               "Significant Negative" = "lightblue",
-                               "Not Significant" = "grey"),
-                    name = "Residual Type") +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
-
-## 5.5. Combine into single plot -----------------------------------------------
-
-# Combine plots
-tws_forest_15km_local_morans_I <- plot_grid(plot1, plot2, plot3,
-                                            labels = c("a)", "b)", "c)"),
-                                            nrow = 1, align = "h")
-
-# Save to file
-ggsave(here("figures", "SupplementaryFigure5_Local_Moran_I_TWS_Forest_15km.png"),
-       tws_forest_15km_local_morans_I, width = 18, height = 8)
-
-# 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
-
-# Calculate % of cells with significant spatial autocorrelation
-sig_percentage <- mean(turnover_sf$local_moran_p < 0.01, na.rm = TRUE) * 100
-
-# Print summary statistics
-cat("\n=== SPATIAL AUTOCORRELATION SUMMARY ===\n")
-cat("Global Moran's I:", round(moran_test$estimate[1], 4), "\n")
-cat("p-value:", format.pval(moran_test$p.value), "\n")
-cat("Percentage of cells with significant local autocorrelation:", round(sig_percentage, 2), "%\n")
 
 # END OF SCRIPT ----------------------------------------------------------------
