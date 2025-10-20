@@ -233,7 +233,7 @@ Data exploration revealed that the data contains some large outliers. Outlier su
 #| label: outlier-summary
 #| echo: false
 
-# Load the forest -> TWS raster for spatial reference
+# Load the Forest -> TWS raster for spatial reference
 clc_status_15km_forest_tws_masked <- rast(here("data", "derived_data", 
                                                "clc_status_15km_forest_tws_masked.tif"))
 
