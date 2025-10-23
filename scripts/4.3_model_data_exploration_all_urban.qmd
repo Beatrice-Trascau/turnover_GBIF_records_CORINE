@@ -2,6 +2,10 @@
 title: "All to Urban JDI Data Exploration"
 format: html
 editor: visual
+number-sections: true
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
 ---
 
 # Aims
@@ -16,7 +20,11 @@ library(here)
 source(here("scripts", "0_setup.R"))
 ```
 
+# All GBIF Occurences
+
 ```{r data preparation}
+#| label: data-prep
+#| include: false
 
 # Load Turnover data
 load(here("data", "derived_data",
@@ -50,6 +58,16 @@ N <- nrow(turnover_all_urban_15km)
 # Calculate new JDI values
 turnover_all_urban_15km <- turnover_all_urban_15km |>
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+
+# Prepare data for GLS: remove rows with missing x or y and categorise time periods
+turnover_all_urban_15km_coords_time <- turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
+# Log transform recorder effort values
+turnover_all_urban_15km_coords_time <- turnover_all_urban_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 ```
 
 # Summary Statistics
@@ -91,8 +109,6 @@ summary_period_table <- summary_by_period |>
 summary_period_table
 ```
 
-# Distribution of Values
-
 Firstly, we look at the distribution of values across each of the response variables used in our model.
 
 ```{r variables}
@@ -110,7 +126,7 @@ jdi_hist <- ggplot(turnover_all_urban_15km, aes(x = JDI)) +
         strip.text = element_text(face = "bold"))
 
 # All -> Urban
-all_to_urban_hist <- ggplot(turnover_all_urban_15km, aes(x = tws_to_forest)) +
+all_to_urban_hist <- ggplot(turnover_all_urban_15km, aes(x = all_to_urban)) +
   geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
   facet_wrap(~ lc_time_period) +
   labs(x = "All to Urban Transition (pixel count)",
@@ -120,7 +136,7 @@ all_to_urban_hist <- ggplot(turnover_all_urban_15km, aes(x = tws_to_forest)) +
         strip.text = element_text(face = "bold"))
 
 # Urban No Change
-urban_no_change_hist <- ggplot(turnover_all_urban_15km, aes(x = tws_no_change)) +
+urban_no_change_hist <- ggplot(turnover_all_urban_15km, aes(x = urban_no_change)) +
   geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
   facet_wrap(~ lc_time_period) +
   labs(x = "Urban No Change (pixel count)",
@@ -149,16 +165,12 @@ delta_recorder_effort_plot <- ggplot(turnover_all_urban_15km, aes(x = delta_reco
   theme(strip.background = element_rect(fill = "lightgrey"),
         strip.text = element_text(face = "bold"))
 
+# Combine plots
+urban_plots <- plot_grid(jdi_hist, all_to_urban_hist, urban_no_change_hist, recorder_effort_plot, delta_recorder_effort_plot, ncol = 2, labels = c("a)", "b)", "c)", "d)", "e)"))
 
 # Print plots
-jdi_hist
-all_to_urban_hist
-urban_no_change_hist
-recorder_effort_plot
-delta_recorder_effort_plot
+urban_plots
 ```
-
-# Relationships
 
 ## Correlation Matrix
 
@@ -169,12 +181,13 @@ Then, we will also check the correlation between the variables used in the analy
 #| echo: false
 
 # Correlation matrix for numeric variables
-numeric_vars <- turnover_all_urban_15km  |>
+numeric_vars <- turnover_all_urban_15km_coords_time  |>
   select(JDI, all_to_urban, urban_no_change, 
          intersection_size, union_size, 
          total_spp_before, total_spp_after,
          total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort)
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
 
 # Calculate correlation matrix
 cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
@@ -268,3 +281,1094 @@ jdi_recordinf_combied
 ```
 
 The relationships between JDI and recorder effort are non-linear across all three periods of change. In the case of the relationship between JDI and $\Delta Recorder_{effort}$, JDI increases non-linearly with increasing change inn recorder effort. However, the magnitude of increase differs depending on the period considered. The relationship with recorder effort is similar to the TWS -\> Forest and the Forest -\> TWS dataframes, meaning that the relatioship is consistent regardless of the land cover change class considered.
+
+# Modeling
+
+### Trial 1: $\beta$ regression
+
+To start off, we ran the following $\beta$ regression:
+
+```{r beta regression}
+#| label: tbl-beta-regression
+#| echo: false
+#| tbl-cap: "Beta Regression Results All -> Urban Land Cover Change"
+
+# Load model
+load(here("data", "models", "exploratory", 
+          "AllUrban_turnover_model1_beta_regression.RData"))
+
+# Extract residuals from model
+model2.1_residuals <- residuals(AllUrban_turnover_model1_beta_regression)
+
+# Add residuals to df
+turnover_all_urban_15km$residuals <- model2.1_residuals
+
+# Get summary
+model_summary <- tidy(AllUrban_turnover_model1_beta_regression,
+                      conf.int = TRUE)
+
+# Display summary
+knitr::kable(model_summary, digits = 4)
+```
+
+```{r beta regression model fit}
+#| label: tbl-beta-regression-model-fit
+#| echo: false
+#| warning: false
+#| tbl-cap: "Beta Regression Results Model Fit Statistics"
+
+# Dispaly model fit statistics
+model_glance <- glance(AllUrban_turnover_model1_beta_regression)
+knitr::kable(model_glance, digits = 4)
+```
+
+### Check for Spatial Autocorrelation
+
+```{r Morans I table check for spatial autocorrelation}
+#| label: tbl-morans-i
+#| echo: false
+#| tbl-cap: "Moran's I Test for Spatial Autocorrelation of Model Residuals"
+#| fig-width: 12
+#| fig-height: 8
+
+# Load All -> Urban raster
+clc_status_15km_all_urban_masked <- rast(here("data", "derived_data",
+                                              "clc_status_15km_all_urban_combined_masked.tif"))
+
+# Create reference grid
+reference_grid <- clc_status_15km_all_urban_masked[[1]]
+
+# Convert turnover df to sf object
+turnover_sf <- st_as_sf(turnover_all_urban_15km,
+                        coords = c("x", "y"),
+                        crs = st_crs(reference_grid))
+
+# Create a neighbour list using k-nearest neighbours (k = 5)
+coords_matrix <- st_coordinates(turnover_sf)
+neighbours <- knn2nb(knearneigh(coords_matrix, k = 5))
+
+# Convert to spatial weights matrix
+weights <- nb2listw(neighbours, style = "W")
+
+# Compute Moran's I test for spatial autocorrelation
+moran_test <- moran.test(turnover_sf$residuals, listw = weights)
+
+# Print results
+moran_results <- data.frame(Statistic = c("Moran I", "Expectation", "Variance", "Standard deviate", "P-value"),
+                            Value = c(moran_test$estimate[1], 
+                                      moran_test$estimate[2], 
+                                      moran_test$estimate[3],
+                                      moran_test$statistic,
+                                      moran_test$p.value))
+# Display output
+knitr::kable(moran_results, digits = 6,
+             col.names = c("Test Statistic", "Value"))
+
+# Create Moran scatterplot to visualise the relationship
+# moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
+#                          xlab = "Model Residuals", 
+#                          ylab = "Spatially Lagged Residuals")
+```
+
+```{r Morans I figure}
+#| label: fig-morans-i
+#| echo: false
+#| fig-cap: "Distribution of a) Local Moran's I, b,c) Significant Spatial Autocorrelation Values"
+#| fig-width: 12
+#| fig-height: 8
+
+# Calculate local Moran's I wiht zero.policy
+local_moran <- localmoran(turnover_sf$residuals, weights, zero.policy = TRUE)
+
+# Add local Moran's I statistics to the spatial dataframe
+turnover_sf$local_moran_i <- local_moran[, 1] # I statistics
+turnover_sf$local_moran_p <- local_moran[, 5] # p-value
+
+# Check for missing values in Moran's I column
+# missing_values <- sum(is.na(turnover_sf$local_moran_i))
+# cat("Number of cells with missing Local Moran's I values:", missing_values, "\n") #0
+
+# Filter out NA for mapping
+turnover_sf_clean <- turnover_sf |>
+  filter(!is.na(local_moran_i))
+
+
+# Extract coordinates
+coords <- st_coordinates(turnover_sf)
+turnover_df <- cbind(st_drop_geometry(turnover_sf), coords)
+
+# Plot map
+plot1 <- ggplot(turnover_df |> 
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = local_moran_i)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "viridis", name = "Local Moran's I") +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
+
+# Save map
+# ggsave(here("figures", "SupplementaryFigure5a_Local_Moran_I_TWS_Forest_15km.png"),
+#        plot1, width = 10, height = 8)
+
+
+# Plot map
+plot2 <- ggplot(turnover_df |> 
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = local_moran_p < 0.01)) +
+  geom_tile() +
+  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey"),
+                    name = "Significant",
+                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.001")) +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+          axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.line = element_blank(),
+          axis.ticks = element_blank())
+
+# Save figure 
+# ggsave(here("figures", "SupplementaryFigure5b_Local_Moran_I_Significance_TWS_Forest_15km.png"),
+#        plot1, width = 10, height = 8)
+
+# Create categorical variable that combines significance and residual sign
+turnover_df <- turnover_df |>
+  mutate(sig_residual_type = case_when(local_moran_p < 0.01 & residuals > 0 ~ "Significant Positive",
+                                       local_moran_p < 0.01 & residuals < 0 ~ "Significant Negative",
+                                       local_moran_p >= 0.01 ~ "Not Significant"))
+
+# Plot map of significant clusters with positive/negative residuals
+plot3 <- ggplot(turnover_df |>
+                  filter(!is.na(local_moran_i)), 
+                aes(x = X, y = Y, fill = sig_residual_type)) +
+  geom_tile() +
+  scale_fill_manual(values = c("Significant Positive" = "pink", 
+                               "Significant Negative" = "lightblue",
+                               "Not Significant" = "grey"),
+                    name = "Residual Type") +
+  theme_classic() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
+
+# Combine plots
+all_urban_15km_local_morans_I <- plot_grid(plot1, plot2, plot3,
+                                            labels = c("a)", "b)", "c)"),
+                                            nrow = 2, align = "h")
+
+# Display all_urban_15km_local_morans_I
+all_urban_15km_local_morans_I
+
+# Save to file
+ggsave(here("figures", "SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png"),
+       all_urban_15km_local_morans_I, width = 18, height = 8)
+```
+
+Moran's I test for spatial autocorrelation revealed that there is significant spatial autocorrelation. Therefore, this needs to be accounted for to improve model predictions. Given the testing we have done previously, for the Forest -\> TWS models, we will no longer attempt the GLMM, ordered $\beta$ or the GLS with raw data. We will go straight to trying the GLS with logged recorder effort.
+
+## (Final) Trial 2: GLS with log recorder effort
+
+```{r gls log correlation}
+#| label: gls-logged-corr-structure
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "exploratory", "AllUrban_turnover_model2_gls_log.RData"))
+
+# Extract correlation structure parameters
+print(AllUrban_turnover_model2_gls_log$modelStruct$corStruct)
+
+# Get range parameter
+range_param <- coef(AllUrban_turnover_model2_gls_log$modelStruct$corStruct, unconstrained = FALSE)
+```
+
+```{r gls log model diagnostic}
+#| label: fig-gls-logged-values
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model 2"
+
+# Extract residuals
+residuals_gls <- residuals(AllUrban_turnover_model2_gls_log, type = "normalized")
+
+# Get the model frame to ensure we're using the exact same data
+model_data <- getData(AllUrban_turnover_model2_gls_log)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(AllUrban_turnover_model2_gls_log), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$all_to_urban, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The diagnostic plots for this model show that:
+
+1.  Residuals vs Fitted:
+    -   Most residuals are centered around 0
+    -   Spread is roughly constant across the fitted values
+2.  QQ Plot:
+    -   There is some deviation from the red line, especially at the bottom of the tail, suggesting that residuals are not perfectly normal
+    -   Our sample size is relatively large, and this is somewhat common with ecological data
+3.  Residuals vs. Forest -\> TWS
+    -   Data concentration at 0, which makes sense given that most of the cells will have no TWS to Forest
+    -   But relatively even spread
+4.  Residuals vs. Recorder Effort
+    -   Residuals are evenly spread across the range of log recorder effort
+    -   Residuals are (mostly) centered around zero and there is no obvious pattern observed
+
+This model looks ok to use! Therefore, it will be the one used in the manuscript.
+
+```{r gls summary}
+#| label: tbl-gls-logged-values-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients All → Urban Effects on Biodiversity Turnover"
+
+# Extract model summary
+model_summary <- summary(AllUrban_turnover_model2_gls_log)
+coef_table <- model_summary$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs <- data.frame(Variable = rownames(coef_table),
+                          Estimate = round(coef_table[, "Value"], 4),
+                          `Std Error` = round(coef_table[, "Std.Error"], 4),
+                          `t value` = round(coef_table[, "t-value"], 3),
+                          `p value` = coef_table[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs$Significance <- case_when(model_coefs$`p value` < 0.001 ~ "***",
+                                      model_coefs$`p value` < 0.01 ~ "**", 
+                                      model_coefs$`p value` < 0.05 ~ "*",
+                                      model_coefs$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls2 model fit statistics}
+#| label: tbl-gls-model-fit
+#| echo: false
+#| tbl-cap: "GLS Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(AllUrban_turnover_model2_gls_log$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({model_summary$dims$N
+}, error = function(e) {
+  nobs(AllUrban_turnover_model2_gls_log)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(AllUrban_turnover_model2_gls_log), 2),
+                                  round(BIC(AllUrban_turnover_model2_gls_log), 2), 
+                                  round(as.numeric(logLik(AllUrban_turnover_model2_gls_log)), 2),
+                                  round(model_summary$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
+
+```{r gls model output plot}
+#| label: fig-gls-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from GLS"
+
+# Get summary of the model
+model_summary <- summary(AllUrban_turnover_model2_gls_log)
+
+# Create dataframe of coeficients
+AllUrban_turnover_model2_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+AllUrban_turnover_model2_gls_log_coef_df_no_intercept <- AllUrban_turnover_model2_gls_log_coef_df[AllUrban_turnover_model2_gls_log_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure8_a <- ggplot(AllUrban_turnover_model2_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "TWS to Forest",
+                              "urban_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+
+# Display plot
+figure8_a
+```
+
+# Vascular Plant Occurences
+
+```{r prepare vascular plant data}
+#| label: plant-data-prep
+#| include: false
+
+# Load Turnover data
+load(here("data", "derived_data", 
+          "vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Select only All -> Urban columns
+  # check column names
+colnames(vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km)
+
+# Also rename the columns for easier manipulation of df
+plants_turnover_all_urban_15km <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  # determine which rows belong to which time period
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                     TRUE ~ NA_real_),
+         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                                  TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
+         -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
+         -`2006-2012_all_to_urban`, -`2012-2018_all_to_urban`)
+
+# Remove rows that might have NA for x or y and categorise time periods for GLS
+plants_turnover_all_urban_15km_coords_time <- plants_turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+```
+
+## Summary Statistics
+
+```{r plant-summary-stats}
+#| label: tbl-summary-stats-plants
+#| echo: false
+#| tbl-cap: "Summary Statistics of Jaccard Dissimilarity Index (JDI) by Time Period for Vascular Plant Records"
+
+# Extract summary data
+plant_summary_by_period <- plants_turnover_all_urban_15km_coords_time |>
+  group_by(lc_time_period) |>
+  summarize(n_observations = n(),
+            mean_JDI = mean(JDI, na.rm = TRUE),
+            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_all_to_urban = mean(all_to_urban, na.rm = TRUE),
+            sd_all_to_urban = sd(all_to_urban, na.rm = TRUE),
+            mean_urban_no_change = mean(urban_no_change, na.rm = TRUE),
+            sd_urban_no_change = sd(urban_no_change, na.rm = TRUE),
+            mean_delta_recorder_effort = mean(delta_recorder_effort, na.rm = TRUE),
+            mean_recorder_effort = mean(recorder_effort, na.rm = TRUE))
+
+# Create table for period summary
+plant_summary_by_period <- plant_summary_by_period |>
+  kbl(digits = 3,
+      align = c("l", rep("r", ncol(plant_summary_by_period)-1))) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) |>
+  column_spec(1, bold = TRUE) |>
+  row_spec(0, bold = TRUE, background = "#E6F0FF") |>
+  add_header_above(c(" " = 1, 
+                     "Sample" = 1,
+                     "Turnover" = 2, 
+                     "All to Urban" = 2,
+                     "Urban No Change" = 2,
+                     "Recorder Effort" = 2))
+
+# Print the table
+plant_summary_by_period
+```
+
+## Distribution of Values
+
+```{r plant-variables}
+#| label: fig-variables-distributions-plant
+#| fig-cap: "Distribution of a) Jaccard Dissimilarity Index, b) TWS to Forest transition pixel count, c) TWS No Change pixel count, d) Recorder Effort e) Change in Recorder Effort in Subser with Only Vascular Plant Records"
+#| echo: false
+
+
+# Jaccard's Dissimilarity Index
+plant_jdi_hist <- ggplot(plants_turnover_all_urban_15km_coords_time, aes(x = JDI)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Jaccard Dissimilarity Index",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# All -> Urban
+plant_all_to_urban_hist <- ggplot(plants_turnover_all_urban_15km_coords_time, aes(x = all_to_urban)) +
+  geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "All to Urban Transition (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Urban No Change
+plant_urban_no_change_hist <- ggplot(plants_turnover_all_urban_15km_coords_time, aes(x = urban_no_change)) +
+  geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Urban No Change (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Recorder effort
+plant_recorder_effort_plot <- ggplot(plants_turnover_all_urban_15km_coords_time, aes(x = recorder_effort)) +
+  geom_histogram(bins = 30, fill = "orange", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Delta recorder effort
+plant_delta_recorder_effort_plot <- ggplot(plants_turnover_all_urban_15km_coords_time, aes(x = delta_recorder_effort)) +
+  geom_histogram(bins = 30, fill = "coral", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Delta Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Combine plots
+plant_urban_plots <- plot_grid(plant_jdi_hist, plant_all_to_urban_hist, plant_urban_no_change_hist, plant_recorder_effort_plot, plant_delta_recorder_effort_plot, ncol = 2, labels = c("a)", "b)", "c)", "d)", "e)"))
+
+# Print plots
+plant_urban_plots
+```
+
+## Correlation Matrix
+
+```{r plant correlation matrix}
+#| label: fig-variables-relationships-plants
+#| echo: false
+#| fig-cap: "Correlation matrix of variables used in the vascular plant models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Correlation matrix for numeric variables
+plant_numeric_vars <- plants_turnover_all_urban_15km_coords_time |>
+  select(JDI, all_to_urban, urban_no_change, 
+         intersection_size, union_size, 
+         total_spp_before, total_spp_after,
+         total_occ_before, total_occ_after,
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
+
+# Calculate correlation matrix
+plant_cor_matrix <- cor(plant_numeric_vars, use = "pairwise.complete.obs")
+
+# Create correlation plot
+plant_cor_plot <- corrplot(plant_cor_matrix, 
+                     method = "circle", 
+                     type = "upper", 
+                     tl.col = "black", 
+                     tl.srt = 45, 
+                     addCoef.col = "black", 
+                     number.cex = 0.7,
+                     diag = FALSE)
+```
+
+## Modeling
+
+### Trial1: GLS with logged recorder effort
+
+```{r gls plants log correlation}
+#| label: gls-logged-corr-structure
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_AllUrban_model1_gls.RData"))
+
+# Extract correlation structure parameters
+print(plants_AllUrban_model1_gls$modelStruct$corStruct)
+
+# Get range parameter
+range_param <- coef(plants_AllUrban_model1_gls$modelStruct$corStruct, unconstrained = FALSE)
+```
+
+```{r gls plants log model diagnostic}
+#| label: fig-gls-logged-values
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model 2"
+
+# Extract residuals
+residuals_gls <- residuals(plants_AllUrban_model1_gls, type = "normalized")
+
+# Get the model frame to ensure we're using the exact same data
+model_data <- getData(plants_AllUrban_model1_gls)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(plants_AllUrban_model1_gls), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$all_to_urban, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The diagnostic plots for this model show that:
+
+1.  Residuals vs Fitted:
+    -   There is some funneling, with variance spreading out at both ends
+    -   This plots suggests residuals are suffering from a bit of heteroscedasticity
+2.  QQ Plot:
+    -   There is deviation from the line at both ends
+    -   Our sample size is relatively large, and this is somewhat common with ecological data
+3.  Residuals vs. Forest -\> TWS
+    -   Data concentration at 0, which makes sense given that most of the cells will have no TWS to Forest
+    -   There is a bit of fanning
+4.  Residuals vs. Recorder Effort
+    -   Residuals are evenly spread across the range of log recorder effort
+    -   Residuals are (mostly) centered around zero and there is no obvious pattern observed
+
+This model looks borderline acceptable to use. I could probably justify using it by wanting to keep the consistency.
+
+```{r gls plants summary}
+#| label: tbl-gls-logged-values-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients All → Urban Effects on Biodiversity Turnover"
+
+# Extract model summary
+model_summary <- summary(plants_AllUrban_model1_gls)
+coef_table <- model_summary$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs <- data.frame(Variable = rownames(coef_table),
+                          Estimate = round(coef_table[, "Value"], 4),
+                          `Std Error` = round(coef_table[, "Std.Error"], 4),
+                          `t value` = round(coef_table[, "t-value"], 3),
+                          `p value` = coef_table[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs$Significance <- case_when(model_coefs$`p value` < 0.001 ~ "***",
+                                      model_coefs$`p value` < 0.01 ~ "**", 
+                                      model_coefs$`p value` < 0.05 ~ "*",
+                                      model_coefs$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls2 plant model fit statistics}
+#| label: tbl-gls-model-fit
+#| echo: false
+#| tbl-cap: "GLS Plant Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(plants_AllUrban_model1_gls$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({model_summary$dims$N
+}, error = function(e) {
+  nobs(plants_AllUrban_model1_gls)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(plants_AllUrban_model1_gls), 2),
+                                  round(BIC(plants_AllUrban_model1_gls), 2), 
+                                  round(as.numeric(logLik(plants_AllUrban_model1_gls)), 2),
+                                  round(model_summary$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
+
+```{r gls plant model output plot}
+#| label: fig-gls-plant-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from Plant GLS"
+
+# Get summary of the model
+plants_model_summary <- summary(plants_AllUrban_model1_gls)
+
+# Create dataframe of coeficients
+plants_AllUrban_model1_glslog_coef_df <- data.frame(term = names(plants_model_summary$tTable[, "Value"]),
+                                                       estimate = plants_model_summary$tTable[, "Value"],
+                                                       std.error = plants_model_summary$tTable[, "Std.Error"],
+                                                       statistic = plants_model_summary$tTable[, "t-value"],
+                                                       p.value = plants_model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+plants_AllUrban_model1_glslog_coef_df_no_intercept <- plants_AllUrban_model1_glslog_coef_df[plants_AllUrban_model1_glslog_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure8_b <- ggplot(plants_AllUrban_model1_glslog_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "TWS to Forest",
+                              "urban_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure8_b
+```
+
+# Bird Occurrences
+
+```{r prepare bird data}
+#| label: bird-data-prep
+#| include: false
+
+# Load data
+load(here("data", "derived_data", 
+          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+birds_turnover_all_urban_15km <- birds_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  # determine which rows belong to which time period
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                     TRUE ~ NA_real_),
+         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                                  TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
+         -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
+         -`2006-2012_all_to_urban`, -`2012-2018_all_to_urban`)
+
+# Check transformation went ok
+head(birds_turnover_all_urban_15km)
+
+# Remove rows that might have NA for x or y & categorise time periods
+birds_turnover_all_urban_15km_coords_time <- birds_turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+```
+
+## Summary Statistics
+
+```{r bird summary statistics}
+#| label: tbl-summary-stats-birds
+#| echo: false
+#| tbl-cap: "Summary Statistics of Jaccard Dissimilarity Index (JDI) by Time Period for Bird Records"
+
+# Extract summary data
+birds_summary_by_period <- birds_turnover_all_urban_15km_coords_time |>
+  group_by(lc_time_period) |>
+  summarize(n_observations = n(),
+            mean_JDI = mean(JDI, na.rm = TRUE),
+            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_all_to_urban = mean(all_to_urban, na.rm = TRUE),
+            sd_all_to_urban = sd(all_to_urban, na.rm = TRUE),
+            mean_urban_no_change = mean(urban_no_change, na.rm = TRUE),
+            sd_urban_no_change = sd(urban_no_change, na.rm = TRUE),
+            mean_delta_recorder_effort = mean(delta_recorder_effort, na.rm = TRUE),
+            mean_recorder_effort = mean(recorder_effort, na.rm = TRUE))
+
+# Create table for period summary
+birds_summary_by_period <- birds_summary_by_period |>
+  kbl(digits = 3,
+      align = c("l", rep("r", ncol(birds_summary_by_period)-1))) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) |>
+  column_spec(1, bold = TRUE) |>
+  row_spec(0, bold = TRUE, background = "#E6F0FF") |>
+  add_header_above(c(" " = 1, 
+                     "Sample" = 1,
+                     "Turnover" = 2, 
+                     "TWS to Forst" = 2,
+                     "TWS No Change" = 2,
+                     "Recorder Effort" = 2))
+
+# Print the table
+birds_summary_by_period
+```
+
+## Distribution of Values
+
+```{r bird values}
+#| label: fig-variables-distributions-birds
+#| fig-cap: "Distribution of a) Jaccard Dissimilarity Index, b) Forest to TWS transition pixel count, c) Forest No Change pixel count, d) Recorder Effort e) Change in Recorder Effort in Subser with Only Bird Records"
+#| echo: false
+
+# Jaccard's Dissimilarity Index
+bird_jdi_hist <- ggplot(birds_turnover_all_urban_15km_coords_time, aes(x = JDI)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Jaccard Dissimilarity Index",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# TWS -> Forest
+bird_tws_to_forest_hist <- ggplot(birds_turnover_all_urban_15km_coords_time, aes(x = all_to_urban)) +
+  geom_histogram(bins = 30, fill = "brown", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "All to Urban Transition (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# TWS No Change
+bird_tws_no_change_hist <- ggplot(birds_turnover_all_urban_15km_coords_time, aes(x = urban_no_change)) +
+  geom_histogram(bins = 30, fill = "darkgreen", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Urban No Change (pixel count)",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Recorder effort
+bird_recorder_effort_plot <- ggplot(birds_turnover_all_urban_15km_coords_time, aes(x = recorder_effort)) +
+  geom_histogram(bins = 30, fill = "orange", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Delta recorder effort
+bird_delta_recorder_effort_plot <- ggplot(birds_turnover_all_urban_15km_coords_time, aes(x = delta_recorder_effort)) +
+  geom_histogram(bins = 30, fill = "coral", color = "white", alpha = 0.7) +
+  facet_wrap(~ lc_time_period) +
+  labs(x = "Delta Recorder Effort",
+       y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_rect(fill = "lightgrey"),
+        strip.text = element_text(face = "bold"))
+
+# Combine plots
+bird_plots <- plot_grid(bird_jdi_hist, bird_tws_to_forest_hist, bird_tws_no_change_hist, bird_recorder_effort_plot, bird_delta_recorder_effort_plot, ncol = 2, labels = c("a)", "b)", "c)", "d)", "e)"))
+
+# Print plots
+bird_plots
+```
+
+## Correlation Matrix
+
+```{r bird correlation matrix}
+#| label: fig-variables-relationships-birds
+#| echo: false
+#| fig-cap: "Correlation matrix of variables used in the bird models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Correlation matrix for numeric variables
+bird_numeric_vars <- birds_turnover_all_urban_15km_coords_time |>
+  select(JDI, all_to_urban, urban_no_change, 
+         intersection_size, union_size, 
+         total_spp_before, total_spp_after,
+         total_occ_before, total_occ_after,
+         recorder_effort, delta_recorder_effort,
+         log_recorder_effort)
+
+# Calculate correlation matrix
+bird_cor_matrix <- cor(bird_numeric_vars, use = "pairwise.complete.obs")
+
+# Create correlation plot
+bird_cor_plot <- corrplot(bird_cor_matrix, 
+                     method = "circle", 
+                     type = "upper", 
+                     tl.col = "black", 
+                     tl.srt = 45, 
+                     addCoef.col = "black", 
+                     number.cex = 0.7,
+                     diag = FALSE)
+```
+
+## Modeling
+
+### (Final) Trial 1: GLS with log recording effort
+
+```{r bird gls}
+#| label: bird-gls-output
+#| echo: false
+#| message: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_TWSF_model1_gls.RData"))
+
+# Extract summary
+birds_AllUrban_model1_gls_summary <- summary(birds_AllUrban_model1_gls)
+
+# Extract correlation structure parameters
+print(birds_AllUrban_model1_gls$modelStruct$corStruct)
+
+# Get range parameter
+birds_range_param <- coef(birds_AllUrban_model1_gls$modelStruct$corStruct, unconstrained = FALSE)
+```
+
+```{r gls birds log}
+#| label: fig-birds-gls-logged-values
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for Bird GLS"
+
+# Extract residuals
+birds_residuals_gls <- residuals(birds_AllUrban_model1_gls, type = "normalized")
+
+# Get the data actually used in the model
+birds_model_data <- getData(birds_AllUrban_model1_gls)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_AllUrban_model1_gls), birds_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(birds_residuals_gls, main = "Normal Q-Q Plot")
+qqline(birds_residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(birds_model_data$all_to_urban, birds_residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs All to Urban")
+abline(h = 0, col = "red", lty = 2)
+
+plot(birds_model_data$log_recorder_effort, birds_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The diagnostic plots for this model show that:
+
+1.  Residuals vs Fitted:
+    -   There is some funneling, with variance spreading out at both ends
+    -   This plots suggests residuals are suffering from a bit of heteroscedasticity
+2.  QQ Plot:
+    -   There is deviation from the line at both ends
+    -   Our sample size is relatively large, and this is somewhat common with ecological data
+3.  Residuals vs. Forest -\> TWS
+    -   Data concentration at 0, which makes sense given that most of the cells will have no TWS to Forest
+    -   There is a bit of fanning
+4.  Residuals vs. Recorder Effort
+    -   Residuals are evenly spread across the range of log recorder effort
+    -   Residuals are (mostly) centered around zero and there is no obvious pattern observed
+
+This model looks borderline acceptable to use. I could probably justify using it by wanting to keep the consistency.
+
+```{r gls birds summary}
+#| label: tbl-gls-birds-values-summary
+#| echo: false
+#| tbl-cap: "GLS Model Coefficients All -> Urban Effects on Birds Turnover"
+
+# Extract model summary
+model_summary_birds <- summary(birds_AllUrban_model1_gls)
+coef_table_birds <- model_summary_birds$tTable
+
+# Create coefficient table without confidence intervals initially
+model_coefs_birds <- data.frame(Variable = rownames(coef_table_birds),
+                          Estimate = round(coef_table_birds[, "Value"], 4),
+                          `Std Error` = round(coef_table_birds[, "Std.Error"], 4),
+                          `t value` = round(coef_table_birds[, "t-value"], 3),
+                          `p value` = coef_table_birds[, "p-value"],
+                          check.names = FALSE)
+
+# Add significance stars
+model_coefs_birds$Significance <- case_when(model_coefs_birds$`p value` < 0.001 ~ "***",
+                                      model_coefs_birds$`p value` < 0.01 ~ "**", 
+                                      model_coefs_birds$`p value` < 0.05 ~ "*",
+                                      model_coefs_birds$`p value` < 0.1 ~ ".",
+                                      TRUE ~ "")
+
+# Display using kable
+knitr::kable(model_coefs_birds, digits = c(0, 4, 4, 3, 6, 0),
+             format.args = list(scientific = FALSE))
+```
+
+```{r gls birds model fit statistics}
+#| label: tbl-gls-birds-model-fit
+#| echo: false
+#| tbl-cap: "GLS Birds Model Fit Statistics"
+
+
+# Model information
+cat("Model Specifications:\n")
+cat("- Formula:", deparse(birds_AllUrban_model1_gls$call$model), "\n")
+cat("- Correlation Structure: Exponential spatial correlation\n") 
+cat("- Method: REML\n")
+
+# Try to get sample size safely
+n_obs <- tryCatch({model_summary_birds$dims$N
+}, error = function(e) {
+  nobs(birds_AllUrban_model1_gls)
+})
+
+cat("- Number of observations:", n_obs, "\n")
+
+# Model fit statistics
+fit_stats <- data.frame(Statistic = c("AIC", "BIC", "Log-likelihood", "Residual Std Error"),
+                        Value = c(round(AIC(birds_AllUrban_model1_gls), 2),
+                                  round(BIC(birds_AllUrban_model1_gls), 2), 
+                                  round(as.numeric(logLik(birds_AllUrban_model1_gls)), 2),
+                                  round(model_summary_birds$sigma, 4)))
+knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
+```
+
+```{r gls bird model output plot}
+#| label: fig-gls-bird-coefficient-plot
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Coefficient Estimates from Bird GLS"
+
+# Get summary of the model
+model_summary <- summary(birds_AllUrban_model1_gls)
+
+# Create dataframe of coeficients
+birds_AllUrban_model1_gls_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+birds_AllUrban_model1_gls_coef_df_no_intercept <- birds_AllUrban_model1_gls_coef_df[birds_AllUrban_model1_gls_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure8_c <- ggplot(birds_AllUrban_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "All to Forest",
+                              "urban_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure8_c
+```
