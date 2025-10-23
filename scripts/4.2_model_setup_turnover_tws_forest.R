@@ -24,7 +24,7 @@ load(here("data", "derived_data",
 load(here("data", "derived_data", 
           "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
-# 2. PREPARE DATA FOR ANALYSIS -------------------------------------------------
+# 2. ALL OCCURRENCES -----------------------------------------------------------
 
 ## 2.1. Select only Forest -> TWS columns --------------------------------------
 
@@ -122,5 +122,262 @@ save(TWSF_turnover_model2_gls_log,
      file = here("data", "models", "final",
                  "TWSF_turnover_model2_gls_log.RData"))
 
+## 2.4. Plot model output ------------------------------------------------------
+
+# Get summary of the model
+model_summary <- summary(TWSF_turnover_model2_gls_log)
+
+# Create dataframe of coeficients
+TWSF_turnover_model2_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+TWSF_turnover_model2_gls_log_coef_df_no_intercept <- TWSF_turnover_model2_gls_log_coef_df[TWSF_turnover_model2_gls_log_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure7_a <- ggplot(TWSF_turnover_model2_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("tws_to_forest" = "TWS to Forest",
+                              "tws_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "tws_no_change",
+                              "tws_to_forest")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure7a_TWSF_gls_model_output_all_occurrences_turnover.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure7a_TWSF_gls_model_output_all_occurrences_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
+
+# 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
+
+## 3.1. Prepare plant data for analysis ----------------------------------------
+
+# Select only TWS -> Forest columns
+# check column names
+colnames(vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km)
+
+# Also rename the columns for easier manipulation of df
+plants_turnover_tws_forest_15km <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  # determine which rows belong to which time period
+  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+                                   TRUE ~ NA_real_),
+         tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+                                   TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`, 
+         -`2012-2018_TWS no change`,-`2000-2006_TWS to Forest`, 
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`)
+
+# Check transformation went ok
+head(plants_turnover_tws_forest_15km)
+
+# Remove rows that might have NA for x or y and categorise time periods for GLS
+plants_turnover_tws_forest_15km_coords_time <- plants_turnover_tws_forest_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+## 3.2. GLS on Plant data ------------------------------------------------------
+
+# Check if the recorder effort values were logged correctly
+any(!is.finite(plants_turnover_tws_forest_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
+
+# Define model
+plants_TWSF_model1_gls <- gls(JDI ~ tws_to_forest + tws_no_change + 
+                                delta_recorder_effort + log_recorder_effort + lc_time_period,
+                              correlation = corExp(form = ~ x + y | time_numeric),  
+                              data = plants_turnover_tws_forest_15km_coords_time,
+                              method = "REML")
+
+# Save model output
+save(plants_TWSF_model1_gls, 
+     file = here("data", "models", "exploratory", "plants_TWSF_model1_gls.RData"))
+
+# Model diagnostics (see 4.2.qmd) revealed that model is acceptable to use 
+  # saving it in the final folder as well
+save(plants_TWSF_model1_gls, 
+     file = here("data", "models", "final", "plants_TWSF_model1_gls.RData"))
+
+## 3.3. Plot model output ------------------------------------------------------
+
+# Get model summary
+plants_TWSF_model1_gls_summary <- summary(plants_TWSF_model1_gls)
+
+# Create dataframe of coeficients
+plants_TWSF_model1_gls_summary_coef_df <- data.frame(term = names(plants_TWSF_model1_gls_summary$tTable[, "Value"]),
+                                             estimate = plants_TWSF_model1_gls_summary$tTable[, "Value"],
+                                             std.error = plants_TWSF_model1_gls_summary$tTable[, "Std.Error"],
+                                             statistic = plants_TWSF_model1_gls_summary$tTable[, "t-value"],
+                                             p.value = plants_TWSF_model1_gls_summary$tTable[, "p-value"])
+
+# Remove the intercept
+plants_TWSF_model1_gls_summary_coef_df_no_intercept <- plants_TWSF_model1_gls_summary_coef_df[plants_TWSF_model1_gls_summary_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure7_b <- ggplot(plants_TWSF_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("tws_to_forest" = "TWS to Forest",
+                              "tws_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "tws_no_change",
+                              "tws_to_forest")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure7b_TWSF_gls_model_output_plants_turnover.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure7b_TWS_gls_model_output_plants_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
+
+# 4. BIRD OCCURRENCES ONLY -----------------------------------------------------
+
+## 4.1. Prepare bird data for analysis -----------------------------------------
+
+# Check column names
+colnames(birds_all_periods_turnover_all_land_cover_chanegs_15km)
+
+# Also rename the columns for easier manipulation of df
+birds_turnover_tws_forest_15km <- birds_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  # determine which rows belong to which time period
+  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+                                   TRUE ~ NA_real_),
+         tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+                                   TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`, 
+         -`2012-2018_TWS no change`,-`2000-2006_TWS to Forest`, 
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`)
+
+# Check transformation went ok
+head(birds_turnover_tws_forest_15km)
+
+# Remove rows that might have NA for x or y & categorise time periods
+birds_turnover_tws_forest_15km_coords_time <- birds_turnover_tws_forest_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+## 4.2. GLS on bird data -------------------------------------------------------
+
+# Check if the recorder effort values were logged correctly
+any(!is.finite(birds_turnover_tws_forest_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
+
+# Define model
+birds_TWSF_model1_gls <- gls(JDI ~ tws_to_forest + tws_no_change + 
+                                delta_recorder_effort + log_recorder_effort + lc_time_period,
+                              correlation = corExp(form = ~ x + y | time_numeric),  
+                              data = birds_turnover_tws_forest_15km_coords_time,
+                              method = "REML")
+
+# Save model output
+save(birds_TWSF_model1_gls, 
+     file = here("data", "models", "exploratory", "birds_TWSF_model1_gls.RData"))
+
+# Model diagnostics (see 4.2.qmd) revealed that model is acceptable to use 
+  # saving it in the final folder as well
+save(birds_TWSF_model1_gls, 
+     file = here("data", "models", "final", "birds_TWSF_model1_gls.RData"))
+
+## 4.3. Plot model output ------------------------------------------------------
+
+# Get summary of the model
+birds_summary <- summary(birds_TWSF_model1_gls)
+
+# Create dataframe of coeficients
+birds_TWSF_model1_gls_coef_df <- data.frame(term = names(birds_summary$tTable[, "Value"]),
+                                            estimate = birds_summary$tTable[, "Value"],
+                                            std.error = birds_summary$tTable[, "Std.Error"],
+                                            statistic = birds_summary$tTable[, "t-value"],
+                                            p.value = birds_summary$tTable[, "p-value"])
+
+# Remove the intercept
+birds_TWSF_model1_gls_coef_df_no_intercept <- birds_TWSF_model1_gls_coef_df[birds_TWSF_model1_gls_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure7_c <- ggplot(birds_TWSF_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("tws_to_forest" = "TWS to Forest",
+                              "tws_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "tws_no_change",
+                              "tws_to_forest")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure7_c
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure7c_TWSF_gls_model_output_birds_turnover.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure7c_TWSF_gls_model_output_birds_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
 
 # END OF SCRIPT ----------------------------------------------------------------
