@@ -8,10 +8,6 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-# Turnover data
-load(here("data", "derived_data", 
-          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
-
 # Turnover data for all occurrences
 load(here("data", "derived_data", 
           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
