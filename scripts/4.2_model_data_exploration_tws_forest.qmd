@@ -1066,7 +1066,6 @@ birds_turnover_tws_forest_15km_coords_time <- birds_turnover_tws_forest_15km |>
                                   lc_time_period == "2006-2012" ~ 2,
                                   lc_time_period == "2012-2018" ~ 3),
          log_recorder_effort = log(recorder_effort))
-
 ```
 
 ## Summary Statistics
