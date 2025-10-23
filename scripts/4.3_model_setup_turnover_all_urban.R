@@ -7,13 +7,17 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-# Turnover data
+# Turnover data for all occurrences
 load(here("data", "derived_data", 
           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
-# Forest -> TWS raster
-clc_status_15km_all_urban_masked <- rast(here("data", "derived_data",
-                                              "clc_status_15km_all_urban_combined_masked.tif"))
+# Turnover data for plants
+load(here("data", "derived_data", 
+          "vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# Turnover data for birds
+load(here("data", "derived_data", 
+          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
 # 2. PREPARE DATA FOR ANALYSIS -------------------------------------------------
 
@@ -47,7 +51,7 @@ turnover_all_urban_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
 # Check transformation went ok
 head(turnover_all_urban_15km)
 
-## 2.2. Transform JDI values for beta regression -------------------------------
+## 2.2. Beta regression --------------------------------------------------------
 
 # JDI is in [0,1] but beta regression requires that values do not touch 0 and 1
 # so we will transform the JDI values according to this formula: 
@@ -63,165 +67,311 @@ turnover_all_urban_15km <- turnover_all_urban_15km |>
 # Check the rest of the values are what you expect them to be
 glimpse(turnover_all_urban_15km) # everything looks ok
 
-# 3. RUN BETA GLM --------------------------------------------------------------
-
 # Run model
-model3.1 <- betareg::betareg(JDI_beta ~ all_to_urban + urban_no_change + 
+AllUrban_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ all_to_urban + urban_no_change + 
                                delta_recorder_effort + recorder_effort + lc_time_period,
                              data = turnover_all_urban_15km)
+# Save model
+save(AllUrban_turnover_model1_beta_regression,
+     file = here("data", "models", "exploratory", 
+                 "AllUrban_turnover_model1_beta_regression.RData"))
 
-# Get summary
-summary(model3.1)
+## 2.3. GLS with logged recorder effort ----------------------------------------
 
-# Extarct residuals from model
-model3.1_residuals <- residuals(model3.1)
+# Prepare data for GLS: remove rows with missing x or y and categorise time periods
+turnover_all_urban_15km_coords_time <- turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3))
 
-# Add residuals to df
-turnover_all_urban_15km$residuals <- model3.1_residuals
+# Check if there are any cells with recorder effort = 0
+c <- turnover_all_urban_15km_coords_time |>
+  filter(recorder_effort == 0)
+length(c) #0 - Good!
 
-# 4. CHECK SPATIAL AUTOCORRELATION OF RESIDUALS --------------------------------
+# Log transform recorder effort values
+turnover_all_urban_15km_coords_time <- turnover_all_urban_15km_coords_time |>
+  mutate(log_recorder_effort = log(recorder_effort))
 
-## 4.1. Prepare data for testing of autocorrelation ----------------------------
+# Check log transformed values
+summary(turnover_all_urban_15km_coords_time$log_recorder_effort)
+any(!is.finite(turnover_all_urban_15km_coords_time$log_recorder_effort)) # FALSE = no infinite values - Good!
 
-# Create reference grid
-reference_grid <- clc_status_15km_all_urban_masked[[1]]
+# Define GLS
+AllUrban_turnover_model2_gls_log <- gls(JDI ~ all_to_urban + urban_no_change + 
+                                      delta_recorder_effort + log_recorder_effort + lc_time_period,
+                                    correlation = corExp(form = ~ x + y | time_numeric),  
+                                    data = turnover_all_urban_15km_coords_time,
+                                    method = "REML")
 
-# Convert turnover df to sf object
-turnover_sf <- st_as_sf(turnover_all_urban_15km,
-                        coords = c("x", "y"),
-                        crs = st_crs(reference_grid))
+# Save model output to file
+save(AllUrban_turnover_model2_gls_log, 
+     file = here("data", "models", "exploratory",
+                 "AllUrban_turnover_model2_gls_log.RData"))
 
-## 4.2. Create spatial neighbours ----------------------------------------------
+# Model passed the validation - diagnostic plots looked good!
+  # save model in the final folder as well
+save(AllUrban_turnover_model2_gls_log, 
+     file = here("data", "models", "final",
+                 "AllUrban_turnover_model2_gls_log.RData"))
 
-# Create a neighbour list using k-nearest neighbours (k = 5)
-coords_matrix <- st_coordinates(turnover_sf)
-neighbours <- knn2nb(knearneigh(coords_matrix, k = 5))
+## 2.4. Plot model output ------------------------------------------------------
 
-# Convert to spatial weights matrix
-weights <- nb2listw(neighbours, style = "W")
+# Get summary of the model
+model_summary <- summary(AllUrban_turnover_model2_gls_log)
 
-## 4.3. Calculate Moran's I ----------------------------------------------------
+# Create dataframe of coeficients
+AllUrban_turnover_model2_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                   estimate = model_summary$tTable[, "Value"],
+                                                   std.error = model_summary$tTable[, "Std.Error"],
+                                                   statistic = model_summary$tTable[, "t-value"],
+                                                   p.value = model_summary$tTable[, "p-value"])
 
-# Compute Moran's I test for spatial autocorrelation
-moran_test <- moran.test(turnover_sf$residuals, listw = weights)
+# Remove the intercept
+AllUrban_turnover_model2_gls_log_coef_df_no_intercept <- AllUrban_turnover_model2_gls_log_coef_df[AllUrban_turnover_model2_gls_log_coef_df$term != "(Intercept)", ]
 
-# Print results
-print(moran_test) # strong spatial autocorrelation of residuals 
+# Create coefficient plot
+figure8_a <- ggplot(AllUrban_turnover_model2_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "TWS to Forest",
+                              "urban_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
 
-# Create Moran scatterplot to visualise the relationship
-moran_plot <- moran.plot(turnover_sf$residuals, listw = weights,
-                         xlab = "Model Residuals", 
-                         ylab = "Spatially Lagged Residuals")
+# Save figure as .png
+ggsave(filename = here("figures", "Figure8a_AllUrban_gls_model_output_all_occurrences_turnover.png"),
+       width = 12, height = 8, dpi = 300)
 
-# 5. PLOT MORAN'S I RESULTS ----------------------------------------------------
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure8a_AllUrban_gls_model_output_all_occurrences_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
 
-## 5.1. Calculate local Moran's I values ---------------------------------------
+# 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
-# Calculate local Moran's I wiht zero.policy
-local_moran <- localmoran(turnover_sf$residuals, weights, zero.policy = TRUE)
+## 3.1. Prepare plant data for analysis ----------------------------------------
 
-# Add local Moran's I statistics to the spatial dataframe
-turnover_sf$local_moran_i <- local_moran[, 1] # I statistics
-turnover_sf$local_moran_p <- local_moran[, 5] # p-value
+# Select only All -> Urban columns
+  # check column names
+colnames(vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km)
 
-## 5.2. Handle missing values --------------------------------------------------
+# Also rename the columns for easier manipulation of df
+plants_turnover_all_urban_15km <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  # determine which rows belong to which time period
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                     TRUE ~ NA_real_),
+         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                                  TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
+         -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
+         -`2006-2012_all_to_urban`, -`2012-2018_all_to_urban`)
 
-# Check for missing values in Moran's I column
-missing_values <- sum(is.na(turnover_sf$local_moran_i))
-cat("Number of cells with missing Local Moran's I values:", missing_values, "\n") #0
+# Check transformation went ok
+head(plants_turnover_all_urban_15km)
 
-# Filter out NA for mapping
-turnover_sf_clean <- turnover_sf |>
-  filter(!is.na(local_moran_i))
+# Remove rows that might have NA for x or y and categorise time periods for GLS
+plants_turnover_all_urban_15km_coords_time <- plants_turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
 
-## 5.3. Map of local Moran I values --------------------------------------------
+## 3.2. GLS with logged recorder effort ----------------------------------------
 
-# Extract coordinates
-coords <- st_coordinates(turnover_sf)
-turnover_df <- cbind(st_drop_geometry(turnover_sf), coords)
+#Check if the recorder effort values were logged correctly
+any(!is.finite(plants_turnover_all_urban_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
-# Plot map
-plot1 <- ggplot(turnover_df |> 
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = local_moran_i)) +
-  geom_tile() +
-  scale_fill_viridis_c(option = "viridis", name = "Local Moran's I") +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
+# Define model
+plants_AllUrban_model1_gls <- gls(JDI ~ all_to_urban + urban_no_change + 
+                                delta_recorder_effort + log_recorder_effort + lc_time_period,
+                              correlation = corExp(form = ~ x + y | time_numeric),  
+                              data = plants_turnover_all_urban_15km_coords_time,
+                              method = "REML")
 
-# Save map
-# ggsave(here("figures", "SupplementaryFigure4a_Local_Moran_I_Forest_TWS_15km.png"),
-#        plot1, width = 10, height = 8)
+# Save model output
+save(plants_AllUrban_model1_gls, 
+     file = here("data", "models", "exploratory", "plants_AllUrban_model1_gls.RData"))
 
-## 5.3. Map of significance of local Moran's I values --------------------------
+# Model diagnostics (see 4.2.qmd) revealed that model is acceptable to use 
+  # saving it in the final folder as well
+save(plants_AllUrban_model1_gls, 
+     file = here("data", "models", "final", "plants_AllUrban_model1_gls.RData"))
 
-# Plot map
-plot2 <- ggplot(turnover_df |> 
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = local_moran_p < 0.01)) +
-  geom_tile() +
-  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey"),
-                    name = "Significant",
-                    labels = c("FALSE" = "Not significant", "TRUE" = "p < 0.01")) +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
+## 3.4. Plot model output ------------------------------------------------------
 
-# Save figure 
-# ggsave(here("figures", "SupplementaryFigure4b_Local_Moran_I_Significance_Forest_TWS_15km.png"),
-#        plot1, width = 10, height = 8)
+# Get summary of the model
+plants_model_summary <- summary(plants_AllUrban_model1_gls)
 
-## 5.4. Map of significant Moran's I with positive/negative residuals -----------
+# Create dataframe of coeficients
+plants_AllUrban_model1_glslog_coef_df <- data.frame(term = names(plants_model_summary$tTable[, "Value"]),
+                                                       estimate = plants_model_summary$tTable[, "Value"],
+                                                       std.error = plants_model_summary$tTable[, "Std.Error"],
+                                                       statistic = plants_model_summary$tTable[, "t-value"],
+                                                       p.value = plants_model_summary$tTable[, "p-value"])
 
-# Create categorical variable that combines significance and residual sign
-turnover_df <- turnover_df |>
-  mutate(sig_residual_type = case_when(local_moran_p < 0.01 & residuals > 0 ~ "Significant Positive",
-                                       local_moran_p < 0.01 & residuals < 0 ~ "Significant Negative",
-                                       local_moran_p >= 0.01 ~ "Not Significant"))
+# Remove the intercept
+plants_AllUrban_model1_glslog_coef_df_no_intercept <- plants_AllUrban_model1_glslog_coef_df[plants_AllUrban_model1_glslog_coef_df$term != "(Intercept)", ]
 
-# Plot map of significant clusters with positive/negative residuals
-plot3 <- ggplot(turnover_df |>
-                  filter(!is.na(local_moran_i)), 
-                aes(x = X, y = Y, fill = sig_residual_type)) +
-  geom_tile() +
-  scale_fill_manual(values = c("Significant Positive" = "pink", 
-                               "Significant Negative" = "lightblue",
-                               "Not Significant" = "grey"),
-                    name = "Residual Type") +
-  theme_classic() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.line = element_blank(),
-        axis.ticks = element_blank())
+# Create coefficient plot
+figure8_b <- ggplot(plants_AllUrban_model1_glslog_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "TWS to Forest",
+                              "urban_no_change" = "TWS No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
 
-## 5.5. Combine into single plot -----------------------------------------------
+# Save figure as .png
+ggsave(filename = here("figures", "Figure8b_AllUrban_gls_model_output_plants_turnover.png"),
+       width = 12, height = 8, dpi = 300)
 
-# Combine plots
-all_urban_15km_local_morans_I <- plot_grid(plot1, plot2,plot3,
-                                            labels = c("a)", "b)", "c)"),
-                                            nrow = 1, align = "h")
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure8a_AllUrban_gls_model_output_plants_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
 
-# Save to file
-ggsave(here("figures", "SupplementaryFigure6_Local_Moran_I_All_Urban_15km.png"),
-       all_urban_15km_local_morans_I, width = 18, height = 8)
+# 4. BIRD OCCURRENCES ONLY -----------------------------------------------------
 
-# 6. PRINT MORAN'S I SUMMARY STATISTICS ----------------------------------------
+## 4.1. Prepare bird data for analysis -----------------------------------------
 
-# Calculate % of cells with significant spatial autocorrelation
-sig_percentage <- mean(turnover_sf$local_moran_p < 0.01, na.rm = TRUE) * 100
+# Check column names
+colnames(birds_all_periods_turnover_all_land_cover_chanegs_15km)
 
-# Print summary statistics
-cat("\n=== SPATIAL AUTOCORRELATION SUMMARY ===\n")
-cat("Global Moran's I:", round(moran_test$estimate[1], 4), "\n")
-cat("p-value:", format.pval(moran_test$p.value), "\n")
-cat("Percentage of cells with significant local autocorrelation:", round(sig_percentage, 2), "%\n")
+# Also rename the columns for easier manipulation of df
+birds_turnover_all_urban_15km <- birds_all_periods_turnover_all_land_cover_chanegs_15km |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  # determine which rows belong to which time period
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                     TRUE ~ NA_real_),
+         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                                  TRUE ~ NA_real_)) |>
+  # remove columns no longer required
+  select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
+         -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
+         -`2006-2012_all_to_urban`, -`2012-2018_all_to_urban`)
+
+# Check transformation went ok
+head(birds_turnover_all_urban_15km)
+
+# Remove rows that might have NA for x or y & categorise time periods
+birds_turnover_all_urban_15km_coords_time <- birds_turnover_all_urban_15km |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+## 4.2. GLS on bird data -------------------------------------------------------
+
+# Check if the recorder effort values were logged correctly
+any(!is.finite(birds_turnover_all_urban_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
+
+# Define model
+birds_AllUrban_model1_gls <- gls(JDI ~ all_to_urban + urban_no_change + 
+                               delta_recorder_effort + log_recorder_effort + lc_time_period,
+                             correlation = corExp(form = ~ x + y | time_numeric),  
+                             data = birds_turnover_all_urban_15km_coords_time,
+                             method = "REML")
+
+# Save model output
+save(birds_AllUrban_model1_gls, 
+     file = here("data", "models", "exploratory", "birds_AllUrban_model1_gls.RData"))
+
+# Model diagnostics (see 4.2.qmd) revealed that model is acceptable to use 
+  # saving it in the final folder as well
+save(birds_AllUrban_model1_gls, 
+     file = here("data", "models", "final", "birds_AllUrban_model1_gls.RData"))
+
+## 4.3. Plot model output ------------------------------------------------------
+
+# Get summary of the model
+model_summary <- summary(birds_AllUrban_model1_gls)
+
+# Create dataframe of coeficients
+birds_AllUrban_model1_gls_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                                                estimate = model_summary$tTable[, "Value"],
+                                                std.error = model_summary$tTable[, "Std.Error"],
+                                                statistic = model_summary$tTable[, "t-value"],
+                                                p.value = model_summary$tTable[, "p-value"])
+
+# Remove the intercept
+birds_AllUrban_model1_gls_coef_df_no_intercept <- birds_AllUrban_model1_gls_coef_df[birds_AllUrban_model1_gls_coef_df$term != "(Intercept)", ]
+
+# Create coefficient plot
+figure8_c <- ggplot(birds_AllUrban_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+                     xmax = estimate + 1.96 * std.error)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_discrete(labels = c("all_to_urban" = "All to Forest",
+                              "urban_no_change" = "Forest No Change", 
+                              "delta_recorder_effort" = "ΔRecorder Effort",
+                              "log_recorder_effort" = "log Recorder Effort",
+                              "lc_time_period2006-2012" = "2006-2012 Time Period",
+                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
+                   limits = c("lc_time_period2012-2018",
+                              "lc_time_period2006-2012", 
+                              "log_recorder_effort",
+                              "delta_recorder_effort",
+                              "urban_no_change",
+                              "all_to_urban")) +
+  labs(x = "Estimate ± 95% CI", y = NULL) +
+  theme_classic()
+
+# Display plot
+figure8_c
+
+# Save figure as .png
+ggsave(filename = here("figures", "Figure8c_AllUrban_gls_model_output_birds_turnover.png"),
+       width = 12, height = 8, dpi = 300)
+
+# Save figure as .svg
+ggsave(filename = here("figures", "Figure8c_AllUrban_gls_model_output_birds_turnover.svg"),
+       width = 12, height = 8, dpi = 300)
 
 # END OF SCRIPT ----------------------------------------------------------------
