@@ -85,6 +85,15 @@ clean_occurrences_15km <- clean_occurrences |>
 # Check how many records are left in the cleaned df
 nrow(clean_occurrences_15km) # 25 196 761
 
+# 5. REMOVE RECORDS WITH OCCURRENCESTATUS = ABSENT -----------------------------
+
+# Only keep records with occurrenceStatus = "PRESENT" 
+clean_occurrences_15km <- clean_occurrences_15km |>
+  filter(occurrenceStatus == "PRESENT")
+
+# Check how many records are left in the cleaned df
+nrow(clean_occurrences_15km) #25 145 572
+
 # Save cleaned occurrences
 write.csv(clean_occurrences_15km,
           here("data", "derived_data", "clean_occurrences_15km.txt"))
