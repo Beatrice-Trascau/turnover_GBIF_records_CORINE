@@ -43,7 +43,7 @@ period2_occurrences <- taxonomic_composition |>
 period3_occurrences <- taxonomic_composition |>
   filter(year %in% c(2008:2012, 2015:2018)) |>
   mutate(period = case_when(year %in% 2008:2012 ~ "2008-2012",
-                            year %in% 2015:2018 ~ "2015-2018"))
+                            year %in% 2018:2021 ~ "2018-2021"))
 
 # Combine all periods
 taxonomic_composition_periods <- bind_rows(period1_occurrences,
@@ -70,7 +70,7 @@ taxonomic_colours <- c("Plants" = "#66C2A5",
 
 # Define order for the periods
 period_order <- c("1997-2000", "2006-2009", "2003-2006", 
-                  "2012-2015", "2008-2012", "2015-2018")
+                  "2012-2015", "2008-2012", "2018-2021")
 
 # Convert period column to a factor and follow the order
 taxonomic_summary <- taxonomic_summary |>
@@ -162,7 +162,7 @@ print(summary_bird_2012_2015$count) # 4 654 633
 
 # Aggregate data by year and taxonomic group
 yearly_taxonomic_counts <- taxonomic_composition |>
-  filter(year >= 1997 & year <= 2018) |>
+  filter(year >= 1997 & year <= 2021) |>
   group_by(year, taxonomic_group) |>
   summarise(count = n(), .groups = "drop") |>
   # also calculate proportions per year
