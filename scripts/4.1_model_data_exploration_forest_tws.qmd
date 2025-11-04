@@ -1675,15 +1675,20 @@ birds_range_param <- coef(birds_FTWS_model1_gls$modelStruct$corStruct, unconstra
 
 # Extract residuals
 birds_residuals_gls <- residuals(birds_FTWS_model1_gls, type = "normalized")
+birds_fitted <- fitted(birds_FTWS_model1_gls)
 
-# Get the data actually used in the model
-birds_model_data <- getData(birds_FTWS_model1_gls)
+# Get the indices of observations actually used in the model
+  # the residuals have names that correspond to row numbers
+used_indices <- as.numeric(names(birds_residuals_gls))
+
+# Subset original data to only include rows used in the model
+birds_model_data <- birds_data[used_indices, ]
 
 # Basic residual plots
 par(mfrow = c(2, 2))
 
 # Residuals vs fitted
-plot(fitted(birds_FTWS_model1_gls), birds_residuals_gls,
+plot(birds_fitted, birds_residuals_gls,
      xlab = "Fitted Values", ylab = "Normalized Residuals",
      main = "Residuals vs Fitted")
 abline(h = 0, col = "red", lty = 2)
