@@ -1200,7 +1200,7 @@ bird_cor_plot <- corrplot(bird_cor_matrix,
 #| message: false
 
 # Load model
-load(here("data", "models", "exploratory", "birds_TWSF_model1_gls.RData"))
+load(here("data", "models", "exploratory", "birds_AllUrban_model1_gls.RData"))
 
 # Extract summary
 birds_AllUrban_model1_gls_summary <- summary(birds_AllUrban_model1_gls)
