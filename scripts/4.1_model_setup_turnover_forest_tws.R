@@ -5,12 +5,13 @@
 # Forest -> TWS land cover transition on temporal turnover for all occurrences,
 # plant-only occurrences and bird-only occurrences
 ##----------------------------------------------------------------------------##
-
+library(here)
+source(here("scripts", "0_setup.R"))
 # 1. LOAD DATA -----------------------------------------------------------------
 
 # Turnover data for all occurrences
-load(here("data", "derived_data", 
-          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+# load(here("data", "derived_data", 
+#           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
 
 # Turnover data for plants
 load(here("data", "derived_data", 
@@ -24,7 +25,7 @@ load(here("data", "derived_data",
 
 ## 2.1. Prepare data for analysis ----------------------------------------------
 
-# Select only Forest -> TWS columns 
+# Select only Forest -> TWS columns
 # check column names
 colnames(all_periods_turnover_all_land_cover_chanegs_15km)
 
@@ -46,8 +47,8 @@ turnover_forest_tws_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
   # remove columns no longer required
-  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
-         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`,
          -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
 
 # Check transformation went ok
@@ -70,35 +71,35 @@ turnover_forest_tws_15km <- turnover_forest_tws_15km |>
   mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
 
 # Run model
-FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change + 
+FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change +
                                delta_recorder_effort + recorder_effort + lc_time_period,
                              data = turnover_forest_tws_15km)
 
 # Save model
 save(FTWS_turnover_model1_beta_regression,
-     file = here("data", "models", "exploratory", 
+     file = here("data", "models", "exploratory",
                  "FTWS_turnover_model1_beta_regression.RData"))
 
 
 ## 2.3. GLMM with SSB ID as random effect --------------------------------------
 
 # Run model
-FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change + 
-                            delta_recorder_effort + recorder_effort + lc_time_period + 
+FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change +
+                            delta_recorder_effort + recorder_effort + lc_time_period +
                             (1|ssb_id),
                           family = beta_family(),
                           data = turnover_forest_tws_15km)
 
 # Save model
 save(FTWS_turnover_model2_GLMM,
-     file = here("data", "models", "exploratory", 
+     file = here("data", "models", "exploratory",
                  "FTWS_turnover_model2_GLMM.RData"))
 
 ## 2.4. Ordered beta regression ------------------------------------------------
 
 # Run model
-# FTWS_turnover_model3_ordered_beta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change + 
-#                                                   delta_recorder_effort + recorder_effort + lc_time_period + 
+# FTWS_turnover_model3_ordered_beta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change +
+#                                                   delta_recorder_effort + recorder_effort + lc_time_period +
 #                                                   (1|ssb_id),
 #                                                 data = turnover_forest_tws_15km,
 #                                                 cores = 4,
@@ -109,20 +110,20 @@ save(FTWS_turnover_model2_GLMM,
 
 # Save model
 # save(FTWS_turnover_model3_ordered_beta,
-#      file = here("data", "models", "exploratory", 
+#      file = here("data", "models", "exploratory",
 #                  "FTWS_turnover_model3_ordered_beta.RData"))
 
 ## 2.5. GLS with raw data and exponential structure ----------------------------
 
 # Fit gls
-FTWS_turnover_model4_gls_raw <- gls(JDI ~ forest_to_tws + forest_no_change + 
+FTWS_turnover_model4_gls_raw <- gls(JDI ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + recorder_effort + lc_time_period,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
 # Save model output to file
-save(FTWS_turnover_model4_gls_raw, 
+save(FTWS_turnover_model4_gls_raw,
      file = here("data", "models", "exploratory",
                  "FTWS_turnover_model4_gls_raw.RData"))
 
@@ -143,16 +144,16 @@ summary(turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-FTWS_turnover_model5_gls_log <- gls(JDI ~ forest_to_tws + forest_no_change + 
+FTWS_turnover_model5_gls_log <- gls(JDI ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + log_recorder_effort + lc_time_period,
-                  correlation = corExp(form = ~ x + y | time_numeric),  
+                  correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
 # Model validation looks ok => THIS IS THE FINAL MODEL WE WILL USE
 
 # Save model output to file
-save(FTWS_turnover_model5_gls_log, 
+save(FTWS_turnover_model5_gls_log,
      file = here("data", "models", "final",
                  "FTWS_turnover_model5_gls_log.RData"))
 
@@ -178,13 +179,13 @@ figure6_a <- ggplot(FTWS_turnover_model5_gls_log_coef_df_no_intercept, aes(x = e
                      xmax = estimate + 1.96 * std.error)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
   scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-                              "forest_no_change" = "Forest No Change", 
+                              "forest_no_change" = "Forest No Change",
                               "delta_recorder_effort" = "ΔRecorder Effort",
                               "log_recorder_effort" = "log Recorder Effort",
                               "lc_time_period2006-2012" = "2006-2012 Time Period",
                               "lc_time_period2012-2018" = "2012-2018 Time Period"),
                    limits = c("lc_time_period2012-2018",
-                              "lc_time_period2006-2012", 
+                              "lc_time_period2006-2012",
                               "log_recorder_effort",
                               "delta_recorder_effort",
                               "forest_no_change",
@@ -252,8 +253,8 @@ plants_turnover_forest_tws_15km <- vascular_plants_all_periods_turnover_all_land
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
   # remove columns no longer required
-  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
-         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`,
          -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
 
 # Check transformation went ok
@@ -282,9 +283,9 @@ summary(plants_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(plants_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + log_recorder_effort + lc_time_period,
-                  correlation = corExp(form = ~ x + y | time_numeric),  
+                  correlation = corExp(form = ~ x + y | time_numeric),
                   data = plants_turnover_forest_tws_15km_coords_time,
                   method = "REML")
 
@@ -292,7 +293,7 @@ plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
   # despite some deviances, we will use this model to keep things consistent
 
 # Save model output to file
-save(plants_FTWS_model1_gls, 
+save(plants_FTWS_model1_gls,
      file = here("data", "models", "final",
                  "plants_FTWS_model1_gls.RData"))
 
@@ -312,20 +313,20 @@ plants_FTWS_model1_gls_coef_df <- data.frame(term = names(plants_FTWS_model1_gls
 plants_FTWS_model1_gls_coef_df_no_intercept <- plants_FTWS_model1_gls_coef_df[plants_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
 
 # Create coefficient plot
-figure6_b <- ggplot(plants_FTWS_model1_gls_coef_df_no_intercept, 
+figure6_b <- ggplot(plants_FTWS_model1_gls_coef_df_no_intercept,
                     aes(x = estimate, y = term)) +
   geom_point() +
   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
                      xmax = estimate + 1.96 * std.error)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
   scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-                              "forest_no_change" = "Forest No Change", 
+                              "forest_no_change" = "Forest No Change",
                               "delta_recorder_effort" = "ΔRecorder Effort",
                               "log_recorder_effort" = "log Recorder Effort",
                               "lc_time_period2006-2012" = "2006-2012 Time Period",
                               "lc_time_period2012-2018" = "2012-2018 Time Period"),
                    limits = c("lc_time_period2012-2018",
-                              "lc_time_period2006-2012", 
+                              "lc_time_period2006-2012",
                               "log_recorder_effort",
                               "delta_recorder_effort",
                               "forest_no_change",
@@ -363,8 +364,8 @@ plants_FTWS_model2_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delt
                          method = "REML")
 
 # Save model output
-save(plants_FTWS_model2_GAM, 
-     file = here("data", "models", "exploratory", 
+save(plants_FTWS_model2_GAM,
+     file = here("data", "models", "exploratory",
                  "plants_FTWS_model2_GAM.RData"))
 
 ## 3.5. GAM with forest -> tws and spatial smooth ------------------------------
@@ -379,7 +380,7 @@ plants_FTWS_model3_GAM_extra_smooth <- gam(JDI_beta ~ s(forest_to_tws) + forest_
 
 
 # Save model output
-save(plants_FTWS_model3_GAM_extra_smooth, 
+save(plants_FTWS_model3_GAM_extra_smooth,
      file = here("data", "models", "exploratory",
                  "plants_FTWS_model3_GAM_extra_smooth.RData"))
 
@@ -438,55 +439,63 @@ summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
-                           delta_recorder_effort + log_recorder_effort + lc_time_period,
-                         correlation = corExp(form = ~ x + y | time_numeric),  
-                         data = birds_turnover_forest_tws_15km_coords_time,
-                         method = "REML")
+# birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
+#                            delta_recorder_effort + log_recorder_effort + lc_time_period,
+#                          correlation = corExp(form = ~ x + y | time_numeric),  
+#                          data = birds_turnover_forest_tws_15km_coords_time,
+#                          method = "REML")
 
 # Save model output to file
-save(birds_FTWS_model1_gls, 
-     file = here("data", "models", "final",
-                 "birds_FTWS_model1_gls.RData"))
+# save(birds_FTWS_model1_gls, 
+#      file = here("data", "models", "final",
+#                  "birds_FTWS_model1_gls.RData"))
 
 ## 4.3. Plot model output ------------------------------------------------------
 
 # Get summary
-model_summary_birds <- summary(birds_FTWS_model1_gls)
-
-# Create dataframe of coeficients
-birds_FTWS_model1_gls_coef_df <- data.frame(term = names(model_summary_birds$tTable[, "Value"]),
-                                            estimate = model_summary_birds$tTable[, "Value"],
-                                            std.error = model_summary_birds$tTable[, "Std.Error"],
-                                            statistic = model_summary_birds$tTable[, "t-value"],
-                                            p.value = model_summary_birds$tTable[, "p-value"])
-
-# Remove the intercept
-birds_FTWS_model1_gls_coef_df_no_intercept <- birds_FTWS_model1_gls_coef_df[birds_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
-
-# Create coefficient plot
-figure6_c <- ggplot(birds_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
-  geom_point() +
-  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
-                     xmax = estimate + 1.96 * std.error)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-                              "forest_no_change" = "Forest No Change", 
-                              "delta_recorder_effort" = "ΔRecorder Effort",
-                              "log_recorder_effort" = "log Recorder Effort",
-                              "lc_time_period2006-2012" = "2006-2012 Time Period",
-                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
-                   limits = c("lc_time_period2012-2018",
-                              "lc_time_period2006-2012", 
-                              "log_recorder_effort",
-                              "delta_recorder_effort",
-                              "forest_no_change",
-                              "forest_to_tws")) +
-  labs(x = "Estimate ± 95% CI", y = NULL) +
-  theme_classic()
-
-# Display plot
-figure6_c
+# model_summary_birds <- summary(birds_FTWS_model1_gls)
+# 
+# # Create dataframe of coeficients
+# birds_FTWS_model1_gls_coef_df <- data.frame(term = names(model_summary_birds$tTable[, "Value"]),
+#                                             estimate = model_summary_birds$tTable[, "Value"],
+#                                             std.error = model_summary_birds$tTable[, "Std.Error"],
+#                                             statistic = model_summary_birds$tTable[, "t-value"],
+#                                             p.value = model_summary_birds$tTable[, "p-value"])
+# 
+# # Remove the intercept
+# birds_FTWS_model1_gls_coef_df_no_intercept <- birds_FTWS_model1_gls_coef_df[birds_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
+# 
+# # Create coefficient plot
+# figure6_c <- ggplot(birds_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
+#   geom_point() +
+#   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
+#                      xmax = estimate + 1.96 * std.error)) +
+#   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+#   scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
+#                               "forest_no_change" = "Forest No Change", 
+#                               "delta_recorder_effort" = "ΔRecorder Effort",
+#                               "log_recorder_effort" = "log Recorder Effort",
+#                               "lc_time_period2006-2012" = "2006-2012 Time Period",
+#                               "lc_time_period2012-2018" = "2012-2018 Time Period"),
+#                    limits = c("lc_time_period2012-2018",
+#                               "lc_time_period2006-2012", 
+#                               "log_recorder_effort",
+#                               "delta_recorder_effort",
+#                               "forest_no_change",
+#                               "forest_to_tws")) +
+#   labs(x = "Estimate ± 95% CI", y = NULL) +
+#   theme_classic()
+# 
+# # Display plot
+# figure6_c
+# 
+# # Save figure as .png
+# ggsave(filename = here("figures", "Figure6c_gls_model_output_birds_turnover.png"),
+#        width = 12, height = 8, dpi = 300)
+# 
+# # Save figure as .svg
+# ggsave(filename = here("figures", "Figure6c_gls_model_output_birds_turnover.svg"),
+#        width = 12, height = 8, dpi = 300)
 
 ## 4.4. Weighted GLS -----------------------------------------------------------
 
