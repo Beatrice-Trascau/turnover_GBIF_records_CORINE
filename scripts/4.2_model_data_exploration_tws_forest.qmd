@@ -499,8 +499,7 @@ Moran's I test for spatial autocorrelation revealed that there is significant sp
 #| message: false
 
 # Load model
-load(here("data", "models", "exploratory",
-          "TWSF_turnover_model2_gls_log.RData"))
+load(here("data", "models", "exploratory", "TWSF_turnover_model2_gls_log.RData"))
 
 # Extract correlation structure parameters
 print(TWSF_turnover_model2_gls_log$modelStruct$corStruct)
@@ -909,7 +908,7 @@ The diagnostic plots for this model show that:
 
 1.  Residuals vs Fitted:
     -   Most residuals are centered around 0
-    -   Spread is roughly constant across the fitted values
+    -   Spread is roughly constant across the fitted values but there is some funneling
 2.  QQ Plot:
     -   There is some deviation from the red line at both ends suggesting that residuals are not perfectly normal
     -   Our sample size is relatively large, and this is somewhat common with ecological data
@@ -920,7 +919,7 @@ The diagnostic plots for this model show that:
     -   Residuals are evenly spread across the range of log recorder effort
     -   Residuals are (mostly) centered around zero and there is no obvious pattern observed
 
-This model looks good to use! Therefore, it will be the one used in the manuscript.
+This model looks ok(ish) to use! Therefore, it will be the one used in the manuscript.
 
 ```{r gls plants summary}
 #| label: tbl-gls-logged-values-summary
