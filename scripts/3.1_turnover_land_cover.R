@@ -28,6 +28,10 @@ all_urban_15km <- rast(here("data", "derived_data",
 occurrences_norway <- fread(here("data", "derived_data", 
                                  "clean_occurrences_15km.txt"))
 
+# Keep only records with occurrenceStatus = PRESENT
+occurrences_norway <- occurrences_norway |>
+  filter(occurrenceStatus == "PRESENT")
+
 ## 1.3. SSB ID Grid ------------------------------------------------------------
 
 # SSB ID Grid - 50km
