@@ -1,8 +1,8 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 5.1_species_gain_loss_forest_tws
-# This script calculates and visualises species gain and loss for birds and
-# vascular plants in areas with forest to TWS land cover changes
+# 5.1_species_richness_change_exploration
+# This script calculates and explores changes in species richness across land
+# cover changes
 ##----------------------------------------------------------------------------##
 
 # 1. LOAD DATA -----------------------------------------------------------------
