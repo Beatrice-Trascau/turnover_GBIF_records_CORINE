@@ -32,7 +32,45 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
 # Execute the function
 sapply(package_vec, install_load_package)
 
-# 2. DOWNLOAD FILES ------------------------------------------------------------
+# 2. CREATE NECESSARY FILE STRUCTURE -------------------------------------------
+
+# Function to create the file structure needed to run the analysis smoothly
+create_project_structure <- function(base_path = "CORINE_Change_GBIF_Records") {
+  # define the directory structure
+  dirs <- c(
+    file.path(base_path),
+    file.path(base_path, "data"),
+    file.path(base_path, "data", "raw_data"),
+    file.path(base_path, "data", "raw_data", "raw_norway_shapefile"),
+    file.path(base_path, "data", "raw_data", "chelsa"),
+    file.path(base_path, "data", "derived_data"),
+    file.path(base_path, "data", "derived_data", "reprojected_norway_shapefile"),
+    file.path(base_path, "data", "derived_data", "chelsa"),
+    file.path(base_path, "data", "models"),
+    file.path(base_path, "data", "models", "exploratory"),
+    file.path(base_path, "data", "models", "final"),
+    file.path(base_path, "scripts"),
+    file.path(base_path, "figures"),
+    
+  )
+  
+  # create directories if they don't exist
+  for (dir in dirs) {
+    if (!dir.exists(dir)) {
+      dir.create(dir, recursive = TRUE)
+      cat("Created directory:", dir, "\n")
+    } else {
+      cat("Directory already exists:", dir, "\n")
+    }
+  }
+  
+  cat("\nProject structure setup complete!\n")
+}
+
+# Run function
+create_project_structure()
+
+# 3. DOWNLOAD FILES ------------------------------------------------------------
 
 # Function to check if files are in directory and then download them if they
 # aren't
@@ -47,7 +85,7 @@ download_files <- function(urls, filenames, dir = here("data", "raw_data")) {
   }
 }
 
-# 3. READ RASTERS --------------------------------------------------------------
+# 4. READ RASTERS --------------------------------------------------------------
 
 # Function to read rasters (from the raw_data file)
 
@@ -62,7 +100,7 @@ read_rasters <- function(filenames, dir = here("data/raw_data")) {
   return(do.call(c, rasters))
 }
 
-# 4. CROP AND MASK RASTERS TO NORWAY -------------------------------------------
+# 5. CROP AND MASK RASTERS TO NORWAY -------------------------------------------
 
 # Function to crop and mask rasters to Norway
 
@@ -70,7 +108,7 @@ crop_mask_to_norway <- function(raster_stack, norway_shape) {
   return(crop(raster_stack, norway_shape, mask = TRUE))
 }
 
-# 5. MODIFY CLASSES IN RASTERS -------------------------------------------------
+# 6. MODIFY CLASSES IN RASTERS -------------------------------------------------
 
 # Function to modify class values in the rasters
 
@@ -85,7 +123,7 @@ modify_class_values <- function(raster_stack, class_modifications) {
   return(modified_stack)
 }
 
-# 6. CALCULATE FOREST -> TWS TRANSITIONS ---------------------------------------
+# 7. CALCULATE FOREST -> TWS TRANSITIONS ---------------------------------------
 
 # Function to calculate Forest -> TWS transitions between two time periods
 analyse_forest_transition <- function(rast_t1, rast_t2) {
@@ -118,7 +156,7 @@ analyse_forest_transition <- function(rast_t1, rast_t2) {
 }
 
 
-# 7. CALCULATE TWS -> FORESTS TRANSITIONS --------------------------------------
+# 8. CALCULATE TWS -> FORESTS TRANSITIONS --------------------------------------
 
 # Function to calculate TWS -> Forest transitions between two time periods
 analyse_tws_transition <- function(rast_t1, rast_t2) {
@@ -150,7 +188,7 @@ analyse_tws_transition <- function(rast_t1, rast_t2) {
   return(transition)
 }
 
-# 8. CALCULATE ALLL -> URBAN TRANSITIONS ---------------------------------------
+# 9. CALCULATE ALLL -> URBAN TRANSITIONS ---------------------------------------
 
 # Function to calculate All -> Urban transitions between two time periods
 analyse_urban_conversion <- function(rast_t1, rast_t2) {
@@ -198,7 +236,7 @@ analyse_urban_conversion <- function(rast_t1, rast_t2) {
   return(transition)
 }
 
-# 9. AGGREGATE RASTERS TO LARGER GRIDS -----------------------------------------
+# 10. AGGREGATE RASTERS TO LARGER GRIDS -----------------------------------------
 
 # This function aggregates the transition rasters (created with the functions 
 #   above) to larger grid sizes
@@ -239,7 +277,7 @@ aggregate_transitions <- function(transition_raster, factor) {
   return(rast(agg_counts))
 }
 
-# 10. CHECK IF CELLS ARE NA ----------------------------------------------------
+# 11. CHECK IF CELLS ARE NA ----------------------------------------------------
 
 # Function to check if certain cells in a raster were already NA before the masking
 #   this function is used to check that masking of cells with >50% of their area
@@ -270,7 +308,7 @@ check_na_values <- function(raster_layer, coords) {
   return(NA)
 }
 
-# 14. CALCULATE JACCARD'S DISSIMILARITY INDEX ----------------------------------
+# 12. CALCULATE JACCARD'S DISSIMILARITY INDEX ----------------------------------
 
 # Function to calculate Jaccard dissimilarity for a period pair
 calculate_jaccard_for_periods <- function(df, before_period, after_period, change_period) {
