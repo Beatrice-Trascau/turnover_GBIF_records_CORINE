@@ -1,0 +1,333 @@
+---
+title: "Change in species richness models"
+format: html
+editor: visual
+number-sections: true
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
+---
+
+## Aims
+
+This document outlines data exploration steps of the data used to model changes in species richness in relationship to different land cover changes.
+
+```{r libraries}
+#| label: packages
+#| echo: false
+#| include: false
+library(here)
+source(here("scripts", "0_setup.R"))
+```
+
+# Vascular Plants Models
+
+## Forest -\> TWS
+
+### Trial 1: GLS
+
+The first model attempted to run was a GLS.
+
+```{r plants FTWS GLS}
+#| label: plants-FTWS-GLS
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory",
+                 "plants_sp_richness_FTWS_model1_gls.RData"))
+
+# Extract residuals from model
+plants_model1_residuals <- residuals(plants_sp_richness_FTWS_model1_gls)
+
+# Get summary
+model_summary <- tidy(plants_sp_richness_FTWS_model1_gls,
+                      conf.int = TRUE)
+
+# Display summary
+knitr::kable(model_summary, digits = 4)
+```
+
+```{r plants gls log model diagnostic}
+#| label: fig-gls-logged-values
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for GLS model 1"
+
+# Extract residuals
+residuals_gls <- residuals(plants_sp_richness_FTWS_model1_gls, type = "normalized")
+
+# Get the model frame to ensure we're using the exact same data
+model_data <- getData(plants_sp_richness_FTWS_model1_gls)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(plants_sp_richness_FTWS_model1_gls), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$forest_to_tws, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The model diagnostic plots reveal some serious issues, especially with non-linearity. The next attempt will be a GAM.
+
+### Trial 2: GAM
+
+```{r plants FTWS GAM1}
+#| label: plants-FTWS-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_FTWS_model2_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_FTWS_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_FTWS_model2_GAM)
+```
+
+These diagnostics are also revealing some serious issues and deviations from expectations. We are specifically seeing that residuals are showing signs of heteroscedasticity, which means that variance of residuals changes across different values of predictors. This makes sense since there are some cells that have very high numbers for recording effort which would obviously impact the change in species richness.
+
+### (Final) Trial 3: GAM with variance structure
+
+I tried to re-run the same GAM but with weights calculated based on residual variance from GAM 1.
+
+```{r plants FTWS GAM2}
+#| label: plants-FTWS-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_FTWS_model3_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_FTWS_model3_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_FTWS_model3_GAM)
+```
+
+This model fits much better than the previous one. The DHARMa diagnosis suggests that there are still some problems. However, the p values for diagnostic tests are actually quite close to 0.05.
+
+## TWS -\> Forest
+
+### Trial 1: GAM
+
+```{r plants TWSF GAM1}
+#| label: plants-TWSF-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_TWSF_model1_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_TWSF_model1_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_TWSF_model1_GAM)
+```
+
+The GAM diagnostics showed some issues which could be solved with the same weighting approach we used for the Forest -\> TWS model.
+
+### (Final) Trial 2: GAM with weighted variance structure
+
+I re-ran the GAM with weights calculated based on residual variance from GAM 1.
+
+```{r plants TWSF GAM2}
+#| label: plants-TWSF-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_TWSF_model2_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_TWSF_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_TWSF_model2_GAM)
+```
+
+The addition of the weights() argument seems to have improved the model fit. We will use this model in the manuscript.
+
+## All -\> Urban
+
+### Trial 1: GAM
+
+```{r plants AllUrban GAM1}
+#| label: plants-AllUrban-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_AllUrban_model1_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_AllUrban_model1_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_AllUrban_model1_GAM)
+```
+
+The GAM diagnostics showed some issues which could be solved with the same weighting approach we used for the Forest -\> TWS model.
+
+### (Final) Trial 2: GAM with weighted variance structure
+
+```{r plants AllUrban GAM2}
+#| label: plants-AllUrban-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "plants_sp_richness_AllUrban_model2_GAM.RData"))
+
+# Check output
+summary(plants_sp_richness_AllUrban_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(plants_sp_richness_AllUrban_model2_GAM)
+```
+
+The addition of the weights() argument seems to have improved the model fit. We will use this model in the manuscript.
+
+# Bird Models
+
+## Forest -\> TWS
+
+### Trial 1: GAM
+
+```{r birds FTWS GAM1}
+#| label: birds-FTWS-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_FTWS_model1_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_FTWS_model1_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_FTWS_model1_GAM)
+```
+
+### (Final) Trial 2: GAM with variance structure
+
+I tried to re-run the same GAM but with weights calculated based on residual variance from GAM 1.
+
+```{r birds FTWS GAM2}
+#| label: birds-FTWS-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_FTWS_model2_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_FTWS_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_FTWS_model2_GAM)
+```
+
+Model validation reveals better performance after adding the weights.
+
+## TWS -\> Forest
+
+### Trial 1: GAM
+
+```{r birds TWSF GAM1}
+#| label: birds-TWSF-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_TWSF_model1_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_TWSF_model1_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_TWSF_model1_GAM)
+```
+
+The GAM diagnostics showed some issues which could be solved with the same weighting approach we used for the Forest -\> TWS model.
+
+### (Final) Trial 2: GAM with weighted variance structure
+
+```{r birds TWSF GAM2}
+#| label: birds-TWSF-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_TWSF_model2_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_TWSF_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_TWSF_model2_GAM)
+```
+
+The addition of the weights() argument seems to have improved the model fit. We will use this model in the manuscript.
+
+## All -\> Urban
+
+### Trial 1: GAM
+
+```{r birds AllUrban GAM1}
+#| label: birds-AllUrban-GAM1
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_AllUrban_model1_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_AllUrban_model1_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_AllUrban_model1_GAM)
+```
+
+The GAM diagnostics showed some issues which could be solved with the same weighting approach we used for the Forest -\> TWS model.
+
+### (Final) Trial 2: GAM with weighted variance structure
+
+```{r birds AllUrban GAM2}
+#| label: birds-AllUrban-GAM2
+#| echo: false
+
+# Load model
+load(here("data", "models", "exploratory", "birds_sp_change_AllUrban_model2_GAM.RData"))
+
+# Check output
+summary(birds_sp_change_AllUrban_model2_GAM)
+
+# Check model fit
+par(mfrow = c(2, 2))
+gam.check(birds_sp_change_AllUrban_model2_GAM)
+```
+
+The addition of the weights() argument seems to have improved the model fit. We will use this model in the manuscript.
