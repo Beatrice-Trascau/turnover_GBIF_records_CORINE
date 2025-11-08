@@ -76,10 +76,10 @@ writeVector(norway, here::here("data", "raw_data", "raw_norway_shapefile",
 
 # Check projections
 crs(norway, proj = TRUE)
-crs(corine_change_stack[[1]], proj = TRUE)
+crs(corine_status_stack[[1]], proj = TRUE)
 
 # Reproject Norway shapefile to the CORINE layers
-norway_corine_projection <- project(norway, crs(corine_change_stack))
+norway_corine_projection <- project(norway, crs(corine_status_stack))
 
 # Check projection
 crs(norway_corine_projection, proj = TRUE) #projection correct now
