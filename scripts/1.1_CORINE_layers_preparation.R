@@ -8,45 +8,40 @@
 # 1. DEFINE URLS, NAMES AND NEW VALUES FOR RASTERS -----------------------------
 
 # URLs and Filenames for the CORINE Change Layers
-change_urls <- c(
-  "https://ntnu.box.com/shared/static/vduuevecunldbrc7jb60jarjts99c4db.tif",
-  "https://ntnu.box.com/shared/static/nmn2kguk9ipx0u4a2a8yfvcozdf6g9ij.tif",
-  "https://ntnu.box.com/shared/static/pah7ig013inqeepg3gwvfan9w00anitp.tif",
-  "https://ntnu.box.com/shared/static/g9grkxsvv20sz48rkbig8f9tb8gennfy.tif",
-  "https://ntnu.box.com/shared/static/v51lua6b9fph0k7bmsbbc1g20tkdjqh9.tif",
-  "https://ntnu.box.com/shared/static/x7ck0jnagfoxvjxvxf99l9lhknky5xlt.tif")
+change_urls <- c("https://ntnu.box.com/shared/static/vduuevecunldbrc7jb60jarjts99c4db.tif",
+                 "https://ntnu.box.com/shared/static/nmn2kguk9ipx0u4a2a8yfvcozdf6g9ij.tif",
+                 "https://ntnu.box.com/shared/static/pah7ig013inqeepg3gwvfan9w00anitp.tif",
+                 "https://ntnu.box.com/shared/static/g9grkxsvv20sz48rkbig8f9tb8gennfy.tif",
+                 "https://ntnu.box.com/shared/static/v51lua6b9fph0k7bmsbbc1g20tkdjqh9.tif",
+                 "https://ntnu.box.com/shared/static/x7ck0jnagfoxvjxvxf99l9lhknky5xlt.tif")
 
-change_filenames <- c(
-  "U2006_CHA0006_00_V2020_20u1.tif",
-  "U2006_CHA0006_06_V2020_20u1.tif",
-  "U2012_CHA0612_06_V2020_20u1.tif",
-  "U2012_CHA0612_12_V2020_20u1.tif",
-  "U2018_CHA1218_12_V2020_20u1.tif",
-  "U2018_CHA1218_18_V2020_20u1.tif")
+change_filenames <- c("U2006_CHA0006_00_V2020_20u1.tif",
+                      "U2006_CHA0006_06_V2020_20u1.tif",
+                      "U2012_CHA0612_06_V2020_20u1.tif",
+                      "U2012_CHA0612_12_V2020_20u1.tif",
+                      "U2018_CHA1218_12_V2020_20u1.tif",
+                      "U2018_CHA1218_18_V2020_20u1.tif")
 
 # URLs and Filenames for the CORINE Status Layers
-status_urls <- c(
-  "https://ntnu.box.com/shared/static/ffmbbb89aikwg64tg9ei30c8fnf7chl2.tif",
-  "https://ntnu.box.com/shared/static/2x6g9jaov5rex3u0xt3hq9mmy91d63ew.tif",
-  "https://ntnu.box.com/shared/static/ut1pcbnj7xgfwv3ptahu5c3krdy24l7d.tif",
-  "https://ntnu.box.com/shared/static/iub514rfjnkopg3nu4nc18j4axq5jfon.tif")
+status_urls <- c("https://ntnu.box.com/shared/static/ffmbbb89aikwg64tg9ei30c8fnf7chl2.tif",
+                 "https://ntnu.box.com/shared/static/2x6g9jaov5rex3u0xt3hq9mmy91d63ew.tif",
+                 "https://ntnu.box.com/shared/static/ut1pcbnj7xgfwv3ptahu5c3krdy24l7d.tif",
+                 "https://ntnu.box.com/shared/static/iub514rfjnkopg3nu4nc18j4axq5jfon.tif")
 
-status_filenames <- c(
-  "U2006_CLC2000_V2020_20u1.tif",
-  "U2012_CLC2006_V2020_20u1.tif",
-  "U2018_CLC2012_V2020_20u1.tif",
-  "U2018_CLC2018_V2020_20u1.tif")
+status_filenames <- c("U2006_CLC2000_V2020_20u1.tif",
+                      "U2012_CLC2006_V2020_20u1.tif",
+                      "U2018_CLC2012_V2020_20u1.tif",
+                      "U2018_CLC2018_V2020_20u1.tif")
 
 # Changes for classes in the rasters
-class_modifications <- list(
-  list(from = 1:11, to = 1),
-  list(from = c(12, 18, 20), to = 80),
-  list(from = 21, to = 103),
-  list(from = c(23, 24, 25), to = 250),
-  list(from = c(26, 27), to = 380),
-  list(from = 29, to = 590),
-  list(from = 32, to = 711),
-  list(from = c(30, 31, 33, 34, 35, 36, 39, 40, 41, 43, 44, 127, 128), to = NA))
+class_modifications <- list(list(from = 1:11, to = 1),
+                            list(from = c(12, 18, 20), to = 80),
+                             list(from = 21, to = 103),
+                            list(from = c(23, 24, 25), to = 250),
+                            list(from = c(26, 27), to = 380),
+                            list(from = 29, to = 590),
+                            list(from = 32, to = 711),
+                            list(from = c(30, 31, 33, 34, 35, 36, 39, 40, 41, 43, 44, 127, 128), to = NA))
 
 # 2. READ IN CORINE LAYERS -----------------------------------------------------
 
