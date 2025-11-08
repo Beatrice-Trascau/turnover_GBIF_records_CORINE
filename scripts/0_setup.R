@@ -27,7 +27,7 @@ package_vec <- c("here", "terra", "sf", "geodata", "mapview",
                  "gratia", "lattice", "car", "kableExtra",
                  "betareg", "spdep", "corrplot", "leaflet",
                  "viridis", "DT", "broom", "nlme", "ordbetareg",
-                 "climenv")
+                 "climenv", "googledrive")
 
 # Execute the function
 sapply(package_vec, install_load_package)
@@ -35,23 +35,22 @@ sapply(package_vec, install_load_package)
 # 2. CREATE NECESSARY FILE STRUCTURE -------------------------------------------
 
 # Function to create the file structure needed to run the analysis smoothly
-create_project_structure <- function(base_path = "CORINE_Change_GBIF_Records") {
+create_project_structure <- function(base_path = "turnover_GBIF_records_CORINE") {
   # define the directory structure
   dirs <- c(
     file.path(base_path),
     file.path(base_path, "data"),
     file.path(base_path, "data", "raw_data"),
     file.path(base_path, "data", "raw_data", "raw_norway_shapefile"),
-    file.path(base_path, "data", "raw_data", "chelsa"),
+    file.path(base_path, "data", "raw_data", "worldclim"),
     file.path(base_path, "data", "derived_data"),
     file.path(base_path, "data", "derived_data", "reprojected_norway_shapefile"),
-    file.path(base_path, "data", "derived_data", "chelsa"),
+    file.path(base_path, "data", "derived_data", "worldclim"),
     file.path(base_path, "data", "models"),
     file.path(base_path, "data", "models", "exploratory"),
     file.path(base_path, "data", "models", "final"),
     file.path(base_path, "scripts"),
-    file.path(base_path, "figures"),
-    
+    file.path(base_path, "figures")
   )
   
   # create directories if they don't exist
