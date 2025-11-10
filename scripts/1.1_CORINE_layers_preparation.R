@@ -56,7 +56,7 @@ corine_status_stack <- read_rasters(status_filenames)
 
 # 3. CUT AND MASK CHANGE LAYERS TO NORWAY --------------------------------------
 
-## 3.1. Download country shapefile ----
+## 3.1. Download country shapefile ---------------------------------------------
 norway <- geodata::gadm(country = "NOR", level = 0, 
                         path = tempdir(),
                         version = "latest")
