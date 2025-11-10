@@ -42,19 +42,4 @@ for(i in seq_len(nrow(worldclim_folders))){
                         worldclim_dir)
 }
 
-# 2. CROP AND MASK CLIMATIC VARIABLES TO NORWAY --------------------------------
-
-# Load Norway shapefile
-norway_corine_projection <- vect(here("data", "derived_data", 
-                                      "reprojected_norway_shapefile", 
-                                      "norway_corine_projection.shp"))
-
-# Check CRS
-st_crs(norway_corine_projection)$input
-
-
-
-
-
-
-
+# END OF SCRIPT ----------------------------------------------------------------
