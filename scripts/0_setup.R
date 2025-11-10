@@ -344,5 +344,37 @@ calculate_jaccard_for_periods <- function(df, before_period, after_period, chang
   return(jaccard_results)
 }
 
+# 13. DOWNLOAD FOLDERS FROM GOOGLE DRIVE ---------------------------------------
+
+# Function to download a folder and its contents from Google Drive
+download_drive_folder <- function(folder_id, folder_name, local_path) {
+  
+  # Create local folder
+  folder_path <- file.path(local_path, folder_name)
+  if (!dir.exists(folder_path)) {
+    dir.create(folder_path, recursive = TRUE)
+  }
+  
+  # List all files in the Google Drive folder
+  files_in_folder <- drive_ls(as_id(folder_id))
+  
+  cat("  Found", nrow(files_in_folder), "files in", folder_name, "\n")
+  
+  # Download each file
+  for (i in seq_len(nrow(files_in_folder))) {
+    file_info <- files_in_folder[i, ]
+    local_file_path <- file.path(folder_path, file_info$name)
+    
+    # Skip if file already exists locally
+    if (!file.exists(local_file_path)) {
+      cat("    Downloading:", file_info$name, "\n")
+      drive_download(as_id(file_info$id), 
+                     path = local_file_path,
+                     overwrite = FALSE)
+    } else {
+      cat("    Skipping (already exists):", file_info$name, "\n")
+    }
+  }
+}
 
 # END OF SCRIPT ----------------------------------------------------------------
