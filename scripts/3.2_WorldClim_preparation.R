@@ -22,9 +22,9 @@ worldclim_folders <- list.dirs(worldclim_dir, full.names = FALSE,
                                recursive = FALSE)
 
 # Create lists to store the rasters for each variable
-tmin_rasters <- list()
-tmax_rasters <- list()
-precip_rasters <- list()
+tmin_annual_rasters <- list()
+tmax_annual_rasters <- list()
+prec_annual_rasters <- list()
 
 # Process each worldclim folder
 for (i in seq_along(worldclim_folders)) {
@@ -91,11 +91,20 @@ for (i in seq_along(worldclim_folders)) {
     if(variable_type == "prec"){
       # sum across all months to get annual precipitation
       annual_value <- sum(monthly_stack_norway)
-      names(annual_value) <- paste0(variable_type, "_", year, "annual_total")
+      names(annual_value) <- paste0(variable_type, "_", year, "_annual_total")
     } else {
       # calculate mean minimum and maximum temperature
       annual_value <- mean(monthly_stack_norway)
-      names(annual_value) <- paste0(variable_type, "_", year, "annual_mean")
+      names(annual_value) <- paste0(variable_type, "_", year, "_annual_mean")
+    }
+    
+    # store in the lists
+    if(variable_type == "tmin"){
+      tmin_annual_rasters[[as.character(year)]] <- annual_value
+    } else if(variable_type == "tmax"){
+      tmax_annual_rasters[[as.character(year)]] <- annual_value
+    } else if(variable_type == "prec"){
+      prec_annual_rasters[[as.character(year)]] <- annual_value
     }
     
   }
@@ -105,17 +114,44 @@ for (i in seq_along(worldclim_folders)) {
   
 }
 
+# 3. CREATE ONE RASTER STACK FOR EACH VARIABLE ---------------------------------
 
+# Stack all tmin years (make sure that you have more than 0 years processed)
+if(length(tmin_annual_rasters) > 0){
+  tmin_stack <- rast(tmin_annual_rasters)
+  # order layers by years
+  tmin_stack <- tmin_stack[[order(names(tmin_stack))]]
+}
 
+# Stack all tmax years
+if(length(tmax_annual_rasters) > 0){
+  tmax_stack <- rast(tmax_annual_rasters)
+  # order layers by years
+  tmax_stack <- tmax_stack[[order(names(tmax_stack))]]
+}
 
+# Stack all prec years
+if(length(prec_annual_rasters) > 0){
+  prec_stack <- rast(prec_annual_rasters)
+  # order layers by years
+  prec_stack <- prec_stack[[order(names(prec_stack))]]
+}
 
+# 4. SAVE PROCESSED WORLDCLIM VARIABLES ----------------------------------------
 
+# Save minimum teperature stack
+writeRaster(tmin_stack, 
+            here("data", "derived_data", "worldclim_tmin_annual_norway.tif"),
+            overwrite = TRUE)
 
+# Save maximum temperature stack
+writeRaster(tmax_stack, 
+            here("data", "derived_data", "worldclim_tmax_annual_norway.tif"),
+            overwrite = TRUE)
 
+# Save annual precipitation stack
+writeRaster(prec_stack, 
+            here("data", "derived_data", "worldclim_prec_annual_norway.tif"),
+            overwrite = TRUE)
 
-
-
-
-
-
-
+# END OF SCRIPT ----------------------------------------------------------------
