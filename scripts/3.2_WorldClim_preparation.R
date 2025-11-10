@@ -141,17 +141,20 @@ if(length(prec_annual_rasters) > 0){
 
 # Save minimum teperature stack
 writeRaster(tmin_stack, 
-            here("data", "derived_data", "worldclim_tmin_annual_norway.tif"),
+            here("data", "derived_data", "worldclim",
+                 "worldclim_tmin_annual_norway.tif"),
             overwrite = TRUE)
 
 # Save maximum temperature stack
 writeRaster(tmax_stack, 
-            here("data", "derived_data", "worldclim_tmax_annual_norway.tif"),
+            here("data", "derived_data", "worldclim",
+                 "worldclim_tmax_annual_norway.tif"),
             overwrite = TRUE)
 
 # Save annual precipitation stack
 writeRaster(prec_stack, 
-            here("data", "derived_data", "worldclim_prec_annual_norway.tif"),
+            here("data", "derived_data", "worldclim",
+                 "worldclim_prec_annual_norway.tif"),
             overwrite = TRUE)
 
 # END OF SCRIPT ----------------------------------------------------------------
