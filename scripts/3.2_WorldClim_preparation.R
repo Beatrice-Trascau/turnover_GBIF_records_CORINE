@@ -157,4 +157,127 @@ writeRaster(prec_stack,
                  "worldclim_prec_annual_norway.tif"),
             overwrite = TRUE)
 
+# 5. VALIDATE CREATED RASTERS --------------------------------------------------
+
+## 5.1. Check basic raster properties are correct ------------------------------
+
+# Check the number of layers in each stack
+nlyr(tmin_stack) #35
+nlyr(tmax_stack) #35
+nlyr(prec_stack) #35 - All 3 are as expected!
+
+## 5.2. Check layer names and years --------------------------------------------
+
+# Extract years from layer names - with function
+extract_years <- function(stack_names) {
+  str_extract(stack_names, "\\d{4}") |> as.numeric()
+}
+
+tmin_years <- extract_years(names(tmin_stack))
+tmax_years <- extract_years(names(tmax_stack))
+prec_years <- extract_years(names(prec_stack))
+
+# Check which years there are in the layers
+paste(sort(tmin_years), collapse = ", ") 
+paste(sort(tmax_years), collapse = ", ") # 1990-2024 for all 3 stacks - correct!
+paste(sort(prec_years), collapse = ", ") # For further analyis: need to remove <1997 & >2021
+
+## 5.3. Check spatial properties -----------------------------------------------
+
+# Load CORINE to use as example
+corine <- rast(here("data", "derived_data", "clc_status_15km_forest_tws_masked.tif"))
+
+# Check extents
+as.vector(ext(tmin_stack))
+as.vector(ext(tmax_stack))
+as.vector(ext(prec_stack)) # All stacks have the same extent
+as.vector(ext(corine[[1]])) # CLC has slightly different values but nothing drastic
+
+# Check resolutions
+res(tmin_stack)
+res(tmax_stack)
+res(prec_stack) # All have the same values (3711.318, 3711.318)
+res(corine[[1]]) # 15000, 15000
+
+# Check CRS - all looks well!
+cat("  tmin matches CORINE:", compareGeom(tmin_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
+cat("  tmax matches CORINE:", compareGeom(tmax_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
+cat("  prec matches CORINE:", compareGeom(prec_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
+
+## 5.4. Check if values are logical --------------------------------------------
+
+# Check range for tmin values
+tmin_range <- minmax(tmin_stack)
+
+# Check range for tmin values
+tmax_range <- minmax(tmax_stack)
+
+# Check range for prec values
+prec_range <- minmax(prec_stack)
+
+# Check for NA values
+for (i in 1:nlyr(tmin_stack)) {
+  na_count <- global(is.na(tmin_stack[[i]]), sum)
+  if (na_count[1,1] > 0) {
+    cat("  tmin layer", i, "(", names(tmin_stack)[i], "):", na_count[1,1], "NA cells\n")
+  }
+}
+cat("  Total NA cells in tmin:", sum(global(is.na(tmin_stack), sum)[,1]), "\n")
+cat("  Total NA cells in tmax:", sum(global(is.na(tmax_stack), sum)[,1]), "\n")
+cat("  Total NA cells in prec:", sum(global(is.na(prec_stack), sum)[,1]), "\n")
+# there seem to be a lot of NAs
+
+## 5.5. Logical checks ---------------------------------------------------------
+
+# Check if tmin < tmax for all years
+issues_found <- FALSE
+for (year in tmin_years) {
+  # Find layers for this year
+  tmin_layer <- grep(as.character(year), names(tmin_stack), value = FALSE)[1]
+  tmax_layer <- grep(as.character(year), names(tmax_stack), value = FALSE)[1]
+  
+  if (!is.na(tmin_layer) & !is.na(tmax_layer)) {
+    # Check if any cell has tmin >= tmax
+    diff_raster <- tmax_stack[[tmax_layer]] - tmin_stack[[tmin_layer]]
+    problem_cells <- global(diff_raster <= 0, sum, na.rm = TRUE)[1,1]
+    
+    if (problem_cells > 0) {
+      cat(" Year", year, ":", problem_cells, "cells where tmin >= tmax\n")
+      issues_found <- TRUE
+    }
+  }
+} # Year 2004 : 3 cells where tmin >= tmax ???
+if (!issues_found) {
+  cat("  ✓ All cells have tmax > tmin for all years\n")
+}
+
+# Check for unreasonable values
+unrealistic_tmin <- global(tmin_stack < -50 | tmin_stack > 40, sum, na.rm = TRUE)
+unrealistic_tmax <- global(tmax_stack < -50 | tmax_stack > 40, sum, na.rm = TRUE) # both look ok
+
+# Check that precipitation is above 0 and lower than 10 000 mm
+unrealistic_prec <- global(prec_stack < 0 | prec_stack > 10000, sum, na.rm = TRUE) # 0
+
+## 5.6. Visual check -----------------------------------------------------------
+
+# Plot first year of each variable for visual inspection
+par(mfrow = c(2, 2))
+
+# Plot tmin
+plot(tmin_stack[[1]], main = paste("Min Temp", names(tmin_stack)[1]))
+plot(norway_corine_projection, add = TRUE)
+
+# Plot tmax
+plot(tmax_stack[[1]], main = paste("Max Temp", names(tmax_stack)[1]))
+plot(norway_corine_projection, add = TRUE)
+
+# Plot prec
+plot(prec_stack[[1]], main = paste("Precipitation", names(prec_stack)[1]))
+plot(norway_corine_projection, add = TRUE)
+
+# Plot difference (tmax - tmin) for first year
+temp_diff <- tmax_stack[[1]] - tmin_stack[[1]]
+plot(temp_diff, main = "Temperature Range (tmax - tmin)")
+plot(norway_corine_projection, add = TRUE)
+
 # END OF SCRIPT ----------------------------------------------------------------
