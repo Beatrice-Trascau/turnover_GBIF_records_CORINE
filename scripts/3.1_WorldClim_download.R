@@ -8,7 +8,7 @@
 # 1. DOWNLOAD WORLDCLIM DATA ---------------------------------------------------
 
 # Define directory for the data
-worldclim_directory <- here("data", "raw_data", "worldclim")
+worldclim_dir <- here("data", "raw_data", "worldclim")
 
 # Historical WorldClim maximum temperature, minimum temperaute and precipitation were downloaded from https://worldclim.org/data/monthlywth.html on 08.11.2025 and uploaded to GoogleDrive
 # Download folders for each period and variable
