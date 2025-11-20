@@ -5,279 +5,234 @@
 # layers to Norway
 ##----------------------------------------------------------------------------##
 
-# 1. LOAD NORWAY SHAPEFILE -----------------------------------------------------
+# 1. LOAD DATA AND DIRECTORIES -------------------------------------------------
 
 # Read in Norway shapefile thatmatches CORINE projection
 norway_corine_projection <- vect(here("data", "derived_data",
                                       "reprojected_norway_shapefile",
                                       "norway_corine_projection.shp"))
 
-# 2. PROCESS EACH WORLDCLIM FOLDER ---------------------------------------------
+# Define paths
+chelsa_dir <- here("data", "raw_data", "chelsa")
+chelsa_processed_dir <- here("data", "derived_data", "chelsa")
 
-# Define path to WorldClim folder
-worldclim_dir <- here("data", "raw_data", "worldclim")
+# Load CLC for later resampling of CHELSA
+corine_reference <- rast(here("data", "derived_data", "clc_status_15km_forest_tws_masked.tif"))[[1]]
 
-# Get all WorldClim folders
-worldclim_folders <- list.dirs(worldclim_dir, full.names = FALSE, 
-                               recursive = FALSE)
+# Define months for processing
+months <- sprintf("%02d", 1:12)  # 01-12 with leading zeros
 
-# Create lists to store the rasters for each variable
-tmin_annual_rasters <- list()
-tmax_annual_rasters <- list()
-prec_annual_rasters <- list()
+# 2. PROCESS CHELSA VARIABLES --------------------------------------------------
 
-# Process each worldclim folder
-for (i in seq_along(worldclim_folders)) {
+# Define time peirods for analysis
+time_periods <- list("1997-2000" = 1997:2000,
+                     "2003-2006" = 2003:2006,
+                     "2006-2009" = 2006:2009,
+                     "2009-2012" = 2009:2012,
+                     "2012-2015" = 2012:2015,
+                     "2018-2021" = 2018:2021)
+
+## 2.1. Process temperature data -----------------------------------------------
+
+# Get tracking of processing progress
+cat("\n", paste(rep("=", 70), collapse = ""), "\n")
+cat("PROCESSING TEMPERATURE DATA\n")
+cat(paste(rep("=", 70), collapse = ""), "\n")
+
+# Create list to store period means
+tas_period_means <- list()
+
+# Process each time period
+for(period_name in names(time_periods)){
   
-  # get the folder
-  folder <- worldclim_folders[i]
-  # get the path to the folder
-  folder_path <- file.path(worldclim_dir, folder)
+  # tracking
+  cat("\nProcessing temperature for period:", period_name, "\n")
   
-  # add progress bar
-  cat("\nProcessing folder", i, "of", length(worldclim_folders), ":", folder, "\n")
+  # create variables needed
+  period_years <- time_periods[[period_name]]
+  monthly_rasters <- list()
   
-  # extract variable type from folder name
-  variable_type <- case_when(str_detect(folder, "tmin") ~ "tmin",
-                             str_detect(folder, "tmax") ~ "tmax",
-                             str_detect(folder, "prec") ~ "prec",
-                             TRUE ~ "unknown")
-  
-  # extract period from folder name
-  period <- str_extract(folder, "\\d{4}-\\d{4}")
-  
-  # get all TIFF files in the folder
-  tif_files <- list.files(folder_path, pattern = "\\.tif$", full.names = TRUE)
-  
-  # extract years from the file names
-  file_info <- tibble(filepath = tif_files,
-                      filename = basename(tif_files)) |>
-    mutate(year_month = str_extract(filename, "\\d{4}-\\d{2}(?=\\.tif$)"),
-           year = as.numeric(str_sub(year_month, 1, 4)),
-           month = as.numeric(str_sub(year_month, 6, 7))) |>
-    arrange(year, month)
-  
-  # get the unique years in the folder
-  unique_years <- unique(file_info$year)
-  
-  # Process each year within the folder
-  for (year in unique_years) {
+  # load all monthly rasters for this periods (all months from all years)
+  for(year in period_years){
+    # track which year is being processed
+    cat("  Processing year", year, "...")
+    months_found <- 0
     
-    # add a progress tracker
-    cat("    Processing year", year, "...\n")
-    
-    # get the 12 monthly files for the specific year
-    year_files <- file_info |>
-      filter(year == !!year) |>
-      pull(filepath)
-    
-    # add a warning if it doesn't find 12 files per year
-    if (length(year_files) != 12) {
-      cat("      Warning: Found", length(year_files), "months for year", year, 
-          "(expected 12)\n")
+    # process each month
+    for(month in months){
+      # give filename and path
+      filename <- paste0("CHELSA_tas_", month, "_", year, "_V.2.1.tif")
+      filepath <- file.path(chelsa_dir, "tas", as.character(year), filename)
+      
+      # read raster if file exists
+      if(file.exists(filepath)){
+        #read raster
+        r <- rast(filepath)
+        
+        # reproject to CORINE CRS
+        r_proj <- project(r, crs(norway_corine_projection), method = "bilinear")
+        
+        # crop and mask to Norway
+        r_norway <- crop(r_proj, norway_corine_projection, mask = TRUE)
+        
+        # convert from Kelvin to Celsius
+        r_celsius <- (r_norway / 10) - 273.15
+        
+        # add to all monthly raster list
+        monthly_rasters[[length(monthly_rasters) + 1]] <- r_celsius
+        months_found <- months_found + 1
+      } else {
+        # get warning message
+        cat("\n    Warning: Missing file", filename)
+      }
     }
     
-    # read monthly rasters for the specific year
-    monthly_stack <- rast(year_files)
+    # get progress update
+    cat(" ✓ (", months_found, "months)\n")
+  }
+  
+  # calculate mean across all months in the period (without averaging per year first)
+  if(length(monthly_rasters) > 0){
+    # create a stack
+    period_stack <- rast(monthly_rasters)
     
-    # reproject to CORINE CRS
-    monthly_stack_reprojected <- project(monthly_stack, crs(norway_corine_projection))
+    # calculate the mean
+    period_mean <- mean(period_stack, na.rm = TRUE)
     
-    # crop and mask to Norway
-    monthly_stack_norway <- crop(monthly_stack_reprojected, norway_corine_projection,
-                                 mask = TRUE)
+    # change the name of the period mean
+    names(period_mean) <- paste0("tas_mean_", gsub("-", "_", period_name))
     
-    # calculate annual summary for the year
-    if(variable_type == "prec"){
-      # sum across all months to get annual precipitation
-      annual_value <- sum(monthly_stack_norway)
-      names(annual_value) <- paste0(variable_type, "_", year, "_annual_total")
+    # resample to match CORINE resolution and extent
+    period_mean_resampled <- resample(period_mean, corine_reference, method = "average")
+    
+    # add to the one raster stack that will be saved
+    tas_period_means[[period_name]] <- period_mean_resampled
+    
+    # get a progress update
+    cat("  Completed period", period_name, "- processed", length(monthly_rasters), "months across", length(period_years), "years\n")
+  } else {
+    cat("  No data found for period", period_name, "\n")
+  }
+}
+
+# Stack all temperature period means
+if(length(tas_period_means) > 0) {
+  tas_stack <- rast(tas_period_means)
+  cat("\n Temperature stack created with", nlyr(tas_stack), "layers\n")
+} else {
+  stop("No temperature data processed successfully!")
+}
+
+## 2.2. Process precipitaion data ----------------------------------------------
+
+# Start a tracker
+cat("\n", paste(rep("=", 70), collapse = ""), "\n")
+cat("PROCESSING PRECIPITATION DATA\n")
+cat(paste(rep("=", 70), collapse = ""), "\n")
+
+# Create list to store period means
+pr_period_means <- list()
+
+# Process each time period
+for(period_name in names(time_periods)){
+  
+  # tracking
+  cat("\nProcessing precipitation for period:", period_name, "\n")
+  
+  # create variables needed
+  period_years <- time_periods[[period_name]]
+  annual_totals <- list()
+  
+  # calculate total annual precipiation, then mean across years in the time period
+  for(year in period_years){
+    
+    # tracking
+    cat("  Processing year", year, "...")
+    monthly_rasters <- list()
+    
+    # process each month in the specific year
+    for(month in months){
+      
+      # give filename and path
+      filename <- paste0("CHELSA_pr_", month, "_", year, "_V.2.1.tif")
+      filepath <- file.path(chelsa_dir, "pr", as.character(year), filename)
+      
+      # read raster
+      if(file.exists(filepath)){
+        # read raster
+        r <- rast(filepath)
+        
+        # reproject to CORINE CRS
+        r_proj <- project(r, crs(norway_corine_projection), method = "bilinear")
+        
+        # crop and mask to Norway
+        r_norway <- crop(r_proj, norway_corine_projection, mask = TRUE)
+        
+        # convert from kg/m²/month to mm/month
+        monthly_rasters[[length(monthly_rasters) + 1]] <- r_norway
+      } else {
+        # get a warning
+        cat("\n    Warning: Missing file", filename)
+      }
+    }
+    
+    # calculate annual total precipitation
+    if(length(monthly_rasters) == 12) {
+      annual_total <- sum(rast(monthly_rasters), na.rm = TRUE)
+      annual_totals[[length(annual_totals) + 1]] <- annual_total
+      cat(" (", length(monthly_rasters), "months)\n")
     } else {
-      # calculate mean minimum and maximum temperature
-      annual_value <- mean(monthly_stack_norway)
-      names(annual_value) <- paste0(variable_type, "_", year, "_annual_mean")
-    }
-    
-    # store in the lists
-    if(variable_type == "tmin"){
-      tmin_annual_rasters[[as.character(year)]] <- annual_value
-    } else if(variable_type == "tmax"){
-      tmax_annual_rasters[[as.character(year)]] <- annual_value
-    } else if(variable_type == "prec"){
-      prec_annual_rasters[[as.character(year)]] <- annual_value
-    }
-    
-  }
-  
-  # progress tracker
-  cat("  Completed processing for", folder, "\n")
-  
-}
-
-# 3. CREATE ONE RASTER STACK FOR EACH VARIABLE ---------------------------------
-
-# Stack all tmin years (make sure that you have more than 0 years processed)
-if(length(tmin_annual_rasters) > 0){
-  tmin_stack <- rast(tmin_annual_rasters)
-  # order layers by years
-  tmin_stack <- tmin_stack[[order(names(tmin_stack))]]
-}
-
-# Stack all tmax years
-if(length(tmax_annual_rasters) > 0){
-  tmax_stack <- rast(tmax_annual_rasters)
-  # order layers by years
-  tmax_stack <- tmax_stack[[order(names(tmax_stack))]]
-}
-
-# Stack all prec years
-if(length(prec_annual_rasters) > 0){
-  prec_stack <- rast(prec_annual_rasters)
-  # order layers by years
-  prec_stack <- prec_stack[[order(names(prec_stack))]]
-}
-
-# 4. SAVE PROCESSED WORLDCLIM VARIABLES ----------------------------------------
-
-# Save minimum teperature stack
-writeRaster(tmin_stack, 
-            here("data", "derived_data", "worldclim",
-                 "worldclim_tmin_annual_norway.tif"),
-            overwrite = TRUE)
-
-# Save maximum temperature stack
-writeRaster(tmax_stack, 
-            here("data", "derived_data", "worldclim",
-                 "worldclim_tmax_annual_norway.tif"),
-            overwrite = TRUE)
-
-# Save annual precipitation stack
-writeRaster(prec_stack, 
-            here("data", "derived_data", "worldclim",
-                 "worldclim_prec_annual_norway.tif"),
-            overwrite = TRUE)
-
-# 5. VALIDATE CREATED RASTERS --------------------------------------------------
-
-## 5.1. Check basic raster properties are correct ------------------------------
-
-# Check the number of layers in each stack
-nlyr(tmin_stack) #35
-nlyr(tmax_stack) #35
-nlyr(prec_stack) #35 - All 3 are as expected!
-
-## 5.2. Check layer names and years --------------------------------------------
-
-# Extract years from layer names - with function
-extract_years <- function(stack_names) {
-  str_extract(stack_names, "\\d{4}") |> as.numeric()
-}
-
-tmin_years <- extract_years(names(tmin_stack))
-tmax_years <- extract_years(names(tmax_stack))
-prec_years <- extract_years(names(prec_stack))
-
-# Check which years there are in the layers
-paste(sort(tmin_years), collapse = ", ") 
-paste(sort(tmax_years), collapse = ", ") # 1990-2024 for all 3 stacks - correct!
-paste(sort(prec_years), collapse = ", ") # For further analyis: need to remove <1997 & >2021
-
-## 5.3. Check spatial properties -----------------------------------------------
-
-# Load CORINE to use as example
-corine <- rast(here("data", "derived_data", "clc_status_15km_forest_tws_masked.tif"))
-
-# Check extents
-as.vector(ext(tmin_stack))
-as.vector(ext(tmax_stack))
-as.vector(ext(prec_stack)) # All stacks have the same extent
-as.vector(ext(corine[[1]])) # CLC has slightly different values but nothing drastic
-
-# Check resolutions
-res(tmin_stack)
-res(tmax_stack)
-res(prec_stack) # All have the same values (3711.318, 3711.318)
-res(corine[[1]]) # 15000, 15000
-
-# Check CRS - all looks well!
-cat("  tmin matches CORINE:", compareGeom(tmin_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
-cat("  tmax matches CORINE:", compareGeom(tmax_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
-cat("  prec matches CORINE:", compareGeom(prec_stack, corine[[1]], crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
-
-## 5.4. Check if values are logical --------------------------------------------
-
-# Check range for tmin values
-tmin_range <- minmax(tmin_stack)
-
-# Check range for tmin values
-tmax_range <- minmax(tmax_stack)
-
-# Check range for prec values
-prec_range <- minmax(prec_stack)
-
-# Check for NA values
-for (i in 1:nlyr(tmin_stack)) {
-  na_count <- global(is.na(tmin_stack[[i]]), sum)
-  if (na_count[1,1] > 0) {
-    cat("  tmin layer", i, "(", names(tmin_stack)[i], "):", na_count[1,1], "NA cells\n")
-  }
-}
-cat("  Total NA cells in tmin:", sum(global(is.na(tmin_stack), sum)[,1]), "\n")
-cat("  Total NA cells in tmax:", sum(global(is.na(tmax_stack), sum)[,1]), "\n")
-cat("  Total NA cells in prec:", sum(global(is.na(prec_stack), sum)[,1]), "\n")
-# there seem to be a lot of NAs
-
-## 5.5. Logical checks ---------------------------------------------------------
-
-# Check if tmin < tmax for all years
-issues_found <- FALSE
-for (year in tmin_years) {
-  # Find layers for this year
-  tmin_layer <- grep(as.character(year), names(tmin_stack), value = FALSE)[1]
-  tmax_layer <- grep(as.character(year), names(tmax_stack), value = FALSE)[1]
-  
-  if (!is.na(tmin_layer) & !is.na(tmax_layer)) {
-    # Check if any cell has tmin >= tmax
-    diff_raster <- tmax_stack[[tmax_layer]] - tmin_stack[[tmin_layer]]
-    problem_cells <- global(diff_raster <= 0, sum, na.rm = TRUE)[1,1]
-    
-    if (problem_cells > 0) {
-      cat(" Year", year, ":", problem_cells, "cells where tmin >= tmax\n")
-      issues_found <- TRUE
+      cat(" (only", length(monthly_rasters), "months found)\n")
     }
   }
-} # Year 2004 : 3 cells where tmin >= tmax ???
-if (!issues_found) {
-  cat("  ✓ All cells have tmax > tmin for all years\n")
+  
+  # calculate mean annual precipitaiton for the period
+  if(length(annual_totals) > 0) {
+    # calculate period mean
+    period_mean_annual <- mean(rast(annual_totals), na.rm = TRUE)
+    names(period_mean_annual) <- paste0("pr_mean_annual_", gsub("-", "_", period_name))
+    
+    # resample to match CORINE resolution and extent
+    period_mean_resampled <- resample(period_mean_annual, corine_reference, method = "average")
+    
+    # add to the one raster stack that will be saved
+    pr_period_means[[period_name]] <- period_mean_resampled
+    
+    # get a progress update
+    cat("  Completed period", period_name, "- processed", length(annual_totals), "years\n")
+  } else {
+    cat("  No complete years found for period", period_name, "\n")
+  }
 }
 
-# Check for unreasonable values
-unrealistic_tmin <- global(tmin_stack < -50 | tmin_stack > 40, sum, na.rm = TRUE)
-unrealistic_tmax <- global(tmax_stack < -50 | tmax_stack > 40, sum, na.rm = TRUE) # both look ok
+# Stack all precipitation period means
+if(length(pr_period_means) > 0) {
+  pr_stack <- rast(pr_period_means)
+  cat("\nPrecipitation stack created with", nlyr(pr_stack), "layers\n")
+} else {
+  stop("No precipitation data processed successfully!")
+}
 
-# Check that precipitation is above 0 and lower than 10 000 mm
-unrealistic_prec <- global(prec_stack < 0 | prec_stack > 10000, sum, na.rm = TRUE) # 0
+## 2.3. Save processed rasters -------------------------------------------------
 
-## 5.6. Visual check -----------------------------------------------------------
+# Save temperature stack
+tas_output <- file.path(chelsa_processed_dir, "chelsa_tas_period_means_norway.tif")
+writeRaster(tas_stack, tas_output, overwrite = TRUE)
 
-# Plot first year of each variable for visual inspection
-par(mfrow = c(2, 2))
+# Save precipitation stack
+pr_output <- file.path(chelsa_processed_dir, "chelsa_pr_period_means_norway.tif")
+writeRaster(pr_stack, pr_output, overwrite = TRUE)
 
-# Plot tmin
-plot(tmin_stack[[1]], main = paste("Min Temp", names(tmin_stack)[1]))
-plot(norway_corine_projection, add = TRUE)
+# 3. VALIDATION ----------------------------------------------------------------
 
-# Plot tmax
-plot(tmax_stack[[1]], main = paste("Max Temp", names(tmax_stack)[1]))
-plot(norway_corine_projection, add = TRUE)
 
-# Plot prec
-plot(prec_stack[[1]], main = paste("Precipitation", names(prec_stack)[1]))
-plot(norway_corine_projection, add = TRUE)
 
-# Plot difference (tmax - tmin) for first year
-temp_diff <- tmax_stack[[1]] - tmin_stack[[1]]
-plot(temp_diff, main = "Temperature Range (tmax - tmin)")
-plot(norway_corine_projection, add = TRUE)
 
-# END OF SCRIPT ----------------------------------------------------------------
+
+
+
+
+
+
+
+
