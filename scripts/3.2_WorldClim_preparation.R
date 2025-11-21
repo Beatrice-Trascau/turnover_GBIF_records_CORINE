@@ -225,14 +225,59 @@ writeRaster(pr_stack, pr_output, overwrite = TRUE)
 
 # 3. VALIDATION ----------------------------------------------------------------
 
+## 3.1. Summary validation -----------------------------------------------------
 
+# Check that all layers are present
+cat("Temperature layers:", nlyr(tas_stack), "/ Expected:", length(time_periods), "\n")
+cat("Precipitation layers:", nlyr(pr_stack), "/ Expected:", length(time_periods), "\n")
 
+# Check spatial alignment with CORINE
+cat("CRS match (temperature):", compareGeom(tas_stack, corine_reference, crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
+cat("CRS match (precipitation):", compareGeom(pr_stack, corine_reference, crs = TRUE, ext = FALSE, rowcol = FALSE, res = FALSE), "\n")
+cat("Resolution match (temperature):", all(abs(res(tas_stack) - res(corine_reference)) < 0.1), "\n")
+cat("Resolution match (precipitation):", all(abs(res(pr_stack) - res(corine_reference)) < 0.1), "\n")
+cat("Extent match (temperature):", compareGeom(tas_stack, corine_reference, crs = FALSE, ext = TRUE, rowcol = FALSE, res = FALSE), "\n")
+cat("Extent match (precipitation):", compareGeom(pr_stack, corine_reference, crs = FALSE, ext = TRUE, rowcol = FALSE, res = FALSE), "\n")
 
+# Check temperature value ranges
+temp_ranges <- minmax(tas_stack)
+for(i in 1:ncol(temp_ranges)) {
+  cat(" ", names(tas_stack)[i], ":", round(temp_ranges[1,i], 2), "to", round(temp_ranges[2,i], 2), "°C\n")
+}
 
+# Check precipitation ranges
+prec_ranges <- minmax(pr_stack)
+for(i in 1:ncol(prec_ranges)) {
+  cat(" ", names(pr_stack)[i], ":", round(prec_ranges[1,i], 0), "to", round(prec_ranges[2,i], 0), "mm/year\n")
+}
 
+# Check that the values make sense/ are reasonable
+temp_issues <- global(tas_stack < -50 | tas_stack > 40, sum, na.rm = TRUE)
+prec_issues <- global(pr_stack < 0 | pr_stack > 10000, sum, na.rm = TRUE)
+cat("Temperature values outside -50°C to 40°C:", sum(temp_issues[,1]), "cells\n")
+cat("Precipitation values outside 0 to 10000 mm/year:", sum(prec_issues[,1]), "cells\n")
 
+# Check for NA values
+temp_nas <- global(is.na(tas_stack), sum, na.rm = TRUE)
+prec_nas <- global(is.na(pr_stack), sum, na.rm = TRUE)
+cat("NA cells in temperature data:", sum(temp_nas[,1]), "\n")
+cat("NA cells in precipitation data:", sum(prec_nas[,1]), "\n")
 
+## 3.2. Visualisation ----------------------------------------------------------
 
+# Plot temperature across time periods
+par(mfrow = c(2, 3))
+for(i in 1:nlyr(tas_stack)) {
+  plot(tas_stack[[i]], main = paste("Temperature", names(tas_stack)[i]))
+  plot(norway_corine_projection, add = TRUE)
+}
 
+# Plot precipitation across time periods
+par(mfrow = c(2, 3))
+for(i in 1:nlyr(pr_stack)) {
+  plot(pr_stack[[i]], main = paste("Precipitation", names(pr_stack)[i]))
+  plot(norway_corine_projection, add = TRUE)
+}
 
+# END OF SCRIPT ----------------------------------------------------------------
 
