@@ -1,6 +1,6 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 3.1_turnover_land_cover
+# 4.1_turnover_land_cover
 # This script contains code which calculates the temporal turnover of GBIF
 # records in CORINE land cover pixels
 ##----------------------------------------------------------------------------##
@@ -39,6 +39,16 @@ ssb_grid_50km <- st_read(here("data", "raw_data", "SSB050KM", "ssb50km.shp"))
 
 # SSB ID Grid - 250km
 ssb_grid <- st_read(here("data", "raw_data", "SSB050KM", "ssb50km.shp"))
+
+## 1.4. CHELSA processed data --------------------------------------------------
+
+# Load temperature stack
+chelsa_tas_stack <- rast(here("data", "derived_data", "chelsa", 
+                              "chelsa_tas_period_means_norway.tif"))
+
+# Load precipitation stack
+chelsa_pr_stack <- rast(here("data", "derived_data", "chelsa", 
+                             "chelsa_pr_period_means_norway.tif"))
 
 # 2. CREATE A SPATIAL REFERENCE GRID WITH CELL IDS -----------------------------
 
@@ -618,8 +628,204 @@ all_periods_turnover_all_land_cover_chanegs_15km <- all_periods_turnover_all_lan
   left_join(ssb_lookup, by = "cell_ID")
 
 # Save df to file
-save(all_periods_turnover_all_land_cover_chanegs_15km,
+# save(all_periods_turnover_all_land_cover_chanegs_15km,
+#      file = here("data", "derived_data", 
+#                  "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+
+# 8. ADD CLIMATE DATA ----------------------------------------------------------
+
+## 8.1. Prep climate data ------------------------------------------------------
+
+# Check names ot the layers
+print(names(chelsa_tas_stack))
+print(names(chelsa_pr_stack))
+
+## Define climate period mapping for the land cover periods
+climate_period_mapping <- list("2000-2006" = list(before_climate = "1997-2000",
+                                                  after_climate = "2006-2009",
+                                                  before_precip = "1997-2000",
+                                                  after_precip = "2006-2009"),
+                               "2006-2012" = list(before_climate = "2003-2006",
+                                                  after_climate = "2012-2015",
+                                                  before_precip = "2003-2006", 
+                                                  after_precip = "2012-2015"),
+                               "2012-2018" = list(before_climate = "2009-2012",
+                                                  after_climate = "2018-2021",
+                                                  before_precip = "2009-2012",
+                                                  after_precip = "2018-2021"))
+
+## 8.2. Extract climate data for each period -----------------------------------
+
+# Create list to store climate data for each period
+climate_data_list <- list()
+
+# Run through each period and extract climate data
+for(lc_period in names(climate_period_mapping)){
+  
+  # track which period is being processed
+  cat("\nProcessing climate data for LC period:", lc_period, "\n")
+  
+  # get climate layer names for the period
+  climate_mapping <- climate_period_mapping[[lc_period]]
+  
+  # extract temperature layers (before and after)
+  temp_before_layer <- climate_mapping$before_climate
+  temp_after_layer <- climate_mapping$after_climate
+  
+  # extract precipitation layers (before and after)
+  precip_before_layer <- climate_mapping$before_precip
+  precip_after_layer <- climate_mapping$after_precip
+  
+  # check if the layers exist - give a warning if not
+  if(!temp_before_layer %in% names(chelsa_tas_stack)) {
+    cat("  Warning: Temperature layer", temp_before_layer, "not found\n")
+    next
+  }
+  if(!temp_after_layer %in% names(chelsa_tas_stack)) {
+    cat("  Warning: Temperature layer", temp_after_layer, "not found\n")
+    next
+  }
+  if(!precip_before_layer %in% names(chelsa_pr_stack)) {
+    cat("  Warning: Precipitation layer", precip_before_layer, "not found\n")
+    next
+  }
+  if(!precip_after_layer %in% names(chelsa_pr_stack)) {
+    cat("  Warning: Precipitation layer", precip_after_layer, "not found\n")
+    next
+  }
+  
+  # extract the specific layers
+  temp_before <- chelsa_tas_stack[[temp_before_layer]]
+  temp_after <- chelsa_tas_stack[[temp_after_layer]]
+  precip_before <- chelsa_pr_stack[[precip_before_layer]]
+  precip_after <- chelsa_pr_stack[[precip_after_layer]]
+  
+  # convert to dataframes with coordinates
+  temp_before_df <- as.data.frame(temp_before, xy = TRUE)
+  temp_after_df <- as.data.frame(temp_after, xy = TRUE)
+  precip_before_df <- as.data.frame(precip_before, xy = TRUE)
+  precip_after_df <- as.data.frame(precip_after, xy = TRUE)
+  
+  # extract cell IDs for each coordinate pair
+  temp_before_df$cell_ID <- terra::extract(reference_grid, 
+                                           temp_before_df[, c("x", "y")])[, "cell_id"]
+  temp_after_df$cell_ID <- terra::extract(reference_grid,
+                                          temp_after_df[, c("x", "y")])[, "cell_id"]
+  precip_before_df$cell_ID <- terra::extract(reference_grid,
+                                             precip_before_df[, c("x", "y")])[, "cell_id"]
+  precip_after_df$cell_ID <- terra::extract(reference_grid,
+                                            precip_after_df[, c("x", "y")])[, "cell_id"]
+  
+  # remove rows with NA cell_ID
+  temp_before_df <- temp_before_df |> filter(!is.na(cell_ID))
+  temp_after_df <- temp_after_df |> filter(!is.na(cell_ID))
+  precip_before_df <- precip_before_df |> filter(!is.na(cell_ID))
+  precip_after_df <- precip_after_df |> filter(!is.na(cell_ID))
+  
+  # rename columns so that they will make sense in the dataframe
+  names(temp_before_df)[3] <- "temp_before"
+  names(temp_after_df)[3] <- "temp_after"
+  names(precip_before_df)[3] <- "precip_before"
+  names(precip_after_df)[3] <- "precip_after"
+  
+  # merge all climate data for the period
+  period_climate_data <- temp_before_df |>
+    select(cell_ID, temp_before) |>
+    left_join(temp_after_df |> select(cell_ID, temp_after), by = "cell_ID") |>
+    left_join(precip_before_df |> select(cell_ID, precip_before), by = "cell_ID") |>
+    left_join(precip_after_df |> select(cell_ID, precip_after), by = "cell_ID") |>
+    mutate(lc_time_period = lc_period,
+           # calculate climate change metrics
+           temp_change = temp_after - temp_before,
+           precip_change = precip_after - precip_before,
+           precip_change_percent = ((precip_after - precip_before) / precip_before) * 100,
+           # calculate mean values
+           temp_mean = (temp_before + temp_after) / 2,
+           precip_mean = (precip_before + precip_after) / 2)
+  
+  # store processed climate data in list
+  climate_data_list[[lc_period]] <- period_climate_data
+  
+  # track which period was processed
+  cat("  Processed", nrow(period_climate_data), "cells for period", lc_period, "\n")
+  
+}
+
+## 8.3. Combine all climate data -----------------------------------------------
+
+# Combine all climate periods into a signle df
+all_climate_data <- bind_rows(climate_data_list)
+
+# Check dimensions of the df
+nrow(all_climate_data) # total cells = 
+length(unique(all_climate_data$lc_time_period)) # periods =
+
+# Check for any missing values
+climate_summary <- all_climate_data |>
+  group_by(lc_time_period) |>
+  summarise(n_cells = n(),
+            temp_before_na = sum(is.na(temp_before)),
+            temp_after_na = sum(is.na(temp_after)),
+            precip_before_na = sum(is.na(precip_before)),
+            precip_after_na = sum(is.na(precip_after)),
+            .groups = 'drop')
+
+# Check the summary
+summary(climate_summary)
+
+## 8.4. Merge climate data with turnover data ----------------------------------
+
+# Check structure of the turnover df
+nrow(all_periods_turnover_all_land_cover_chanegs_15km)
+unique(all_periods_turnover_all_land_cover_chanegs_15km$lc_time_period)
+
+# Merge climate data with the existing turnover dataframe
+all_periods_turnover_with_climate <- all_periods_turnover_all_land_cover_chanegs_15km |>
+  left_join(all_climate_data, by = c("cell_ID", "lc_time_period"))
+
+# Check it all went ok
+nrow(all_periods_turnover_with_climate)
+cat("Climate variables added:", sum(c("temp_before", "temp_after", "precip_before", 
+                                      "precip_after", "temp_change", "precip_change") %in% 
+                                      names(all_periods_turnover_with_climate)), "/ 6\n")
+
+## 8.5. Quality checks ---------------------------------------------------------
+
+# Check for missing climate data
+climate_na_summary <- all_periods_turnover_with_climate |>
+  summarise(temp_before_na = sum(is.na(temp_before)),
+            temp_after_na = sum(is.na(temp_after)),
+            precip_before_na = sum(is.na(precip_before)),
+            precip_after_na = sum(is.na(precip_after)),
+            total_rows = n())
+
+print(climate_na_summary)
+
+# Check value ranges
+cat("\nClimate variable ranges:\n")
+cat("Temperature before (°C):", round(range(all_periods_turnover_with_climate$temp_before, na.rm = TRUE), 2), "\n")
+cat("Temperature after (°C):", round(range(all_periods_turnover_with_climate$temp_after, na.rm = TRUE), 2), "\n")
+cat("Temperature change (°C):", round(range(all_periods_turnover_with_climate$temp_change, na.rm = TRUE), 2), "\n")
+cat("Precipitation before (mm/yr):", round(range(all_periods_turnover_with_climate$precip_before, na.rm = TRUE), 0), "\n")
+cat("Precipitation after (mm/yr):", round(range(all_periods_turnover_with_climate$precip_after, na.rm = TRUE), 0), "\n")
+cat("Precipitation change (mm/yr):", round(range(all_periods_turnover_with_climate$precip_change, na.rm = TRUE), 0), "\n")
+
+# Save dataframe of turnove + the new climate data
+save(all_periods_turnover_with_climate,
      file = here("data", "derived_data", 
-                 "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+                 "all_periods_turnover_all_land_cover_climate_15km.rda"))
+
+# One last check!
+cat("\n✅ Climate integration complete!\n")
+cat("Enhanced dataset saved with", ncol(all_periods_turnover_with_climate), "variables\n")
+cat("New climate variables added:\n")
+climate_vars <- c("temp_before", "temp_after", "temp_change", "temp_mean",
+                  "precip_before", "precip_after", "precip_change", 
+                  "precip_change_percent", "precip_mean")
+for(var in climate_vars) {
+  if(var %in% names(all_periods_turnover_with_climate)) {
+    cat(" ✓", var, "\n")
+  }
+}
 
 # END OF SCRIPT ----------------------------------------------------------------
