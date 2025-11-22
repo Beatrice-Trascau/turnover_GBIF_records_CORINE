@@ -70,13 +70,13 @@ for(period_name in names(time_periods)){
         r <- rast(filepath)
         
         # reproject to CORINE CRS
-        r_proj <- project(r, crs(norway_corine_projection), method = "bilinear")
+        r_proj <- project(r, corine_reference, method = "bilinear")
         
         # crop and mask to Norway
         r_norway <- crop(r_proj, norway_corine_projection, mask = TRUE)
         
         # convert from Kelvin to Celsius
-        r_celsius <- (r_norway / 10) - 273.15
+        r_celsius <- r_norway - 273.15
         
         # add to all monthly raster list
         monthly_rasters[[length(monthly_rasters) + 1]] <- r_celsius
@@ -163,7 +163,7 @@ for(period_name in names(time_periods)){
         r <- rast(filepath)
         
         # reproject to CORINE CRS
-        r_proj <- project(r, crs(norway_corine_projection), method = "bilinear")
+        r_proj <- project(r, corine_reference, method = "bilinear")
         
         # crop and mask to Norway
         r_norway <- crop(r_proj, norway_corine_projection, mask = TRUE)
@@ -280,4 +280,3 @@ for(i in 1:nlyr(pr_stack)) {
 }
 
 # END OF SCRIPT ----------------------------------------------------------------
-
