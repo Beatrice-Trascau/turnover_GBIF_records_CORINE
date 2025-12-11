@@ -7,6 +7,9 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
+library(here)
+source(here("scripts", "0_setup.R"))
+
 ## 1.1. 15km CORINE Status Layers ----------------------------------------------
 
 # Forest -> TWS
