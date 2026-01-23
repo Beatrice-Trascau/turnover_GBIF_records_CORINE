@@ -85,4 +85,42 @@ ris <- c("TY  - COMP",
 # Write .RIS reference to file
 writeLines(ris, "references/terra.ris")
 
+## 2.2. Sf ------------------------------------------------------------------
+
+# Get citation info
+cit <- citation("sf")
+
+# Extract authors
+authors <- paste(
+  sapply(cit$author, function(a) {
+    paste(a$family, paste(a$given, collapse = " "), sep = ", ")
+  }),
+  collapse = "\nAU  - "
+)
+
+# Extract year
+year <- cit$year
+
+# Extract title
+title <- cit$title
+
+# Extract version
+version <- as.character(packageVersion("terra"))
+
+# Extract URL
+url <- cit$url
+
+# Build RIS entry
+ris <- c("TY  - COMP",
+         paste0("TI  - ", title),
+         paste0("AU  - ", authors),
+         paste0("PY  - ", year),
+         paste0("N1  - R package version ", version),
+         paste0("UR  - ", url),
+         "ER  -")
+
+# Write .RIS reference to file
+writeLines(ris, "references/sf.ris")
+
+
 # END OF SCRIPT ----------------------------------------------------------------
