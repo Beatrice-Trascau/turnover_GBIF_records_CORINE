@@ -34,7 +34,7 @@ The main objective of the project is to understand the effect of land cover chan
 ## File Structure
 
 | Name                              | Function                                                                  |
-|-----------------------------------|---------------------------------------------------------------------------|
+|-----------------------|-------------------------------------------------|
 | 0_setup                           | Sets up all the packages and functions needed for the project             |
 | 1.1_CORINE_layers_preparation     | Loads and prepares CORINE layers for further analysis                     |
 | 1.2_CORINE_aggregation            | Aggregates original rasters to 15km                                       |
@@ -474,7 +474,7 @@ The previous method ran into several problems and became too complicated, likely
 At the end, we should have a dataframe with the following columns:
 
 | cell_ID | lc_change | lc_no_change | spp_list_before | spp_list_after | total_occ_before | total_occ_after | recorder_effort | delta_recorder_effort | JDI  | Time      |
-|---------|-----------|--------------|-----------------|----------------|------------------|-----------------|-----------------|-----------------------|------|-----------|
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 15678   | 40        | 60           | list()          | list()         | 467              | 897             | 1364            | 0.315                 | 0.65 | 2000-2006 |
 
 At the end, we will combine all 3 dfs into a single one, which will be the one used in the models.
@@ -684,6 +684,8 @@ model8_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
 
 ```
 
+Since this GLS was the one that worked, and we wanted to keep things consistent, we decided to run the same model for the other land-cover transitions and the other metrics as well.
+
 # Species Loss and Gain (5.1)
 
 ## Forest -\> TWS
@@ -697,16 +699,16 @@ Calcualted amount of species loss and gain for vascular plants and bird occurren
 #| warning: false
 
 # Get data
-source(here("scripts", "5.1_species_gain_loss_forest_tws.R"))
+# source(here("scripts", "5.1_species_gain_loss_forest_tws.R"))
 
 # Display table
-summary_stats |>
-  kbl(caption = "Table 4: Summary of Species Gain and Loss in Forest to TWS cells",
-      col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
-                    "Median Change", "Max Change", "Total Cells", "%"),
-      align = c("l", "r")) |>
-  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
-                full_width = FALSE) 
+# summary_stats |>
+#   kbl(caption = "Table 4: Summary of Species Gain and Loss in Forest to TWS cells",
+#       col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
+#                     "Median Change", "Max Change", "Total Cells", "%"),
+#       align = c("l", "r")) |>
+#   kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+#                 full_width = FALSE) 
 ```
 
 ```{r species change forest tws}
@@ -720,7 +722,7 @@ summary_stats |>
 #| warning: false
 
 # Display figure
-gain_loss_forest_tws
+# gain_loss_forest_tws
 ```
 
 ## TWS -\> Forest
@@ -732,13 +734,13 @@ gain_loss_forest_tws
 #| warning: false
 
 # Display table
-summary_stats_tws_forest |>
-  kbl(caption = "Table 5: Summary of Species Gain and Loss in TWS to Forest cells",
-      col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
-                    "Median Change", "Max Change", "Total Cells", "%"),
-      align = c("l", "r")) |>
-  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
-                full_width = FALSE) 
+# summary_stats_tws_forest |>
+#   kbl(caption = "Table 5: Summary of Species Gain and Loss in TWS to Forest cells",
+#       col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
+#                     "Median Change", "Max Change", "Total Cells", "%"),
+#       align = c("l", "r")) |>
+#   kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+#                 full_width = FALSE) 
 ```
 
 ```{r species change plotting}
@@ -752,7 +754,7 @@ summary_stats_tws_forest |>
 #| warning: false
 
 # Display figure
-gain_loss_tws_forest
+# gain_loss_tws_forest
 ```
 
 ## All -\> Urban
@@ -764,13 +766,13 @@ gain_loss_tws_forest
 #| warning: false
 
 # Display table
-summary_stats_all_urban |>
-  kbl(caption = "Table 6: Summary of Species Gain and Loss in All to Urban cells",
-      col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
-                    "Median Change", "Max Change", "Total Cells", "%"),
-      align = c("l", "r")) |>
-  kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
-                full_width = FALSE) 
+# summary_stats_all_urban |>
+#   kbl(caption = "Table 6: Summary of Species Gain and Loss in All to Urban cells",
+#       col.names = c("Time Period", "Group", "Species Change", "Count", "Mean Change",
+#                     "Median Change", "Max Change", "Total Cells", "%"),
+#       align = c("l", "r")) |>
+#   kable_styling(bootstrap_options = c("stried", "hover", "condensed"),
+#                 full_width = FALSE) 
 ```
 
 ```{r species change all urban plotting}
@@ -784,7 +786,7 @@ summary_stats_all_urban |>
 #| warning: false
 
 # Display figure
-gain_loss_all_urban
+# gain_loss_all_urban
 ```
 
 ## Species Change & Recorder Effort
@@ -800,7 +802,7 @@ gain_loss_all_urban
 #| warning: false
 
 # Display figure
-rec_effort
+# rec_effort
 ```
 
 # Outstanding Issues & Next Steps
