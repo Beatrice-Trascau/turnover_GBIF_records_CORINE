@@ -520,7 +520,86 @@ cell_2012_2018_summary_wide_LC3 <- cell_2012_2018_summary_wide_LC2 |>
               select(cell_ID, '2012-2018_Urban_no_change', '2012-2018_all_to_urban'),
             by = "cell_ID")
 
-# 7. CALCULATE JACCARD'S DISSIMILARITY INDEX -----------------------------------
+# 7. CALCULATE TEMPORAL TURNOVER -----------------------------------------------
+
+## 7.0. Helper function to calculate betapart metrics --------------------------
+
+# Function to calculate temporal turnover using betapart::beta.temp()
+  # convers species lists to presence-absence matrices and calculates turnover
+  # and nestedness components
+calculate_betapart_temporal <- function(df, cell_id_col = "cell_ID"){
+  
+  # filter cells with >= 3 species in each time step
+  df_filtered <- df |>
+    filter(total_spp_before >= 3 & total_spp_after >= 3)
+  
+  # check how many cells were removed
+  cat("  Cells retained after filtering (>= 3 species):", nrow(df_filtered), "\n")
+  
+  # get unique species across all cells in both time periods
+  all_species <- df_filtered |>
+    rowwise() |>
+    summarise(species = list(c(species_list_before, species_list_after))) |>
+    pull(species) |>
+    unlist() |>
+    unique()
+  
+  # check how many unique species there are
+  cat("  Total unique species:", length(all_species), "\n")
+  
+  # create presence-absence matrices for before and after periods
+  # each row is a cell, each column is a species (1 = present, 0 = absent)
+  
+  # before period matrix
+  pa_before <- dF_filtered |>
+    rowwise() |>
+    summarise(cell_ID = !!sym(cell_id_col),
+              presence = list(as.integer(all_species %in% species_list_before))) |>
+    tidyr::unnest_wider(presence, names_sep = "_") |>
+    select(-cell_ID) |>
+    as.data.frame()
+  
+  # set column names to species names
+  colnames(pa_before) <- all_species
+  
+  # after period matrix
+  pa_after <- df_filtered |>
+    rowwise() |>
+    summarise(cell_ID = !!sym(cell_id_col),
+              presence = list(as.integer(all_species %in% species_list_after))) |>
+    tidyr::unnest_wider(presence, names_sep = "_") |>
+    select(-cell_ID) |>
+    as.data.frame()
+  
+  # set column names to species names
+  colnames(pa_after) <- all_species
+  
+  # calculate temporal beta diversity using betapart
+  beta_temp_result <- betapart::beta.temp(pa_before, pa_after, 
+                                          index.family = "jaccard")
+  
+  # add betapart results to the filtered dataframe
+  df_filtered <- df_filtered |>
+    mutate(beta_jtu = beta_temp_result$beta.jtu,    # Turnover component
+           beta_jne = beta_temp_result$beta.jne,    # Nestedness component
+           beta_jac = beta_temp_result$beta.jac)    # Total dissimilarity (jtu + jne)
+  
+  # also calculate manual JDI for comparison/validation
+  df_filtered <- df_filtered |>
+    rowwise() |>
+    mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
+           union_size = length(union(species_list_before, species_list_after)),
+           JDI_manual = 1 - (intersection_size / union_size)) |>
+    ungroup()
+  
+  # get an update if the function has finished running
+  cat("  ✓ Betapart calculations complete\n")
+  
+  # return the filtered dataframe
+  return(df_filtered)          
+           
+}
+
 
 ## 7.1. First period: 2000-2006 ------------------------------------------------
 
