@@ -29,11 +29,11 @@ source(here("scripts", "0_setup.R"))
 #| include: false
 
 # Load Turnover data
-load(here("data", "derived_data",
-          "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+load(here("data", "derived_data", 
+          "all_periods_turnover_all_land_cover_climate_15km.rda"))
 
 # Select only columns for Forest -> TWS model
-turnover_forest_tws_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
+turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
             '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
             '2006-2012_TWS no change', '2006-2012_TWS to Forest',
@@ -61,7 +61,7 @@ N <- nrow(turnover_forest_tws_15km)
 
 # Calculate new JDI values
 turnover_forest_tws_15km <- turnover_forest_tws_15km |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+  mutate(JDI_beta = (JDI_manual * (N - 1) + 0.5) / N)
 
 # Prepare data for GLS: remove rows with missing x or y and categorise time periods
 turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km |>
@@ -203,12 +203,10 @@ turnover_forest_tws_15km <- turnover_forest_tws_15km |>
 
 # Correlation matrix for numeric variables
 numeric_vars <- turnover_forest_tws_15km |>
-  select(JDI, forest_to_tws, forest_no_change, 
-         intersection_size, union_size, 
-         total_spp_before, total_spp_after,
-         total_occ_before, total_occ_after,
+  select(beta_jtu, beta_jne, beta_jac, forest_to_tws, forest_no_change, 
          recorder_effort, delta_recorder_effort,
-         log_recorder_effort)
+         log_recorder_effort, temp_change, precip_change, total_spp_before,
+         total_spp_after, total_occ_before, total_occ_after)
 
 # Calculate correlation matrix
 cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
