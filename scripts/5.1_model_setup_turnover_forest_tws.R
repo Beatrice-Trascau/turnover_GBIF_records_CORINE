@@ -2,8 +2,8 @@
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
 # 5.1_model_setup_turnover_forest_tws
 # This script contains code which sets up the models exploring the impact of 
-# Forest -> TWS land cover transition on temporal turnover for all occurrences,
-# plant-only occurrences and bird-only occurrences
+# Forest -> TWS land cover transition on temporal turnover (beta_jtu) for all 
+# occurrences, plant-only occurrences and bird-only occurrences
 ##----------------------------------------------------------------------------##
 
 library(here)
@@ -118,7 +118,7 @@ save(FTWS_turnover_model2_GLMM,
 ## 2.5. GLS with raw data and exponential structure ----------------------------
 
 # Fit gls
-FTWS_turnover_model4_gls_raw <- gls(JDI ~ forest_to_tws + forest_no_change +
+FTWS_turnover_model4_gls_raw <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + recorder_effort + lc_time_period,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
@@ -146,7 +146,7 @@ summary(turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-FTWS_turnover_model5_gls_log <- gls(JDI ~ forest_to_tws + forest_no_change +
+FTWS_turnover_model5_gls_log <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
@@ -159,49 +159,60 @@ save(FTWS_turnover_model5_gls_log,
      file = here("data", "models", "final",
                  "FTWS_turnover_model5_gls_log.RData"))
 
-## 2.4. Plot model output ------------------------------------------------------
+## 2.7. GLS with logged recorder effort and interaction ------------------------
 
-# Get summary of the model
+# Define GLS
+FTWS_turnover_model6_gls_log_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
+                                                  forest_to_tws * precip_change + 
+                                                  forest_no_change +
+                                                  delta_recorder_effort + 
+                                                  log_recorder_effort + 
+                                                  lc_time_period,
+                                                correlation = corExp(form = ~ x + y | time_numeric),
+                                                data = turnover_forest_tws_15km_coords_time,
+                                                method = "REML")
+# Model validaiton looked ok enough
+
+# Compare models based on AIC
+AICtab(FTWS_turnover_model5_gls_log, FTWS_turnover_model6_gls_log_interaction, base = TRUE)
+# model without interaction preferred => save interaction model in exploratory folder
+
+# Save model
+save(FTWS_turnover_model6_gls_log_interaction,
+     file = here("data", "models", "exploratory",
+                 "FTWS_turnover_model6_gls_log_interaction.RData"))
+
+## 2.8. Get model summary ------------------------------------------------------
+
+# Get summary of final model
 model_summary <- summary(FTWS_turnover_model5_gls_log)
 
-# Create dataframe of coeficients
-FTWS_turnover_model5_gls_log_coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
-                                                   estimate = model_summary$tTable[, "Value"],
-                                                   std.error = model_summary$tTable[, "Std.Error"],
-                                                   statistic = model_summary$tTable[, "t-value"],
-                                                   p.value = model_summary$tTable[, "p-value"])
+# Create dataframe of coefficients
+coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                      estimate = model_summary$tTable[, "Value"],
+                      std.error = model_summary$tTable[, "Std.Error"],
+                      statistic = model_summary$tTable[, "t-value"],
+                      p.value = model_summary$tTable[, "p-value"])
 
-# Remove the intercept
-FTWS_turnover_model5_gls_log_coef_df_no_intercept <- FTWS_turnover_model5_gls_log_coef_df[FTWS_turnover_model5_gls_log_coef_df$term != "(Intercept)", ]
+# Add significance stars
+coef_df <- coef_df |>
+  mutate(significance = case_when( p.value < 0.001 ~ "***",
+                                   p.value < 0.01 ~ "**",
+                                   p.value < 0.05 ~ "*",
+                                   p.value < 0.1 ~ ".",
+                                   TRUE ~ ""))
 
-# Create coefficient plot
-figure6_a <- ggplot(FTWS_turnover_model5_gls_log_coef_df_no_intercept, aes(x = estimate, y = term)) +
-  geom_point() +
-  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
-                     xmax = estimate + 1.96 * std.error)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-                              "forest_no_change" = "Forest No Change",
-                              "delta_recorder_effort" = "ΔRecorder Effort",
-                              "log_recorder_effort" = "log Recorder Effort",
-                              "lc_time_period2006-2012" = "2006-2012 Time Period",
-                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
-                   limits = c("lc_time_period2012-2018",
-                              "lc_time_period2006-2012",
-                              "log_recorder_effort",
-                              "delta_recorder_effort",
-                              "forest_no_change",
-                              "forest_to_tws")) +
-  labs(x = "Estimate ± 95% CI", y = NULL) +
-  theme_classic()
+coef_table <- coef_df |>
+  select(term, estimate, std.error, statistic, p.value, significance) |>
+  flextable() |>
+  set_header_labels(term = "Predictor", estimate = "Estimate", std.error = "SE",
+                    statistic = "t-value", p.value = "p-value", significance = "") |>
+  colformat_double(j = c("estimate", "std.error", "statistic"), digits = 3) |>
+  colformat_double(j = "p.value", digits = 4) |>
+  autofit()
 
-# Save figure as .png
-ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.png"),
-       width = 12, height = 8, dpi = 300)
-
-# Save figure as .svg
-ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.svg"),
-       width = 12, height = 8, dpi = 300)
+# Display table
+coef_table
 
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
@@ -260,7 +271,7 @@ summary(plants_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(plants_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
+plants_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
                     delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = plants_turnover_forest_tws_15km_coords_time,
@@ -274,92 +285,60 @@ save(plants_FTWS_model1_gls,
      file = here("data", "models", "final",
                  "plants_FTWS_model1_gls.RData"))
 
-## 3.3. Plot model output ------------------------------------------------------
+## 3.3. Plant GLS with interaction ---------------------------------------------
 
-# Get model summary
-plants_FTWS_model1_gls_summary <- summary(plants_FTWS_model1_gls)
+# Define GLS
+plants_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
+                                                  forest_to_tws * precip_change + 
+                                                  forest_no_change +
+                                                  delta_recorder_effort + 
+                                                  log_recorder_effort + 
+                                                  lc_time_period,
+                                                correlation = corExp(form = ~ x + y | time_numeric),
+                                                data = plants_turnover_forest_tws_15km_coords_time,
+                                                method = "REML")
+# Model validaiton looked ok enough
 
-# Create dataframe of coeficients
-plants_FTWS_model1_gls_coef_df <- data.frame(term = names(plants_FTWS_model1_gls_summary$tTable[, "Value"]),
-                                             estimate = plants_FTWS_model1_gls_summary$tTable[, "Value"],
-                                             std.error = plants_FTWS_model1_gls_summary$tTable[, "Std.Error"],
-                                             statistic = plants_FTWS_model1_gls_summary$tTable[, "t-value"],
-                                             p.value = plants_FTWS_model1_gls_summary$tTable[, "p-value"])
+# Compare models based on AIC
+AICtab(plants_FTWS_model1_gls, plants_FTWS_model2_gls_interaction, base = TRUE)
+# model without interaction preferred => save interaction model in exploratory folder
 
-# Remove the intercept
-plants_FTWS_model1_gls_coef_df_no_intercept <- plants_FTWS_model1_gls_coef_df[plants_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
-
-# Create coefficient plot
-figure6_b <- ggplot(plants_FTWS_model1_gls_coef_df_no_intercept,
-                    aes(x = estimate, y = term)) +
-  geom_point() +
-  geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
-                     xmax = estimate + 1.96 * std.error)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-                              "forest_no_change" = "Forest No Change",
-                              "delta_recorder_effort" = "ΔRecorder Effort",
-                              "log_recorder_effort" = "log Recorder Effort",
-                              "lc_time_period2006-2012" = "2006-2012 Time Period",
-                              "lc_time_period2012-2018" = "2012-2018 Time Period"),
-                   limits = c("lc_time_period2012-2018",
-                              "lc_time_period2006-2012",
-                              "log_recorder_effort",
-                              "delta_recorder_effort",
-                              "forest_no_change",
-                              "forest_to_tws")) +
-  labs(x = "Estimate ± 95% CI", y = NULL) +
-  theme_classic()
-
-# Save figure as .png
-ggsave(filename = here("figures", "Figure6b_gls_model_output_plants_turnover.png"),
-       width = 12, height = 8, dpi = 300)
-
-# Save figure as .svg
-ggsave(filename = here("figures", "Figure6b_gls_model_output_plants_turnover.svg"),
-       width = 12, height = 8, dpi = 300)
-
-## 3.4. GAM with spatial smooth ------------------------------------------------
-
-# Convert lc_time_period to factor
-plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
-  mutate(lc_time_period = as.factor(lc_time_period))
-
-# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
-# get N
-N <- nrow(plants_turnover_forest_tws_15km_coords_time)
-# calculate new JDI values
-plants_turnover_forest_tws_15km_coords_time <- plants_turnover_forest_tws_15km_coords_time |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
-
-# Fit GAM with spatial smooth that is separate per time period
-plants_FTWS_model2_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
-                           log_recorder_effort + lc_time_period +
-                           s(x, y, by = lc_time_period, k = 120),
-                         data = plants_turnover_forest_tws_15km_coords_time,
-                         family = betar(link = "logit"),
-                         method = "REML")
-
-# Save model output
-save(plants_FTWS_model2_GAM,
+# Save model
+save(plants_FTWS_model2_gls_interaction,
      file = here("data", "models", "exploratory",
-                 "plants_FTWS_model2_GAM.RData"))
+                 "plants_FTWS_model2_gls_interactionn.RData"))
 
-## 3.5. GAM with forest -> tws and spatial smooth ------------------------------
+## 3.4. Get model summary ------------------------------------------------------
 
-# Define model
-plants_FTWS_model3_GAM_extra_smooth <- gam(JDI_beta ~ s(forest_to_tws) + forest_no_change + delta_recorder_effort +
-                                             log_recorder_effort + lc_time_period +
-                                             s(x, y, by = lc_time_period, k = 120),
-                                           data = plants_turnover_forest_tws_15km_coords_time,
-                                           family = betar(link = "logit"),
-                                           method = "REML")
+# Get summary of final model
+model_summary <- summary(plants_FTWS_model1_gls)
 
+# Create dataframe of coefficients
+coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                      estimate = model_summary$tTable[, "Value"],
+                      std.error = model_summary$tTable[, "Std.Error"],
+                      statistic = model_summary$tTable[, "t-value"],
+                      p.value = model_summary$tTable[, "p-value"])
 
-# Save model output
-save(plants_FTWS_model3_GAM_extra_smooth,
-     file = here("data", "models", "exploratory",
-                 "plants_FTWS_model3_GAM_extra_smooth.RData"))
+# Add significance stars
+coef_df <- coef_df |>
+  mutate(significance = case_when( p.value < 0.001 ~ "***",
+                                   p.value < 0.01 ~ "**",
+                                   p.value < 0.05 ~ "*",
+                                   p.value < 0.1 ~ ".",
+                                   TRUE ~ ""))
+
+coef_table <- coef_df |>
+  select(term, estimate, std.error, statistic, p.value, significance) |>
+  flextable() |>
+  set_header_labels(term = "Predictor", estimate = "Estimate", std.error = "SE",
+                    statistic = "t-value", p.value = "p-value", significance = "") |>
+  colformat_double(j = c("estimate", "std.error", "statistic"), digits = 3) |>
+  colformat_double(j = "p.value", digits = 4) |>
+  autofit()
+
+# Display table
+coef_table
 
 # 4. BIRD OCCURRENCES ONLY -----------------------------------------------------
 
@@ -416,106 +395,242 @@ summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
+birds_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
                            delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                          correlation = corExp(form = ~ x + y | time_numeric),
                          data = birds_turnover_forest_tws_15km_coords_time,
                          method = "REML")
 
 # Save model output to file
-# save(birds_FTWS_model1_gls, 
-#      file = here("data", "models", "final",
-#                  "birds_FTWS_model1_gls.RData"))
+save(birds_FTWS_model1_gls,
+     file = here("data", "models", "final",
+                 "birds_FTWS_model1_gls.RData"))
 
-## 4.3. Plot model output ------------------------------------------------------
+## 4.3. Bird GLS with interaction ----------------------------------------------
 
-# Get summary
-# model_summary_birds <- summary(birds_FTWS_model1_gls)
-# 
-# # Create dataframe of coeficients
-# birds_FTWS_model1_gls_coef_df <- data.frame(term = names(model_summary_birds$tTable[, "Value"]),
-#                                             estimate = model_summary_birds$tTable[, "Value"],
-#                                             std.error = model_summary_birds$tTable[, "Std.Error"],
-#                                             statistic = model_summary_birds$tTable[, "t-value"],
-#                                             p.value = model_summary_birds$tTable[, "p-value"])
-# 
-# # Remove the intercept
-# birds_FTWS_model1_gls_coef_df_no_intercept <- birds_FTWS_model1_gls_coef_df[birds_FTWS_model1_gls_coef_df$term != "(Intercept)", ]
-# 
-# # Create coefficient plot
-# figure6_c <- ggplot(birds_FTWS_model1_gls_coef_df_no_intercept, aes(x = estimate, y = term)) +
-#   geom_point() +
-#   geom_errorbarh(aes(xmin = estimate - 1.96 * std.error,
-#                      xmax = estimate + 1.96 * std.error)) +
-#   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-#   scale_y_discrete(labels = c("forest_to_tws" = "Forest to TWS",
-#                               "forest_no_change" = "Forest No Change", 
-#                               "delta_recorder_effort" = "ΔRecorder Effort",
-#                               "log_recorder_effort" = "log Recorder Effort",
-#                               "lc_time_period2006-2012" = "2006-2012 Time Period",
-#                               "lc_time_period2012-2018" = "2012-2018 Time Period"),
-#                    limits = c("lc_time_period2012-2018",
-#                               "lc_time_period2006-2012", 
-#                               "log_recorder_effort",
-#                               "delta_recorder_effort",
-#                               "forest_no_change",
-#                               "forest_to_tws")) +
-#   labs(x = "Estimate ± 95% CI", y = NULL) +
-#   theme_classic()
-# 
-# # Display plot
-# figure6_c
-# 
-# # Save figure as .png
-# ggsave(filename = here("figures", "Figure6c_gls_model_output_birds_turnover.png"),
-#        width = 12, height = 8, dpi = 300)
-# 
-# # Save figure as .svg
-# ggsave(filename = here("figures", "Figure6c_gls_model_output_birds_turnover.svg"),
-#        width = 12, height = 8, dpi = 300)
+# Define GLS
+birds_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
+                                            forest_to_tws * precip_change + 
+                                            forest_no_change +
+                                            delta_recorder_effort + 
+                                            log_recorder_effort + 
+                                            lc_time_period,
+                                          correlation = corExp(form = ~ x + y | time_numeric),
+                                          data = plants_turnover_forest_tws_15km_coords_time,
+                                          method = "REML")
+# Model validaiton looked ok enough
 
-## 4.4. Weighted GLS -----------------------------------------------------------
-
-# Define model
-birds_FTWS_model2_weighted_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
-                                        delta_recorder_effort + log_recorder_effort + lc_time_period,
-                                      weights = varPower(form = ~ fitted(.)),
-                                      correlation = corExp(form = ~ x + y | time_numeric),
-                                      data = birds_turnover_forest_tws_15km_coords_time,
-                                      method = "REML")
+# Compare models based on AIC
+AICtab(birds_FTWS_model1_gls, birds_FTWS_model2_gls_interaction, base = TRUE)
+# model without interaction preferred => save interaction model in exploratory folder
 
 # Save model
-save(birds_FTWS_model2_weighted_gls, 
+save(birds_FTWS_model2_gls_interaction,
      file = here("data", "models", "exploratory",
-                 "birds_FTWS_model2_weighted_gls.RData"))
+                 "birds_FTWS_model2_gls_interaction.RData"))
 
-## 4.5. GAM with spatial smooth ------------------------------------------------
+## 4.4. Get model summary ------------------------------------------------------
 
-# Convert lc_time_period to factor
-birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
-  mutate(lc_time_period = as.factor(lc_time_period))
+# Get summary of final model
+model_summary <- summary(birds_FTWS_model1_gls)
 
-# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
-# get N
-N <- nrow(birds_turnover_forest_tws_15km_coords_time)
-# calculate new JDI values
-birds_turnover_forest_tws_15km_coords_time <- birds_turnover_forest_tws_15km_coords_time |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+# Create dataframe of coefficients
+coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                      estimate = model_summary$tTable[, "Value"],
+                      std.error = model_summary$tTable[, "Std.Error"],
+                      statistic = model_summary$tTable[, "t-value"],
+                      p.value = model_summary$tTable[, "p-value"])
 
-# Fit GAM with spatial smooth that is separate per time period
-birds_FTWS_model3_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + delta_recorder_effort +
-                           log_recorder_effort + lc_time_period +
-                           s(x, y, by = lc_time_period, k = 120),
-                         data = birds_turnover_forest_tws_15km_coords_time,
-                         family = betar(link = "logit"),
-                         method = "REML")
+# Add significance stars
+coef_df <- coef_df |>
+  mutate(significance = case_when( p.value < 0.001 ~ "***",
+                                   p.value < 0.01 ~ "**",
+                                   p.value < 0.05 ~ "*",
+                                   p.value < 0.1 ~ ".",
+                                   TRUE ~ ""))
 
-# View model summary
-summary(birds_FTWS_model3_GAM)
+coef_table <- coef_df |>
+  select(term, estimate, std.error, statistic, p.value, significance) |>
+  flextable() |>
+  set_header_labels(term = "Predictor", estimate = "Estimate", std.error = "SE",
+                    statistic = "t-value", p.value = "p-value", significance = "") |>
+  colformat_double(j = c("estimate", "std.error", "statistic"), digits = 3) |>
+  colformat_double(j = "p.value", digits = 4) |>
+  autofit()
 
-# Save model output
-save(birds_FTWS_model3_GAM, 
-     file = here("data", "models", "exploratory",
-                 "birds_FTWS_model3_GAM.RData"))
+# Display table
+coef_table
+
+# 5. PLOT MODEL OUTPUTS --------------------------------------------------------
+
+# Function to create coefficient plot for a single model
+create_coef_plot <- function(model, title, show_y_axis = TRUE) {
+  
+  # get model summary
+  model_summary <- summary(model)
+  
+  # create a dataframe of the coefficients
+  coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                        estimate = model_summary$tTable[, "Value"],
+                        std.error = model_summary$tTable[, "Std.Error"],
+                        statistic = model_summary$tTable[, "t-value"],
+                        p.value = model_summary$tTable[, "p-value"]) |>
+    mutate(conf.low = estimate - 1.96 * std.error,
+           conf.high = estimate + 1.96 * std.error,
+           significance = case_when(p.value < 0.001 ~ "***",
+                                    p.value < 0.01 ~ "**", 
+                                    p.value < 0.05 ~ "*",
+                                    p.value < 0.1 ~ ".",
+                                    TRUE ~ ""),
+      effect_type = case_when(term == "(Intercept)" ~ "Intercept",
+                              p.value < 0.05 & estimate < 0 ~ "Negative (sig.)",
+                              p.value < 0.05 & estimate > 0 ~ "Positive (sig.)",
+                              TRUE ~ "Non-significant"),
+      term_clean = case_when(term == "(Intercept)" ~ "Intercept",
+                             term == "forest_to_tws" ~ "Forest → TWS",
+                             term == "forest_no_change" ~ "Forest (no change)",
+                             term == "delta_recorder_effort" ~ "ΔRecorder effort",
+                             term == "log_recorder_effort" ~ "log(Recorder effort)",
+                             term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
+                             term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
+                             term == "temp_change" ~ "Temperature change",
+                             term == "precip_change" ~ "Precipitation change",
+                             TRUE ~ term))
+  
+  # split into intercept and effects
+  intercept_df <- coef_df |> filter(term == "(Intercept)")
+  effects_df <- coef_df |> 
+    filter(term != "(Intercept)") |>
+    mutate(term_clean = factor(term_clean, 
+                               levels = rev(c("Forest → TWS",
+                                              "Forest (no change)", 
+                                              "Temperature change",
+                                              "Precipitation change",
+                                              "ΔRecorder effort",
+                                              "log(Recorder effort)",
+                                              "Period: 2006-2012",
+                                              "Period: 2012-2018"))))
+  
+  # define colors
+  effect_colors <- c( "Negative (sig.)" = "#9C27B0",
+                      "Positive (sig.)" = "#FF9800",  
+                      "Non-significant" = "grey60",
+                      "Intercept" = "grey30")
+  
+  # create intercept plot (top)
+  plot_intercept <- ggplot(intercept_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3, shape = 15) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors, guide = "none") +
+    labs(x = NULL, y = NULL, title = title) +
+    theme_classic() +
+    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+          axis.text.y = element_text(size = 10, color = "black", face = "bold"),
+          axis.text.x = element_text(size = 9, color = "black"),
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 5, r = 10, b = 2, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # create effects plot (bottom)
+  plot_effects <- ggplot(effects_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors,
+                       name = "Effect type",
+                       breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
+                       labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")) +
+    labs(x = NULL, y = NULL) +
+    theme_classic() +
+    theme(axis.text.x = element_text(size = 9, color = "black"),
+          legend.position = "none",
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 2, r = 10, b = 5, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # show or hide y-axis labels
+  if (!show_y_axis) {
+    plot_intercept <- plot_intercept + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+    plot_effects <- plot_effects + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+  }
+  
+  # combine intercept and effects for this model
+  combined <- plot_intercept / plot_effects + 
+    plot_layout(heights = c(1, 4))
+  
+  return(combined)
+}
+
+# Create plots for each model
+plot_all <- create_coef_plot(FTWS_turnover_model5_gls_log, 
+                             "a) All occurrences", 
+                             show_y_axis = TRUE)
+
+plot_plants <- create_coef_plot(plants_FTWS_model1_gls, 
+                                "b) Vascular plants", 
+                                show_y_axis = FALSE)
+
+plot_birds <- create_coef_plot(birds_FTWS_model1_gls, 
+                               "c) Birds", 
+                               show_y_axis = FALSE)
+
+# Combine all three panels horizontally
+combined_plot <- plot_all | plot_plants | plot_birds
+
+# Create a dummy plot just to extract the legend
+dummy_effects <- data.frame(term_clean = "dummy",estimate = 0,
+                            conf.low = -0.1, conf.high = 0.1,
+                            effect_type = c("Positive (sig.)", "Negative (sig.)", "Non-significant"))
+
+effect_colors <- c("Negative (sig.)" = "#9C27B0",
+                   "Positive (sig.)" = "#FF9800",
+                   "Non-significant" = "grey60")
+
+legend_plot <- ggplot(dummy_effects, aes(x = estimate, y = term_clean, color = effect_type)) +
+  geom_point() +
+  scale_color_manual(
+    values = effect_colors,
+    name = NULL,
+    breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
+    labels = c("Positive effect (p < 0.05)", "Negative effect (p < 0.05)", "Non-significant")
+  ) +
+  theme_void() +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 9))
+
+# Extract legend
+legend <- get_legend(legend_plot)
+
+# Final combined plot with legend
+final_plot <- combined_plot / legend +
+  plot_layout(heights = c(20, 1)) +
+  plot_annotation(theme = theme(plot.title = element_text(size = 13, 
+                                                          face = "bold", 
+                                                          hjust = 0.5, 
+                                                          margin = margin(b = 10))))
+
+# Display
+print(final_plot)
+
+# Save
+ggsave(filename = here("figures", "Figure6abc_betaJTU_FTWS_models.png"),
+       plot = final_plot, width = 14, height = 7, dpi = 300, bg = "white")
+
+ggsave(filename = here("figures", "Figure_combined_models_3panel.pdf"),
+       plot = final_plot, width = 14, height = 7, bg = "white")
 
 # END OF SCRIPT ----------------------------------------------------------------
