@@ -550,71 +550,72 @@ calculate_betapart_temporal <- function(df, cell_id_col = "cell_ID"){
   # create presence-absence matrices for before and after periods
   # each row is a cell, each column is a species (1 = present, 0 = absent)
   
-  # before period matrix
-  pa_before <- dF_filtered |>
-    rowwise() |>
-    summarise(cell_ID = !!sym(cell_id_col),
-              presence = list(as.integer(all_species %in% species_list_before))) |>
-    tidyr::unnest_wider(presence, names_sep = "_") |>
-    select(-cell_ID) |>
-    as.data.frame()
+  # sort all_species to ensure consistent ordering
+  all_species <- sort(all_species)
   
-  # set column names to species names
+  # before period matrix
+  pa_before <- matrix(0, nrow = nrow(df_filtered), ncol = length(all_species))
   colnames(pa_before) <- all_species
   
-  # after period matrix
-  pa_after <- df_filtered |>
-    rowwise() |>
-    summarise(cell_ID = !!sym(cell_id_col),
-              presence = list(as.integer(all_species %in% species_list_after))) |>
-    tidyr::unnest_wider(presence, names_sep = "_") |>
-    select(-cell_ID) |>
-    as.data.frame()
+  for(i in 1:nrow(df_filtered)) {
+    species_present <- df_filtered$species_list_before[[i]]
+    pa_before[i, all_species %in% species_present] <- 1
+  }
   
-  # set column names to species names
+  # after period matrix
+  pa_after <- matrix(0, nrow = nrow(df_filtered), ncol = length(all_species))
   colnames(pa_after) <- all_species
+  
+  for(i in 1:nrow(df_filtered)) {
+    species_present <- df_filtered$species_list_after[[i]]
+    pa_after[i, all_species %in% species_present] <- 1
+  }
+  
+  # verify matrices before passing to betapart
+  cat("  Matrix dimensions - before:", paste(dim(pa_before), collapse=" x "), "\n")
+  cat("  Matrix dimensions - after:", paste(dim(pa_after), collapse=" x "), "\n")
+  cat("  Column names match:", identical(colnames(pa_before), colnames(pa_after)), "\n")
+  cat("  All values 0 or 1 - before:", all(pa_before %in% c(0, 1)), "\n")
+  cat("  All values 0 or 1 - after:", all(pa_after %in% c(0, 1)), "\n")
+  
+  # convert to dataframe for betapart
+  # use check.names=FALSE to preserve original species names without modification
+  pa_before <- as.data.frame(pa_before, check.names = FALSE)
+  pa_after <- as.data.frame(pa_after, check.names = FALSE)
+  
+  # final check after conversion
+  cat("  After df conversion - names match:", identical(names(pa_before), names(pa_after)), "\n")
   
   # calculate temporal beta diversity using betapart
   beta_temp_result <- betapart::beta.temp(pa_before, pa_after, 
                                           index.family = "jaccard")
   
   # add betapart results to the filtered dataframe
-  df_filtered <- df_filtered |>
-    mutate(beta_jtu = beta_temp_result$beta.jtu,    # Turnover component
-           beta_jne = beta_temp_result$beta.jne,    # Nestedness component
-           beta_jac = beta_temp_result$beta.jac)    # Total dissimilarity (jtu + jne)
+  # beta.temp returns a dataframe with one row per site (cell)
+  df_filtered$beta_jtu <- beta_temp_result$beta.jtu    # Turnover component
+  df_filtered$beta_jne <- beta_temp_result$beta.jne    # Nestedness component
+  df_filtered$beta_jac <- beta_temp_result$beta.jac    # Total dissimilarity (jtu + jne)
   
-  # also calculate manual JDI for comparison/validation
+  # Also calculate manual JDI for comparison/validation
   df_filtered <- df_filtered |>
     rowwise() |>
-    mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
-           union_size = length(union(species_list_before, species_list_after)),
-           JDI_manual = 1 - (intersection_size / union_size)) |>
+    mutate(
+      intersection_size = length(intersect(species_list_before, species_list_after)),
+      union_size = length(union(species_list_before, species_list_after)),
+      JDI_manual = 1 - (intersection_size / union_size)
+    ) |>
     ungroup()
   
-  # get an update if the function has finished running
+  # update if function is finished
   cat("  ✓ Betapart calculations complete\n")
   
-  # return the filtered dataframe
-  return(df_filtered)          
-           
+  return(df_filtered)
 }
-
 
 ## 7.1. First period: 2000-2006 ------------------------------------------------
 
-# Filter cells with < 3 species in each time step
-cell_2000_2006_filtered <- cell_2000_2006_summary_wide_LC3 |>
-  filter(total_spp_before >= 3 & total_spp_after >= 3)
-
-# Calculate Jaccard's Dissimilarity Index
-turnover_2000_2006_lc <- cell_2000_2006_filtered |>
-  rowwise() |>
-  # calculate shared (intersection) and total (union) species
-  mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
-         union_size = length(union(species_list_before, species_list_after)),
-         JDI = 1 - (intersection_size / union_size)) |>
-  ungroup()
+# Calculate temporal turnover for first period
+turnover_2000_2006_lc <- calculate_betapart_temporal(cell_2000_2006_summary_wide_LC3)
 
 # Save df 
 save(turnover_2000_2006_lc,
@@ -622,18 +623,8 @@ save(turnover_2000_2006_lc,
 
 ## 7.2. Second period: 2006-2012 -----------------------------------------------
 
-# Filter cells with < 3 species in each time step
-cell_2006_2012_filtered <- cell_2006_2012_summary_wide_LC3 |>
-  filter(total_spp_before >= 3 & total_spp_after >= 3)
-
-# Calculate Jaccard's Dissimilarity Index
-turnover_2006_2012_lc <- cell_2006_2012_filtered |>
-  rowwise() |>
-  # calculate shared (intersection) and total (union) species
-  mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
-         union_size = length(union(species_list_before, species_list_after)),
-         JDI = 1 - (intersection_size / union_size)) |>
-  ungroup()
+# Calculate temporal turnover for second period
+turnover_2006_2012_lc <- calculate_betapart_temporal(cell_2006_2012_summary_wide_LC3)
 
 # Save df 
 save(turnover_2006_2012_lc,
@@ -641,31 +632,43 @@ save(turnover_2006_2012_lc,
 
 ## 7.3. Third period: 2012-2018 ------------------------------------------------
 
-# Filter cells with < 3 species in each time step
-cell_2012_2018_filtered <- cell_2012_2018_summary_wide_LC3 |>
-  filter(total_spp_before >= 3 & total_spp_after >= 3)
-
-# Calculate Jaccard's Dissimilarity Index
-turnover_2012_2018_lc <- cell_2012_2018_filtered |>
-  rowwise() |>
-  # calculate shared (intersection) and total (union) species
-  mutate(intersection_size = length(intersect(species_list_before, species_list_after)),
-         union_size = length(union(species_list_before, species_list_after)),
-         JDI = 1 - (intersection_size / union_size)) |>
-  ungroup()
+# Calculate temporal turnover for third period
+turnover_2012_2018_lc <- calculate_betapart_temporal(cell_2012_2018_summary_wide_LC3)
 
 # Save df 
 save(turnover_2012_2018_lc,
      file = here("data", "derived_data", "turnover_2012_2018_all_data.rda"))
 
-## 7.4 Combine all into single df ----------------------------------------------
+## 7.4. Validation: compare betapart & the manual JDI calculation --------------
+
+# For each period, check if beta.jac matches manual JDI
+for(period_name in c("2000-2006", "2006-2012", "2012-2018")) {
+  
+  if(period_name == "2000-2006") df <- turnover_2000_2006_lc
+  if(period_name == "2006-2012") df <- turnover_2006_2012_lc
+  if(period_name == "2012-2018") df <- turnover_2012_2018_lc
+  
+  cat("\nPeriod:", period_name, "\n")
+  cat("  Correlation (beta.jac vs JDI_manual):", 
+      round(cor(df$beta_jac, df$JDI_manual), 6), "\n")
+  cat("  Mean absolute difference:", 
+      round(mean(abs(df$beta_jac - df$JDI_manual)), 8), "\n")
+  
+  # Show first few values for inspection
+  cat("  Sample comparison (first 5 cells):\n")
+  print(df |> 
+          select(cell_ID, beta_jac, JDI_manual, beta_jtu, beta_jne) |> 
+          head(5))
+}
+
+## 7.5 Combine all into single df ----------------------------------------------
 
 # Combine all periods into a single dataframe 
 all_periods_turnover_all_land_cover_chanegs_15km <- bind_rows(turnover_2000_2006_lc,
                                                               turnover_2006_2012_lc,
                                                               turnover_2012_2018_lc)
 
-## 7.5. Add SSB ID Grid --------------------------------------------------------
+## 7.6. Add SSB ID Grid --------------------------------------------------------
 
 # Check column names in SSB ID grid
 names(ssb_grid)
