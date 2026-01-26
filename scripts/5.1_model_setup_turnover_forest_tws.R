@@ -1,25 +1,27 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 4.1_model_setup_turnover_forest_tws
+# 5.1_model_setup_turnover_forest_tws
 # This script contains code which sets up the models exploring the impact of 
 # Forest -> TWS land cover transition on temporal turnover for all occurrences,
 # plant-only occurrences and bird-only occurrences
 ##----------------------------------------------------------------------------##
+
 library(here)
 source(here("scripts", "0_setup.R"))
+
 # 1. LOAD DATA -----------------------------------------------------------------
 
 # Turnover data for all occurrences
-# load(here("data", "derived_data", 
-#           "all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+load(here("data", "derived_data", 
+          "all_periods_turnover_all_land_cover_climate_15km.rda"))
 
 # Turnover data for plants
 load(here("data", "derived_data", 
-          "vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+          "vascular_plants_turnover_all_land_cover_climate_15km.rda"))
 
 # Turnover data for birds
 load(here("data", "derived_data", 
-          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+          "bird_turnover_all_land_cover_climate_15km.rda"))
 
 # 2. ALL OCCURRENCES -----------------------------------------------------------
 
@@ -27,10 +29,10 @@ load(here("data", "derived_data",
 
 # Select only Forest -> TWS columns
 # check column names
-colnames(all_periods_turnover_all_land_cover_chanegs_15km)
+colnames(all_periods_turnover_with_climate)
 
 # Also rename the columns for easier manipulation of df
-turnover_forest_tws_15km <- all_periods_turnover_all_land_cover_chanegs_15km |>
+turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
             '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
             '2006-2012_TWS no change', '2006-2012_TWS to Forest',
@@ -145,7 +147,7 @@ any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = 
 
 # Define GLS
 FTWS_turnover_model5_gls_log <- gls(JDI ~ forest_to_tws + forest_no_change +
-                    delta_recorder_effort + log_recorder_effort + lc_time_period,
+                    delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
                   method = "REML")
@@ -201,31 +203,6 @@ ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_tur
 ggsave(filename = here("figures", "Figure6a_gls_model_output_all_occurrences_turnover.svg"),
        width = 12, height = 8, dpi = 300)
 
-## 2.5. GAM with delta recorder effort and spatial smooth ----------------------
-
-# Convert lc_time_period to factor
-turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
-  mutate(lc_time_period = as.factor(lc_time_period))
-
-# Modify JDI values so that they do not touch [0,1] - to fit a beta GAM
-# get N
-N <- nrow(turnover_forest_tws_15km_coords_time)
-# calculate new JDI values
-turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
-
-# Define model
-FTWS_turnover_model6_GAM <- gam(JDI_beta ~ forest_to_tws + forest_no_change + s(delta_recorder_effort) +
-                           log_recorder_effort + lc_time_period +
-                           s(x, y, by = lc_time_period, k = 120),
-                         data = turnover_forest_tws_15km_coords_time,
-                         family = betar(link = "logit"),
-                         method = "REML")
-
-# Save model output
-save(FTWS_turnover_model6_GAM,
-     file = here("data", "models", "exploratory",
-                 "FTWS_turnover_model6_GAM.RData"))
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
@@ -233,10 +210,10 @@ save(FTWS_turnover_model6_GAM,
 
 # Select only Forest -> TWS columns
 # check column names
-colnames(vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km)
+colnames(vascular_plants_turnover_with_climate)
 
 # Also rename the columns for easier manipulation of df
-plants_turnover_forest_tws_15km <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km |>
+plants_turnover_forest_tws_15km <- vascular_plants_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
             '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
             '2006-2012_TWS no change', '2006-2012_TWS to Forest',
@@ -284,7 +261,7 @@ any(!is.finite(plants_turnover_forest_tws_15km_coords_time$recorder_effort)) # F
 
 # Define GLS
 plants_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
-                    delta_recorder_effort + log_recorder_effort + lc_time_period,
+                    delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = plants_turnover_forest_tws_15km_coords_time,
                   method = "REML")
@@ -389,10 +366,10 @@ save(plants_FTWS_model3_GAM_extra_smooth,
 ## 4.1. Prepare bird data for analysis -----------------------------------------
 
 # Check column names
-colnames(birds_all_periods_turnover_all_land_cover_chanegs_15km)
+colnames(birds_turnover_with_climate)
 
 # Also rename the columns for easier manipulation of df
-birds_turnover_forest_tws_15km <- birds_all_periods_turnover_all_land_cover_chanegs_15km |>
+birds_turnover_forest_tws_15km <- birds_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
             '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
             '2006-2012_TWS no change', '2006-2012_TWS to Forest',
@@ -439,11 +416,11 @@ summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-# birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change + 
-#                            delta_recorder_effort + log_recorder_effort + lc_time_period,
-#                          correlation = corExp(form = ~ x + y | time_numeric),  
-#                          data = birds_turnover_forest_tws_15km_coords_time,
-#                          method = "REML")
+birds_FTWS_model1_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
+                           delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
+                         correlation = corExp(form = ~ x + y | time_numeric),
+                         data = birds_turnover_forest_tws_15km_coords_time,
+                         method = "REML")
 
 # Save model output to file
 # save(birds_FTWS_model1_gls, 
