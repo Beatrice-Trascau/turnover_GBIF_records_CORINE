@@ -686,6 +686,14 @@ model8_gls <- gls(JDI ~ forest_to_tws + forest_no_change +
 
 Since this GLS was the one that worked, and we wanted to keep things consistent, we decided to run the same model for the other land-cover transitions and the other metrics as well.
 
+## Update 26.01.2026
+
+Previously, we had used a custom function to calculate temporal JDI. Now, we have integrated the calculation of JDI, temporal turnover and nestedness components using the betapart package.
+
+We have also used CHELSA to extract data about the change in temperature and change in precipitation for each cell.
+
+We have now modified the GLS models to include the "climate change" terms and we will look at the impact of land-cover changes on three things: 1) temporal turnover, 2) nestedness, 3) change in species richness.
+
 # Species Loss and Gain (5.1)
 
 ## Forest -\> TWS
