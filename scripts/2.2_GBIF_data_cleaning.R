@@ -52,7 +52,7 @@ coordinate_flags <- clean_coordinates(x = clean_occurrences4,
                                       lon = "decimalLongitude",
                                       lat = "decimalLatitude",
                                       species = "species",
-                                      test = c("equal", "gbif", "zeros"))
+                                      tests = c("equal", "gbif", "zeros"))
 
 # Get a summary of the records
 summary(coordinate_flags) # no flagged records
