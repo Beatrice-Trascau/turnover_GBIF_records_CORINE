@@ -105,7 +105,7 @@ year <- cit$year
 title <- cit$title
 
 # Extract version
-version <- as.character(packageVersion("terra"))
+version <- as.character(packageVersion("sf"))
 
 # Extract URL
 url <- cit$url
@@ -142,7 +142,7 @@ year <- cit$year
 title <- cit$title
 
 # Extract version
-version <- as.character(packageVersion("terra"))
+version <- as.character(packageVersion("CoordinateCleaner"))
 
 # Extract URL
 url <- cit$url
@@ -158,5 +158,42 @@ ris <- c("TY  - COMP",
 
 # Write .RIS reference to file
 writeLines(ris, "references/CoordinateCleaner.ris")
+
+## 2.4. NLME ------------------------------------------------------
+
+# Get citation info
+cit <- citation("nlme")
+
+# Extract authors
+authors <- paste(
+  sapply(cit$author, function(a) {
+    paste(a$family, paste(a$given, collapse = " "), sep = ", ")
+  }),
+  collapse = "\nAU  - "
+)
+
+# Extract year
+year <- cit$year
+
+# Extract title
+title <- cit$title
+
+# Extract version
+version <- as.character(packageVersion("nlme"))
+
+# Extract URL
+url <- cit$url
+
+# Build RIS entry
+ris <- c("TY  - COMP",
+         paste0("TI  - ", title),
+         paste0("AU  - ", authors),
+         paste0("PY  - ", year),
+         paste0("N1  - R package version ", version),
+         paste0("UR  - ", url),
+         "ER  -")
+
+# Write .RIS reference to file
+writeLines(ris, "references/nlme.ris")
 
 # END OF SCRIPT ----------------------------------------------------------------
