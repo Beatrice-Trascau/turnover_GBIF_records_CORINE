@@ -466,7 +466,7 @@ pred_1 <- coefs["(Intercept)"] +
 # Plot prediction for forest to tws
 plot1 <- ggplot(data.frame(x = pred_range_1, y = pred_1), aes(x = x, y = y)) +
   geom_line(color = line_color, linewidth = 1.2) +
-  labs(x = "Forest → TWS (proportion)", y = "Predicted beta_jtu", title = "a)") +
+  labs(x = "TWS → Forest (proportion)", y = "Predicted beta_jtu", title = "a)") +
   theme_classic() +
   theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
         axis.title = element_text(size = 10),
@@ -494,7 +494,7 @@ pred_2 <- coefs["(Intercept)"] +
 # Plot prediction for forest no change
 plot2 <- ggplot(data.frame(x = pred_range_2, y = pred_2), aes(x = x, y = y)) +
   geom_line(color = line_color, linewidth = 1.2) +
-  labs(x = "Forest no change (proportion)", y = NULL, title = "b)") +
+  labs(x = "TWS no change (proportion)", y = NULL, title = "b)") +
   theme_classic() +
   theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
         axis.title = element_text(size = 10),
