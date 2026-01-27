@@ -378,15 +378,15 @@ coef_table
 # Use function defined in section 14.2 of the 0_setup.R script
 
 # Create plots for each model
-plot_all <- create_coef_plot(TWSF_turnover_model1, 
+plot_all <- create_coef_plot_tws(TWSF_turnover_model1, 
                              "a) All occurrences", 
                              show_y_axis = TRUE)
 
-plot_plants <- create_coef_plot(plants_TWSF_model1_gls, 
+plot_plants <- create_coef_plot_tws(plants_TWSF_model1_gls, 
                                 "b) Vascular plants", 
                                 show_y_axis = FALSE)
 
-plot_birds <- create_coef_plot(birds_TWSF_model1_gls, 
+plot_birds <- create_coef_plot_tws(birds_TWSF_model1_gls, 
                                "c) Birds", 
                                show_y_axis = FALSE)
 
