@@ -1624,48 +1624,6 @@ bird_plots <- plot_grid(bird_jdi_hist, bird_forest_to_tws_hist, bird_forest_no_c
 bird_plots
 ```
 
-## Correlation Matrix
-
-```{r bird correlation matrix}
-#| label: fig-variables-relationships-birds
-#| echo: false
-#| fig-cap: "Correlation matrix of variables used in the bird models"
-#| fig-width: 6
-#| fig-height: 4
-
-# Check if there are any cells with recorder effort = 0
-c <- birds_turnover_forest_tws_15km |>
-  filter(recorder_effort == 0)
-length(c) #0 - Good!
-
-# Log transform recorder effort values
-birds_turnover_forest_tws_15km <- birds_turnover_forest_tws_15km |>
-  mutate(log_recorder_effort = log(recorder_effort))
-
-
-# Correlation matrix for numeric variables
-bird_numeric_vars <- birds_turnover_forest_tws_15km |>
-  select(JDI, forest_to_tws, forest_no_change, 
-         intersection_size, union_size, 
-         total_spp_before, total_spp_after,
-         total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort,
-         log_recorder_effort)
-
-# Calculate correlation matrix
-bird_cor_matrix <- cor(bird_numeric_vars, use = "pairwise.complete.obs")
-
-# Create correlation plot
-bird_cor_plot <- corrplot(bird_cor_matrix, 
-                     method = "circle", 
-                     type = "upper", 
-                     tl.col = "black", 
-                     tl.srt = 45, 
-                     addCoef.col = "black", 
-                     number.cex = 0.7,
-                     diag = FALSE)
-```
-
 ## Modeling
 
 ### (Final) Trial 1: GLS
@@ -1814,7 +1772,7 @@ We also ran a model with an interaction term between land-cover changes and clim
 load(here("data", "models", "exploratory", "birds_FTWS_model2_gls_interaction.RData"))
 
 # Extract residuals
-plant_residuals_gls <- residuals(birds_FTWS_model2_gls_interaction, type = "normalized")
+bird_residuals_gls <- residuals(birds_FTWS_model2_gls_interaction, type = "normalized")
 
 # Get the data actually used in the model
 plants_model_data <- getData(birds_FTWS_model2_gls_interaction)
@@ -1823,22 +1781,22 @@ plants_model_data <- getData(birds_FTWS_model2_gls_interaction)
 par(mfrow = c(2, 2))
 
 # Residuals vs fitted
-plot(fitted(birds_FTWS_model2_gls_interaction), plant_residuals_gls,
+plot(fitted(birds_FTWS_model2_gls_interaction), bird_residuals_gls,
      xlab = "Fitted Values", ylab = "Normalized Residuals",
      main = "Residuals vs Fitted")
 abline(h = 0, col = "red", lty = 2)
 
 # QQ plot
-qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
-qqline(plant_residuals_gls, col = "red")
+qqnorm(bird_residuals_gls, main = "Normal Q-Q Plot")
+qqline(bird_residuals_gls, col = "red")
 
 # Residuals vs predictors
-plot(plants_model_data$forest_to_tws, plant_residuals_gls,
+plot(plants_model_data$forest_to_tws, bird_residuals_gls,
      xlab = "Forest to TWS", ylab = "Normalized Residuals",
      main = "Residuals vs Forest to TWS")
 abline(h = 0, col = "red", lty = 2)
 
-plot(plants_model_data$log_recorder_effort, plant_residuals_gls,
+plot(plants_model_data$log_recorder_effort, bird_residuals_gls,
      xlab = "Recorder Effort", ylab = "Normalized Residuals",
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
