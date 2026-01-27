@@ -430,5 +430,190 @@ ggsave(filename = here("figures", "Figure6ghi_betaJTU_AllUrban_models.png"),
 ggsave(filename = here("figures", "Figure6ghi_betaJTU_AllUrban_models.pdf"),
        plot = final_plot, width = 14, height = 7, bg = "white")
 
+# 6. PREDICTION PLOTS ----------------------------------------------------------
+
+## 6.1. All occurrences --------------------------------------------------------
+
+# Get the data and model coefficients
+data_clean <- turnover_all_urban_15km_coords_time
+coefs <- coef(AllUrban_turnover_model1_gls)
+
+# Define colors
+line_color <- "#2196F3"
+
+# Plot 1: all_to_urban 
+
+# Get range of values
+pred_range_1 <- seq(min(data_clean$all_to_urban, na.rm = TRUE),
+                    max(data_clean$all_to_urban, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual prediction calculation
+pred_1 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * pred_range_1 +
+  coefs["urban_no_change"] * mean(data_clean$urban_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1  # Reference level = 2006-2012
+
+# Plot prediction for forest to tws
+plot1 <- ggplot(data.frame(x = pred_range_1, y = pred_1), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "All → Urban (proportion)", y = "Predicted beta_jtu", title = "a)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 2: urban_no_change 
+
+# Get range of values for urban_no_change 
+pred_range_2 <- seq(min(data_clean$urban_no_change, na.rm = TRUE),
+                    max(data_clean$urban_no_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictors
+pred_2 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * mean(data_clean$all_to_urban, na.rm = TRUE) +
+  coefs["urban_no_change"] * pred_range_2 +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot prediction for forest no change
+plot2 <- ggplot(data.frame(x = pred_range_2, y = pred_2), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "No Change (proportion)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 3: log_recorder_effort 
+
+# Get range of values
+pred_range_3 <- seq(min(data_clean$log_recorder_effort, na.rm = TRUE),
+                    max(data_clean$log_recorder_effort, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictor
+pred_3 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * mean(data_clean$all_to_urban, na.rm = TRUE) +
+  coefs["urban_no_change"] * mean(data_clean$urban_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * pred_range_3 +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predictor for log_recorder_effort
+plot3 <- ggplot(data.frame(x = pred_range_3, y = pred_3), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 4: delta_recorder_effort 
+
+# Get range of values for delta recorder effort
+pred_range_4 <- seq(min(data_clean$delta_recorder_effort, na.rm = TRUE),
+                    max(data_clean$delta_recorder_effort, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictor
+pred_4 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * mean(data_clean$all_to_urban, na.rm = TRUE) +
+  coefs["urban_no_change"] * mean(data_clean$urban_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * pred_range_4 +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for delta recorder effort
+plot4 <- ggplot(data.frame(x = pred_range_4, y = pred_4), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "ΔRecorder effort", y = "Predicted beta_jtu", title = "d)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 5: temp_change 
+
+# Get range of temperature change values
+pred_range_5 <- seq(min(data_clean$temp_change, na.rm = TRUE),
+                    max(data_clean$temp_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictors
+pred_5 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * mean(data_clean$all_to_urban, na.rm = TRUE) +
+  coefs["urban_no_change"] * mean(data_clean$urban_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * pred_range_5 +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for temperature change
+plot5 <- ggplot(data.frame(x = pred_range_5, y = pred_5), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 6: precip_change
+
+# Get range of values for precipitation changes
+pred_range_6 <- seq(min(data_clean$precip_change, na.rm = TRUE),
+                    max(data_clean$precip_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictions
+pred_6 <- coefs["(Intercept)"] + 
+  coefs["all_to_urban"] * mean(data_clean$all_to_urban, na.rm = TRUE) +
+  coefs["urban_no_change"] * mean(data_clean$urban_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * pred_range_6 +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for precipitation change
+plot6 <- ggplot(data.frame(x = pred_range_6, y = pred_6), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Combine all plots 
+
+combined_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_plot)
 
 # END OF SCRIPT ----------------------------------------------------------------
