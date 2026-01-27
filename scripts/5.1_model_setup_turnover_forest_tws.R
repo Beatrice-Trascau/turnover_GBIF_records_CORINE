@@ -214,7 +214,6 @@ coef_table <- coef_df |>
 # Display table
 coef_table
 
-
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
 ## 3.1. Prepare plant data for analysis ----------------------------------------
@@ -418,7 +417,7 @@ birds_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change 
                                           correlation = corExp(form = ~ x + y | time_numeric),
                                           data = plants_turnover_forest_tws_15km_coords_time,
                                           method = "REML")
-# Model validaiton looked ok enough
+# Model validation looked ok enough
 
 # Compare models based on AIC
 AICtab(birds_FTWS_model1_gls, birds_FTWS_model2_gls_interaction, base = TRUE)
@@ -463,116 +462,7 @@ coef_table
 
 # 5. PLOT MODEL OUTPUTS --------------------------------------------------------
 
-# Function to create coefficient plot for a single model
-create_coef_plot <- function(model, title, show_y_axis = TRUE) {
-  
-  # get model summary
-  model_summary <- summary(model)
-  
-  # create a dataframe of the coefficients
-  coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
-                        estimate = model_summary$tTable[, "Value"],
-                        std.error = model_summary$tTable[, "Std.Error"],
-                        statistic = model_summary$tTable[, "t-value"],
-                        p.value = model_summary$tTable[, "p-value"]) |>
-    mutate(conf.low = estimate - 1.96 * std.error,
-           conf.high = estimate + 1.96 * std.error,
-           significance = case_when(p.value < 0.001 ~ "***",
-                                    p.value < 0.01 ~ "**", 
-                                    p.value < 0.05 ~ "*",
-                                    p.value < 0.1 ~ ".",
-                                    TRUE ~ ""),
-      effect_type = case_when(term == "(Intercept)" ~ "Intercept",
-                              p.value < 0.05 & estimate < 0 ~ "Negative (sig.)",
-                              p.value < 0.05 & estimate > 0 ~ "Positive (sig.)",
-                              TRUE ~ "Non-significant"),
-      term_clean = case_when(term == "(Intercept)" ~ "Intercept",
-                             term == "forest_to_tws" ~ "Forest → TWS",
-                             term == "forest_no_change" ~ "Forest (no change)",
-                             term == "delta_recorder_effort" ~ "ΔRecorder effort",
-                             term == "log_recorder_effort" ~ "log(Recorder effort)",
-                             term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
-                             term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
-                             term == "temp_change" ~ "Temperature change",
-                             term == "precip_change" ~ "Precipitation change",
-                             TRUE ~ term))
-  
-  # split into intercept and effects
-  intercept_df <- coef_df |> filter(term == "(Intercept)")
-  effects_df <- coef_df |> 
-    filter(term != "(Intercept)") |>
-    mutate(term_clean = factor(term_clean, 
-                               levels = rev(c("Forest → TWS",
-                                              "Forest (no change)", 
-                                              "Temperature change",
-                                              "Precipitation change",
-                                              "ΔRecorder effort",
-                                              "log(Recorder effort)",
-                                              "Period: 2006-2012",
-                                              "Period: 2012-2018"))))
-  
-  # define colors
-  effect_colors <- c( "Negative (sig.)" = "#9C27B0",
-                      "Positive (sig.)" = "#FF9800",  
-                      "Non-significant" = "grey60",
-                      "Intercept" = "grey30")
-  
-  # create intercept plot (top)
-  plot_intercept <- ggplot(intercept_df, aes(x = estimate, y = term_clean)) +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
-    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
-                   height = 0.2, linewidth = 0.7, color = "grey30") +
-    geom_point(aes(color = effect_type), size = 3, shape = 15) +
-    geom_text(aes(x = conf.high, label = significance), 
-              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
-    scale_color_manual(values = effect_colors, guide = "none") +
-    labs(x = NULL, y = NULL, title = title) +
-    theme_classic() +
-    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
-          axis.text.y = element_text(size = 10, color = "black", face = "bold"),
-          axis.text.x = element_text(size = 9, color = "black"),
-          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
-          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
-          plot.margin = margin(t = 5, r = 10, b = 2, l = 5)) +
-    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
-  
-  # create effects plot (bottom)
-  plot_effects <- ggplot(effects_df, aes(x = estimate, y = term_clean)) +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
-    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
-                   height = 0.2, linewidth = 0.7, color = "grey30") +
-    geom_point(aes(color = effect_type), size = 3) +
-    geom_text(aes(x = conf.high, label = significance), 
-              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
-    scale_color_manual(values = effect_colors,
-                       name = "Effect type",
-                       breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
-                       labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")) +
-    labs(x = NULL, y = NULL) +
-    theme_classic() +
-    theme(axis.text.x = element_text(size = 9, color = "black"),
-          legend.position = "none",
-          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
-          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
-          plot.margin = margin(t = 2, r = 10, b = 5, l = 5)) +
-    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
-  
-  # show or hide y-axis labels
-  if (!show_y_axis) {
-    plot_intercept <- plot_intercept + 
-      theme(axis.text.y = element_blank(),
-            axis.ticks.y = element_blank())
-    plot_effects <- plot_effects + 
-      theme(axis.text.y = element_blank(),
-            axis.ticks.y = element_blank())
-  }
-  
-  # combine intercept and effects for this model
-  combined <- plot_intercept / plot_effects + 
-    plot_layout(heights = c(1, 4))
-  
-  return(combined)
-}
+# Use function defined in section 14.1 of the 0_setup.R script
 
 # Create plots for each model
 plot_all <- create_coef_plot(FTWS_turnover_model5_gls_log, 
@@ -630,7 +520,233 @@ print(final_plot)
 ggsave(filename = here("figures", "Figure6abc_betaJTU_FTWS_models.png"),
        plot = final_plot, width = 14, height = 7, dpi = 300, bg = "white")
 
-ggsave(filename = here("figures", "Figure_combined_models_3panel.pdf"),
+ggsave(filename = here("figures", "Figure6abc_betaJTU_FTWS_models.pdf"),
        plot = final_plot, width = 14, height = 7, bg = "white")
 
+# 6. PREDICTION PLOTS ----------------------------------------------------------
+
+## 6.1. All occurrences --------------------------------------------------------
+
+# Get the data and model coefficients
+data_clean <- turnover_forest_tws_15km_coords_time
+coefs <- coef(FTWS_turnover_model5_gls_log)
+
+# Define colors
+line_color <- "#2196F3"
+
+# Plot 1: forest_to_tws 
+
+# Get range of values
+pred_range_1 <- seq(min(data_clean$forest_to_tws, na.rm = TRUE),
+                    max(data_clean$forest_to_tws, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual prediction calculation
+pred_1 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * pred_range_1 +
+  coefs["forest_no_change"] * mean(data_clean$forest_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1  # Reference level = 2006-2012
+
+# Plot prediction for forest to tws
+plot1 <- ggplot(data.frame(x = pred_range_1, y = pred_1), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Forest → TWS (proportion)", y = "Predicted beta_jtu", title = "a)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 2: forest_no_change 
+
+# Get range of values for forest_no_change 
+pred_range_2 <- seq(min(data_clean$forest_no_change, na.rm = TRUE),
+                    max(data_clean$forest_no_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictors
+pred_2 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * mean(data_clean$forest_to_tws, na.rm = TRUE) +
+  coefs["forest_no_change"] * pred_range_2 +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot prediction for forest no change
+plot2 <- ggplot(data.frame(x = pred_range_2, y = pred_2), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Forest no change (proportion)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 3: log_recorder_effort 
+
+# Get range of values
+pred_range_3 <- seq(min(data_clean$log_recorder_effort, na.rm = TRUE),
+                    max(data_clean$log_recorder_effort, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictor
+pred_3 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * mean(data_clean$forest_to_tws, na.rm = TRUE) +
+  coefs["forest_no_change"] * mean(data_clean$forest_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * pred_range_3 +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predictor for log_recorder_effort
+plot3 <- ggplot(data.frame(x = pred_range_3, y = pred_3), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 4: delta_recorder_effort 
+
+# Get range of values for delta recorder effort
+pred_range_4 <- seq(min(data_clean$delta_recorder_effort, na.rm = TRUE),
+                    max(data_clean$delta_recorder_effort, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictor
+pred_4 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * mean(data_clean$forest_to_tws, na.rm = TRUE) +
+  coefs["forest_no_change"] * mean(data_clean$forest_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * pred_range_4 +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for delta recorder effort
+plot4 <- ggplot(data.frame(x = pred_range_4, y = pred_4), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "ΔRecorder effort", y = "Predicted beta_jtu", title = "d)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 5: temp_change 
+
+# Get range of temperature change values
+pred_range_5 <- seq(min(data_clean$temp_change, na.rm = TRUE),
+                    max(data_clean$temp_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictors
+pred_5 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * mean(data_clean$forest_to_tws, na.rm = TRUE) +
+  coefs["forest_no_change"] * mean(data_clean$forest_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * pred_range_5 +
+  coefs["precip_change"] * mean(data_clean$precip_change, na.rm = TRUE) +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for temperature change
+plot5 <- ggplot(data.frame(x = pred_range_5, y = pred_5), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Plot 6: precip_change
+
+# Get range of values for precipitation changes
+pred_range_6 <- seq(min(data_clean$precip_change, na.rm = TRUE),
+                    max(data_clean$precip_change, na.rm = TRUE),
+                    length.out = 100)
+
+# Manual calculation of predictions
+pred_6 <- coefs["(Intercept)"] + 
+  coefs["forest_to_tws"] * mean(data_clean$forest_to_tws, na.rm = TRUE) +
+  coefs["forest_no_change"] * mean(data_clean$forest_no_change, na.rm = TRUE) +
+  coefs["delta_recorder_effort"] * mean(data_clean$delta_recorder_effort, na.rm = TRUE) +
+  coefs["log_recorder_effort"] * mean(data_clean$log_recorder_effort, na.rm = TRUE) +
+  coefs["temp_change"] * mean(data_clean$temp_change, na.rm = TRUE) +
+  coefs["precip_change"] * pred_range_6 +
+  coefs["lc_time_period2006-2012"] * 1
+
+# Plot predicted values for precipitation change
+plot6 <- ggplot(data.frame(x = pred_range_6, y = pred_6), aes(x = x, y = y)) +
+  geom_line(color = line_color, linewidth = 1.2) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 9, color = "black"),
+        panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+        panel.grid.major = element_line(color = "grey90", linewidth = 0.3))
+
+# Combine all plots 
+
+combined_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_plot)
+
+# 7. GLS WITH DIFFERENT RECORDING EFFORT MEASUREMENT ---------------------------
+
+# Since delta recording effort seems to have a +ve effect on the turnover while
+# recording effort (total_occ_before + total_occ_after) has a -ve effect on turnover
+# which seems like a counter intuitive thing, I decided to run an additional model
+# where recorder effort is calculated as mean(total_occ_before, total_occ_after)
+# and check if the results are the same
+
+# Calculate mean recorder effort
+turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
+  mutate(recorder_effort_mean = (total_occ_before + total_occ_after) / 2,
+         log_recorder_effort_mean = log(recorder_effort_mean))
+
+# Check for any issues (zeros, NAs)
+summary(turnover_forest_tws_15km_coords_time$recorder_effort_mean)
+any(!is.finite(turnover_forest_tws_15km_coords_time$log_recorder_effort_mean))
+
+# Fit the model with mean recorder effort
+FTWS_turnover_model_mean_effort <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
+                                         delta_recorder_effort + log_recorder_effort_mean + 
+                                         lc_time_period + temp_change + precip_change,
+                                       correlation = corExp(form = ~ x + y | time_numeric),
+                                       data = turnover_forest_tws_15km_coords_time,
+                                       method = "REML")
+
+# Compare with original model
+AICtab(FTWS_turnover_model5_gls_log, FTWS_turnover_model_mean_effort, base = TRUE)
+
+# Look at the summaries side by side
+summary(FTWS_turnover_model5_gls_log)
+summary(FTWS_turnover_model_mean_effort)
+
+# Compare coefficients
+coef_sum <- coef(FTWS_turnover_model5_gls_log)
+coef_mean <- coef(FTWS_turnover_model_mean_effort)
+
+comparison <- data.frame(predictor = names(coef_sum),
+                         sum_model = coef_sum,
+                         mean_model = coef_mean,
+                         difference = coef_mean - coef_sum)
 # END OF SCRIPT ----------------------------------------------------------------
