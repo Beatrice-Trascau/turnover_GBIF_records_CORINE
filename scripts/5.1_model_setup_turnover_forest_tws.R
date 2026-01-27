@@ -415,7 +415,7 @@ birds_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change 
                                             log_recorder_effort + 
                                             lc_time_period,
                                           correlation = corExp(form = ~ x + y | time_numeric),
-                                          data = plants_turnover_forest_tws_15km_coords_time,
+                                          data = birds_turnover_forest_tws_15km_coords_time,
                                           method = "REML")
 # Model validation looked ok enough
 
@@ -465,15 +465,15 @@ coef_table
 # Use function defined in section 14.1 of the 0_setup.R script
 
 # Create plots for each model
-plot_all <- create_coef_plot(FTWS_turnover_model5_gls_log, 
+plot_all <- create_coef_plot_forest(FTWS_turnover_model5_gls_log, 
                              "a) All occurrences", 
                              show_y_axis = TRUE)
 
-plot_plants <- create_coef_plot(plants_FTWS_model1_gls, 
+plot_plants <- create_coef_plot_forest(plants_FTWS_model1_gls, 
                                 "b) Vascular plants", 
                                 show_y_axis = FALSE)
 
-plot_birds <- create_coef_plot(birds_FTWS_model1_gls, 
+plot_birds <- create_coef_plot_forest(birds_FTWS_model1_gls, 
                                "c) Birds", 
                                show_y_axis = FALSE)
 
