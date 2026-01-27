@@ -1269,7 +1269,7 @@ figure7_c
 load(here("data", "models", "exploratory","birds_TWSF_model2_gls_interaction.RData"))
 
 # Extract residuals
-plant_residuals_gls <- residuals(birds_TWSF_model2_gls_interaction,
+bird_residuals_gls <- residuals(birds_TWSF_model2_gls_interaction,
                                  type = "normalized")
 
 # Get the data actually used in the model
@@ -1279,17 +1279,17 @@ plants_model_data <- getData(birds_TWSF_model2_gls_interaction)
 par(mfrow = c(2, 2))
 
 # Residuals vs fitted
-plot(fitted(birds_TWSF_model2_gls_interaction), plant_residuals_gls,
+plot(fitted(birds_TWSF_model2_gls_interaction), bird_residuals_gls,
      xlab = "Fitted Values", ylab = "Normalized Residuals",
      main = "Residuals vs Fitted")
 abline(h = 0, col = "red", lty = 2)
 
 # QQ plot
-qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
-qqline(plant_residuals_gls, col = "red")
+qqnorm(bird_residuals_gls, main = "Normal Q-Q Plot")
+qqline(bird_residuals_gls, col = "red")
 
 # Residuals vs predictors
-plot(plants_model_data$tws_to_forest, plant_residuals_gls,
+plot(plants_model_data$tws_to_forest, bird_residuals_gls,
      xlab = "TWS to Forest", ylab = "Normalized Residuals",
      main = "Residuals vs Forest to TWS")
 abline(h = 0, col = "red", lty = 2)
