@@ -378,4 +378,235 @@ download_drive_folder <- function(folder_id, folder_name, local_path) {
   }
 }
 
+# 14. MODEL OUTPUT PLOTTING FUNCTIONS ------------------------------------------
+
+## 14.1. Forest to Transitional Woodland Shrub ---------------------------------
+
+# Function to create coefficient plot for a single model
+create_coef_plot <- function(model, title, show_y_axis = TRUE) {
+  
+  # get model summary
+  model_summary <- summary(model)
+  
+  # create a dataframe of the coefficients
+  coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                        estimate = model_summary$tTable[, "Value"],
+                        std.error = model_summary$tTable[, "Std.Error"],
+                        statistic = model_summary$tTable[, "t-value"],
+                        p.value = model_summary$tTable[, "p-value"]) |>
+    mutate(conf.low = estimate - 1.96 * std.error,
+           conf.high = estimate + 1.96 * std.error,
+           significance = case_when(p.value < 0.001 ~ "***",
+                                    p.value < 0.01 ~ "**", 
+                                    p.value < 0.05 ~ "*",
+                                    p.value < 0.1 ~ ".",
+                                    TRUE ~ ""),
+           effect_type = case_when(term == "(Intercept)" ~ "Intercept",
+                                   p.value < 0.05 & estimate < 0 ~ "Negative (sig.)",
+                                   p.value < 0.05 & estimate > 0 ~ "Positive (sig.)",
+                                   TRUE ~ "Non-significant"),
+           term_clean = case_when(term == "(Intercept)" ~ "Intercept",
+                                  term == "forest_to_tws" ~ "Forest → TWS",
+                                  term == "forest_no_change" ~ "Forest (no change)",
+                                  term == "delta_recorder_effort" ~ "ΔRecorder effort",
+                                  term == "log_recorder_effort" ~ "log(Recorder effort)",
+                                  term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
+                                  term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
+                                  term == "temp_change" ~ "Temperature change",
+                                  term == "precip_change" ~ "Precipitation change",
+                                  TRUE ~ term))
+  
+  # split into intercept and effects
+  intercept_df <- coef_df |> filter(term == "(Intercept)")
+  effects_df <- coef_df |> 
+    filter(term != "(Intercept)") |>
+    mutate(term_clean = factor(term_clean, 
+                               levels = rev(c("Forest → TWS",
+                                              "Forest (no change)", 
+                                              "Temperature change",
+                                              "Precipitation change",
+                                              "ΔRecorder effort",
+                                              "log(Recorder effort)",
+                                              "Period: 2006-2012",
+                                              "Period: 2012-2018"))))
+  
+  # define colors
+  effect_colors <- c( "Negative (sig.)" = "#9C27B0",
+                      "Positive (sig.)" = "#FF9800",  
+                      "Non-significant" = "grey60",
+                      "Intercept" = "grey30")
+  
+  # create intercept plot (top)
+  plot_intercept <- ggplot(intercept_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3, shape = 15) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors, guide = "none") +
+    labs(x = NULL, y = NULL, title = title) +
+    theme_classic() +
+    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+          axis.text.y = element_text(size = 10, color = "black", face = "bold"),
+          axis.text.x = element_text(size = 9, color = "black"),
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 5, r = 10, b = 2, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # create effects plot (bottom)
+  plot_effects <- ggplot(effects_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors,
+                       name = "Effect type",
+                       breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
+                       labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")) +
+    labs(x = NULL, y = NULL) +
+    theme_classic() +
+    theme(axis.text.x = element_text(size = 9, color = "black"),
+          legend.position = "none",
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 2, r = 10, b = 5, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # show or hide y-axis labels
+  if (!show_y_axis) {
+    plot_intercept <- plot_intercept + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+    plot_effects <- plot_effects + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+  }
+  
+  # combine intercept and effects for this model
+  combined <- plot_intercept / plot_effects + 
+    plot_layout(heights = c(1, 4))
+  
+  return(combined)
+}
+
+## 14.2. Transitional Woodland Shrub to Forest ---------------------------------
+
+# Function to create coefficient plot for a single model
+create_coef_plot <- function(model, title, show_y_axis = TRUE) {
+  
+  # get model summary
+  model_summary <- summary(model)
+  
+  # create a dataframe of the coefficients
+  coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
+                        estimate = model_summary$tTable[, "Value"],
+                        std.error = model_summary$tTable[, "Std.Error"],
+                        statistic = model_summary$tTable[, "t-value"],
+                        p.value = model_summary$tTable[, "p-value"]) |>
+    mutate(conf.low = estimate - 1.96 * std.error,
+           conf.high = estimate + 1.96 * std.error,
+           significance = case_when(p.value < 0.001 ~ "***",
+                                    p.value < 0.01 ~ "**", 
+                                    p.value < 0.05 ~ "*",
+                                    p.value < 0.1 ~ ".",
+                                    TRUE ~ ""),
+           effect_type = case_when(term == "(Intercept)" ~ "Intercept",
+                                   p.value < 0.05 & estimate < 0 ~ "Negative (sig.)",
+                                   p.value < 0.05 & estimate > 0 ~ "Positive (sig.)",
+                                   TRUE ~ "Non-significant"),
+           term_clean = case_when(term == "(Intercept)" ~ "Intercept",
+                                  term == "tws_to_forest" ~ "TWS → Forest",
+                                  term == "tws_no_change" ~ "TWS (no change)",
+                                  term == "delta_recorder_effort" ~ "ΔRecorder effort",
+                                  term == "log_recorder_effort" ~ "log(Recorder effort)",
+                                  term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
+                                  term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
+                                  term == "temp_change" ~ "Temperature change",
+                                  term == "precip_change" ~ "Precipitation change",
+                                  TRUE ~ term))
+  
+  # split into intercept and effects
+  intercept_df <- coef_df |> filter(term == "(Intercept)")
+  effects_df <- coef_df |> 
+    filter(term != "(Intercept)") |>
+    mutate(term_clean = factor(term_clean, 
+                               levels = rev(c("TWS → Forest",
+                                              "TWS (no change)", 
+                                              "Temperature change",
+                                              "Precipitation change",
+                                              "ΔRecorder effort",
+                                              "log(Recorder effort)",
+                                              "Period: 2006-2012",
+                                              "Period: 2012-2018"))))
+  
+  # define colors
+  effect_colors <- c( "Negative (sig.)" = "#9C27B0",
+                      "Positive (sig.)" = "#FF9800",  
+                      "Non-significant" = "grey60",
+                      "Intercept" = "grey30")
+  
+  # create intercept plot (top)
+  plot_intercept <- ggplot(intercept_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3, shape = 15) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors, guide = "none") +
+    labs(x = NULL, y = NULL, title = title) +
+    theme_classic() +
+    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+          axis.text.y = element_text(size = 10, color = "black", face = "bold"),
+          axis.text.x = element_text(size = 9, color = "black"),
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 5, r = 10, b = 2, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # create effects plot (bottom)
+  plot_effects <- ggplot(effects_df, aes(x = estimate, y = term_clean)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                   height = 0.2, linewidth = 0.7, color = "grey30") +
+    geom_point(aes(color = effect_type), size = 3) +
+    geom_text(aes(x = conf.high, label = significance), 
+              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
+    scale_color_manual(values = effect_colors,
+                       name = "Effect type",
+                       breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
+                       labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")) +
+    labs(x = NULL, y = NULL) +
+    theme_classic() +
+    theme(axis.text.x = element_text(size = 9, color = "black"),
+          legend.position = "none",
+          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+          panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
+          plot.margin = margin(t = 2, r = 10, b = 5, l = 5)) +
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  
+  # show or hide y-axis labels
+  if (!show_y_axis) {
+    plot_intercept <- plot_intercept + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+    plot_effects <- plot_effects + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+  }
+  
+  # combine intercept and effects for this model
+  combined <- plot_intercept / plot_effects + 
+    plot_layout(heights = c(1, 4))
+  
+  return(combined)
+}
+
+
+
+
 # END OF SCRIPT ----------------------------------------------------------------
