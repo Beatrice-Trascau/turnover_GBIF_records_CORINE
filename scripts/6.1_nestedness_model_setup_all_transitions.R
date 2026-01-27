@@ -377,9 +377,65 @@ save(birds_TWSF_beta_jne_model2_interaction,
 # Compare models based on AIC
 AICtab(birds_TWSF_beta_jne_model1, birds_TWSF_beta_jne_model2_interaction, base = TRUE)
 
+# 4. ALL -> URBAN NESTEDNESS (BETA_JNE) ----------------------------------------
+
+## 4.1. All occurrences --------------------------------------------------------
+
+# Select only All -> Urban columns
+turnover_all_urban_15km_all <- all_periods_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+                                     TRUE ~ NA_real_),
+    all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+                             lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+                             lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+                             TRUE ~ NA_real_)) |>
+  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
+         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
+         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+# Fit GLS without interaction
+all_urban_beta_jne_model1 <- gls(beta_jne ~ all_to_urban + urban_no_change +
+                                   delta_recorder_effort + log_recorder_effort + 
+                                   lc_time_period + temp_change + precip_change,
+                                 correlation = corExp(form = ~ x + y | time_numeric),
+                                 data = turnover_all_urban_15km_all,
+                                 method = "REML")
+
+# Save model
+save(all_urban_beta_jne_model1,
+     file = here("data", "models", "final", "all_urban_beta_jne_model1.RData"))
+
+# Fit GLS with interaction 
+all_urban_beta_jne_model2_interaction <-  gls(beta_jne ~ all_to_urban * temp_change +
+                                                all_to_urban * precip_change + 
+                                                urban_no_change +
+                                               delta_recorder_effort + 
+                                               log_recorder_effort + 
+                                               lc_time_period,
+                                             correlation = corExp(form = ~ x + y | time_numeric),
+                                             data = turnover_all_urban_15km_all,
+                                             method = "REML")
 
 
+# Save model
+save(all_urban_beta_jne_model2_interaction,
+     file = here("data", "models", "exploratory", "all_urban_beta_jne_model2_interaction.RData"))
 
+# Compare AICs between models
+AICtab(all_urban_beta_jne_model1, all_urban_beta_jne_model2_interaction, base = TRUE)
 
 
 
