@@ -185,8 +185,8 @@ plots
 
 Then, we will also check the correlation between the variables used in the analysis.
 
-```{r variable relationships}
-#| label: fig-variables-relationships
+```{r variable correlations}
+#| label: fig-variables-correlations
 #| echo: false
 #| fig-cap: "Correlation matrix of variables used in models"
 #| fig-width: 6
@@ -223,6 +223,124 @@ cor_plot <- corrplot(cor_matrix,
 ```
 
 Fortunately, we see no concerningly large correlations between variables used in the analysis.
+
+## Relationships
+
+```{r variable relationships}
+#| label: fig-variables-relationships
+#| echo: false
+#| fig-cap: "Relationships between beta_jtu and variables used in the models"
+#| fig-width: 6
+#| fig-height: 4
+
+
+# Define color
+point_color <- "#2196F3"
+
+## Plot 1: beta_jtu vs forest_to_tws ----------------------------------------
+
+plot1 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = forest_to_tws, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest → TWS (pixels)", y = "beta_jtu", title = "a)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 2: beta_jtu vs forest_no_change --------------------------------------
+
+plot2 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = forest_no_change, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest no change (pixels)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 3: beta_jtu vs log_recorder_effort -----------------------------------
+
+plot3 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = log_recorder_effort, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 4: beta_jtu vs delta_recorder_effort ---------------------------------
+
+plot4 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = delta_recorder_effort, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "ΔRecorder effort", y = "beta_jtu", title = "d)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 5: beta_jtu vs temp_change -------------------------------------------
+
+plot5 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = temp_change, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 6: beta_jtu vs precip_change -----------------------------------------
+
+plot6 <- ggplot(turnover_forest_tws_15km_coords_time, 
+                aes(x = precip_change, y = beta_jtu)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Combine all plots ---------------------------------------------------------
+
+combined_raw_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_raw_plot)
+
+```
 
 ## Outliers
 
@@ -1180,47 +1298,6 @@ plant_plots <- plot_grid(plant_jdi_hist, plant_forest_to_tws_hist, plant_forest_
 plant_plots
 ```
 
-## Correlation Matrix
-
-```{r plant correlation matrix}
-#| label: fig-variables-relationships-plants
-#| echo: false
-#| fig-cap: "Correlation matrix of variables used in the vascular plant models"
-#| fig-width: 6
-#| fig-height: 4
-
-# Check if there are any cells with recorder effort = 0
-b <- plants_turnover_forest_tws_15km |>
-  filter(recorder_effort == 0)
-length(b) #0 - Good!
-
-# Log transform recorder effort values
-plants_turnover_forest_tws_15km <- plants_turnover_forest_tws_15km |>
-  mutate(log_recorder_effort = log(recorder_effort))
-
-# Correlation matrix for numeric variables
-plant_numeric_vars <- plants_turnover_forest_tws_15km |>
-  select(JDI, forest_to_tws, forest_no_change, 
-         intersection_size, union_size, 
-         total_spp_before, total_spp_after,
-         total_occ_before, total_occ_after,
-         recorder_effort, delta_recorder_effort,
-         log_recorder_effort)
-
-# Calculate correlation matrix
-plant_cor_matrix <- cor(plant_numeric_vars, use = "pairwise.complete.obs")
-
-# Create correlation plot
-plant_cor_plot <- corrplot(plant_cor_matrix, 
-                     method = "circle", 
-                     type = "upper", 
-                     tl.col = "black", 
-                     tl.srt = 45, 
-                     addCoef.col = "black", 
-                     number.cex = 0.7,
-                     diag = FALSE)
-```
-
 ## Modeling
 
 ### (Final) Trial1: GLS
@@ -1725,5 +1802,44 @@ knitr::kable(fit_stats, col.names = c("Statistic", "Value"))
 
 We also ran a model with an interaction term between land-cover changes and climate change components. Comparison of the AIC values revealed that the model without ineraction terms was preferred.
 
-```         
+```{r gls birds interaction}
+#| label: fig-birds-gls-logged-values-interaction
+#| echo: false
+#| message: false
+#| fig-width: 12
+#| fig-height: 8
+#| fig-cap: "Diagnostic plots for Bird GLS with interaction"
+
+# Load model
+load(here("data", "models", "exploratory", "birds_FTWS_model2_gls_interaction.RData"))
+
+# Extract residuals
+plant_residuals_gls <- residuals(birds_FTWS_model2_gls_interaction, type = "normalized")
+
+# Get the data actually used in the model
+plants_model_data <- getData(birds_FTWS_model2_gls_interaction)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_FTWS_model2_gls_interaction), plant_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
+qqline(plant_residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(plants_model_data$forest_to_tws, plant_residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(plants_model_data$log_recorder_effort, plant_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
 ```
