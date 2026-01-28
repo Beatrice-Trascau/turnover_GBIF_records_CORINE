@@ -54,6 +54,9 @@ turnover_forest_tws_15km_all <- all_periods_turnover_with_climate |>
                                   lc_time_period == "2012-2018" ~ 3),
          log_recorder_effort = log(recorder_effort))
 
+# Check you didn't accidentally log a 0
+any(!is.finite(turnover_forest_tws_15km_all$log_recorder_effort)) #FALSE!
+
 # Fit GLS with logged recorder effort
 all_FTWS_beta_jne_model1 <- gls(beta_jne ~ forest_to_tws + forest_no_change + delta_recorder_effort + 
                                  log_recorder_effort + lc_time_period + temp_change + precip_change,
@@ -73,7 +76,7 @@ all_FTWS_beta_jne_model2_interaction <-  gls(beta_jne ~ forest_to_tws * temp_cha
                                                log_recorder_effort + 
                                                lc_time_period,
                                              correlation = corExp(form = ~ x + y | time_numeric),
-                                             data = turnover_forest_tws_15km_coords_time,
+                                             data = turnover_forest_tws_15km_all,
                                              method = "REML")
 
 
