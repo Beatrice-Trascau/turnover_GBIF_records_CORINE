@@ -1,0 +1,1412 @@
+---
+title: "Nestedness Model Validation - ALl Land Cover Changes"
+format: html
+editor: visual
+number-sections: true
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
+---
+
+# Aims
+
+This document outlines model validation steps for GLS models exploring the impact of land cover transitions on **beta_jne** (nestedness-resultant component of turnover) for:
+
+-   3 land-cover change types: Forest→TWS, TWS→Forest, All→Urban
+-   3 taxonomic groups: All occurrences, Vascular plants, Birds
+-   Total: 9 models
+
+```{r libraries}
+#| label: packages
+#| echo: false
+#| include: false
+
+library(here)
+source(here("scripts", "0_setup.R"))
+```
+
+```{r load data}
+#| label: load-data
+#| include: false
+
+# Load turnover data for all occurrences
+load(here("data", "derived_data", 
+          "all_periods_turnover_all_land_cover_climate_15km.rda"))
+
+# Load turnover data for vascular plants
+load(here("data", "derived_data", 
+          "vascular_plants_turnover_all_land_cover_climate_15km.rda"))
+
+# Load turnover data for birds
+load(here("data", "derived_data", 
+          "bird_turnover_all_land_cover_climate_15km.rda"))
+```
+
+# Forest → TWS Models
+
+## All Occurrences
+
+```{r ftws all prep}
+#| label: ftws-all-prep
+#| include: false
+
+# Prepare data
+turnover_forest_tws_15km_all <- all_periods_turnover_with_climate |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+                                      TRUE ~ NA_real_),
+    forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+                              lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+                              lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+                              TRUE ~ NA_real_)) |>
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+# Load model
+load(here("data", "models", "final", "all_FTWS_beta_jne_model1.RData"))
+```
+
+## Relationships
+
+```{r variable relationships}
+#| label: fig-variables-relationships
+#| echo: false
+#| fig-cap: "Relationships between beta_jtu and variables used in the models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Define color
+point_color <- "#2196F3"
+
+## Plot 1: beta_jne vs forest_to_tws ----------------------------------------
+
+plot1 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = forest_to_tws, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest → TWS (pixels)", y = "beta_jne", title = "a)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 2: beta_jne vs tws_no_change --------------------------------------
+
+plot2 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = forest_no_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest no change (pixels)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 3: beta_jne vs log_recorder_effort -----------------------------------
+
+plot3 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = log_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 4: beta_jne vs delta_recorder_effort ---------------------------------
+
+plot4 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = delta_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "ΔRecorder effort", y = "beta_jne", title = "d)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 5: beta_jne vs temp_change -------------------------------------------
+
+plot5 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = temp_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 6: beta_jne vs precip_change -----------------------------------------
+
+plot6 <- ggplot(turnover_forest_tws_15km_all, 
+                aes(x = precip_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Combine all plots ---------------------------------------------------------
+
+combined_raw_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_raw_plot)
+```
+
+```{r ftws all diagnostics}
+#| label: fig-ftws-all-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for Forest→TWS All Occurrences beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(all_FTWS_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(all_FTWS_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(all_FTWS_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$forest_to_tws, residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r ftws all summary}
+#| label: tbl-ftws-all-summary
+#| echo: false
+#| tbl-cap: "Model Summary: Forest→TWS All Occurrences beta_jne"
+
+# Extract model summary
+model_summary <- summary(all_FTWS_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Vascular Plants
+
+```{r ftws plants prep}
+#| label: ftws-plants-prep
+#| include: false
+
+# Prepare data
+turnover_forest_tws_15km_plants <- vascular_plants_turnover_with_climate |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+                                      TRUE ~ NA_real_),
+         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+                                   TRUE ~ NA_real_)) |>
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort))
+
+# Load model
+load(here("data", "models", "final", "plants_FTWS_beta_jne_model1.RData"))
+```
+
+```{r ftws plants diagnostics}
+#| label: fig-ftws-plants-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for Forest→TWS Vascular Plants beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(plants_FTWS_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(plants_FTWS_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(plants_FTWS_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$forest_to_tws, residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r ftws plants summary}
+#| label: tbl-ftws-plants-summary
+#| echo: false
+#| tbl-cap: "Model Summary: Forest→TWS Vascular Plants beta_jne"
+
+# Extract model summary
+model_summary <- summary(plants_FTWS_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Birds
+
+```{r ftws birds prep}
+#| label: ftws-birds-prep
+#| include: false
+
+# Prepare data
+turnover_forest_tws_15km_birds <- birds_turnover_with_climate |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(
+    forest_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+      TRUE ~ NA_real_
+    ),
+    forest_to_tws = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+      lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+      lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "birds_FTWS_beta_jne_model1.RData"))
+```
+
+```{r ftws birds diagnostics}
+#| label: fig-ftws-birds-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for Forest→TWS Birds beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(birds_FTWS_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(birds_FTWS_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_FTWS_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$forest_to_tws, residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r ftws birds summary}
+#| label: tbl-ftws-birds-summary
+#| echo: false
+#| tbl-cap: "Model Summary: Forest→TWS Birds beta_jne"
+
+# Extract model summary
+model_summary <- summary(birds_FTWS_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+# TWS → Forest Models
+
+## All Occurrences
+
+```{r twsf all prep}
+#| label: twsf-all-prep
+#| include: false
+
+# Prepare data
+turnover_tws_forest_15km_all <- all_periods_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(
+    tws_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+      TRUE ~ NA_real_
+    ),
+    tws_to_forest = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
+         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "all_TWSF_beta_jne_model1.RData"))
+```
+
+## Relationships
+
+```{r TWSF variable relationships}
+#| label: fig-TWSF-variables-relationships
+#| echo: false
+#| fig-cap: "Relationships between beta_jtu and variables used in the models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Define color
+point_color <- "#2196F3"
+
+## Plot 1: beta_jne vs tws_to_forest ----------------------------------------
+
+plot1 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = tws_to_forest, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest → TWS (pixels)", y = "beta_jne", title = "a)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 2: beta_jne vs tws_no_change --------------------------------------
+
+plot2 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = tws_no_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest no change (pixels)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 3: beta_jne vs log_recorder_effort -----------------------------------
+
+plot3 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = log_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 4: beta_jne vs delta_recorder_effort ---------------------------------
+
+plot4 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = delta_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "ΔRecorder effort", y = "beta_jne", title = "d)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 5: beta_jne vs temp_change -------------------------------------------
+
+plot5 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = temp_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 6: beta_jne vs precip_change -----------------------------------------
+
+plot6 <- ggplot(turnover_tws_forest_15km_all, 
+                aes(x = precip_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Combine all plots ---------------------------------------------------------
+
+combined_raw_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_raw_plot)
+```
+
+```{r twsf all diagnostics}
+#| label: fig-twsf-all-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for TWS→Forest All Occurrences beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(all_TWSF_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(all_TWSF_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(all_TWSF_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$tws_to_forest, residuals_gls,
+     xlab = "TWS to Forest", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r twsf all summary}
+#| label: tbl-twsf-all-summary
+#| echo: false
+#| tbl-cap: "Model Summary: TWS→Forest All Occurrences beta_jne"
+
+# Extract model summary
+model_summary <- summary(all_TWSF_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Vascular Plants
+
+```{r twsf plants prep}
+#| label: twsf-plants-prep
+#| include: false
+
+# Prepare data
+turnover_tws_forest_15km_plants <- vascular_plants_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(
+    tws_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+      TRUE ~ NA_real_
+    ),
+    tws_to_forest = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
+         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "plants_TWSF_beta_jne_model1.RData"))
+```
+
+```{r twsf plants diagnostics}
+#| label: fig-twsf-plants-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for TWS→Forest Vascular Plants beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(plants_TWSF_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(plants_TWSF_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(plants_TWSF_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$tws_to_forest, residuals_gls,
+     xlab = "TWS to Forest", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r twsf plants summary}
+#| label: tbl-twsf-plants-summary
+#| echo: false
+#| tbl-cap: "Model Summary: TWS→Forest Vascular Plants beta_jne"
+
+# Extract model summary
+model_summary <- summary(plants_TWSF_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Birds
+
+```{r twsf birds prep}
+#| label: twsf-birds-prep
+#| include: false
+
+# Prepare data
+turnover_tws_forest_15km_birds <- birds_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(
+    tws_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+      TRUE ~ NA_real_
+    ),
+    tws_to_forest = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+      lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+      lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
+         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "birds_TWSF_beta_jne_model1.RData"))
+```
+
+```{r twsf birds diagnostics}
+#| label: fig-twsf-birds-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for TWS→Forest Birds beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(birds_TWSF_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(birds_TWSF_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_TWSF_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$tws_to_forest, residuals_gls,
+     xlab = "TWS to Forest", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r twsf birds summary}
+#| label: tbl-twsf-birds-summary
+#| echo: false
+#| tbl-cap: "Model Summary: TWS→Forest Birds beta_jne"
+
+# Extract model summary
+model_summary <- summary(birds_TWSF_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+# All → Urban Models
+
+## All Occurrences
+
+```{r urban all prep}
+#| label: urban-all-prep
+#| include: false
+
+# Prepare data
+turnover_all_urban_15km_all <- all_periods_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  mutate(
+    urban_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+      TRUE ~ NA_real_
+    ),
+    all_to_urban = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+      lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+      lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
+         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
+         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "all_urban_beta_jne_model1.RData"))
+```
+
+## Relationships
+
+```{r AllUS variable relationships}
+#| label: fig-TWSF-variables-relationships
+#| echo: false
+#| fig-cap: "Relationships between beta_jtu and variables used in the models"
+#| fig-width: 6
+#| fig-height: 4
+
+# Define color
+point_color <- "#2196F3"
+
+## Plot 1: beta_jne vs all_to_urban ----------------------------------------
+
+plot1 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = all_to_urban, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest → TWS (pixels)", y = "beta_jne", title = "a)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 2: beta_jne vs tws_no_change --------------------------------------
+
+plot2 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = urban_no_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Forest no change (pixels)", y = NULL, title = "b)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 3: beta_jne vs log_recorder_effort -----------------------------------
+
+plot3 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = log_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "log(Recorder effort)", y = NULL, title = "c)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 4: beta_jne vs delta_recorder_effort ---------------------------------
+
+plot4 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = delta_recorder_effort, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "ΔRecorder effort", y = "beta_jne", title = "d)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 5: beta_jne vs temp_change -------------------------------------------
+
+plot5 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = temp_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Temperature change (°C)", y = NULL, title = "e)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Plot 6: beta_jne vs precip_change -----------------------------------------
+
+plot6 <- ggplot(turnover_all_urban_15km_all, 
+                aes(x = precip_change, y = beta_jne)) +
+  geom_point(alpha = 0.3, color = point_color, size = 0.8) +
+  geom_smooth(color = "red", se = TRUE, linewidth = 1) +
+  labs(x = "Precipitation change (mm/yr)", y = NULL, title = "f)") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3)
+  )
+
+## Combine all plots ---------------------------------------------------------
+
+combined_raw_plot <- (plot1 | plot2 | plot3) / (plot4 | plot5 | plot6)
+
+# Display
+print(combined_raw_plot)
+```
+
+```{r urban all diagnostics}
+#| label: fig-urban-all-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for All→Urban All Occurrences beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(all_urban_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(all_urban_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(all_urban_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$all_to_urban, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs All to Urban")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r urban all summary}
+#| label: tbl-urban-all-summary
+#| echo: false
+#| tbl-cap: "Model Summary: All→Urban All Occurrences beta_jne"
+
+# Extract model summary
+model_summary <- summary(all_urban_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Vascular Plants
+
+```{r urban plants prep}
+#| label: urban-plants-prep
+#| include: false
+
+# Prepare data
+turnover_all_urban_15km_plants <- vascular_plants_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  mutate(
+    urban_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+      TRUE ~ NA_real_
+    ),
+    all_to_urban = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+      lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+      lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
+         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
+         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "plants_urban_beta_jne_model1.RData"))
+```
+
+```{r urban plants diagnostics}
+#| label: fig-urban-plants-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for All→Urban Vascular Plants beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(plants_urban_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(plants_urban_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(plants_urban_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$all_to_urban, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs All to Urban")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r urban plants summary}
+#| label: tbl-urban-plants-summary
+#| echo: false
+#| tbl-cap: "Model Summary: All→Urban Vascular Plants beta_jne"
+
+# Extract model summary
+model_summary <- summary(plants_urban_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
+
+## Birds
+
+```{r urban birds prep}
+#| label: urban-birds-prep
+#| include: false
+
+# Prepare data
+turnover_all_urban_15km_birds <- birds_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
+  mutate(
+    urban_no_change = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
+      lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
+      lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
+      TRUE ~ NA_real_
+    ),
+    all_to_urban = case_when(
+      lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
+      lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
+      lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
+         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
+         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(
+    time_numeric = case_when(
+      lc_time_period == "2000-2006" ~ 1,
+      lc_time_period == "2006-2012" ~ 2,
+      lc_time_period == "2012-2018" ~ 3
+    ),
+    log_recorder_effort = log(recorder_effort)
+  )
+
+# Load model
+load(here("data", "models", "final", "birds_urban_beta_jne_model1.RData"))
+```
+
+```{r urban birds diagnostics}
+#| label: fig-urban-birds-diagnostics
+#| echo: false
+#| fig-cap: "Diagnostic plots for All→Urban Birds beta_jne model"
+#| fig-width: 12
+#| fig-height: 8
+
+# Extract residuals
+residuals_gls <- residuals(birds_urban_beta_jne_model1, type = "normalized")
+
+# Get model data
+model_data <- getData(birds_urban_beta_jne_model1)
+
+# Basic residual plots
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_urban_beta_jne_model1), residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(residuals_gls, main = "Normal Q-Q Plot")
+qqline(residuals_gls, col = "red")
+
+# Residuals vs predictors
+plot(model_data$all_to_urban, residuals_gls,
+     xlab = "All to Urban", ylab = "Normalized Residuals",
+     main = "Residuals vs All to Urban")
+abline(h = 0, col = "red", lty = 2)
+
+plot(model_data$log_recorder_effort, residuals_gls,
+     xlab = "log(Recorder Effort)", ylab = "Normalized Residuals",
+     main = "Residuals vs log(Recorder Effort)")
+abline(h = 0, col = "red", lty = 2)
+```
+
+```{r urban birds summary}
+#| label: tbl-urban-birds-summary
+#| echo: false
+#| tbl-cap: "Model Summary: All→Urban Birds beta_jne"
+
+# Extract model summary
+model_summary <- summary(birds_urban_beta_jne_model1)
+coef_table <- model_summary$tTable
+
+# Create coefficient table
+model_coefs <- data.frame(
+  Variable = rownames(coef_table),
+  Estimate = round(coef_table[, "Value"], 4),
+  `Std Error` = round(coef_table[, "Std.Error"], 4),
+  `t value` = round(coef_table[, "t-value"], 3),
+  `p value` = coef_table[, "p-value"],
+  check.names = FALSE
+)
+
+# Add significance stars
+model_coefs$Significance <- case_when(
+  model_coefs$`p value` < 0.001 ~ "***",
+  model_coefs$`p value` < 0.01 ~ "**",
+  model_coefs$`p value` < 0.05 ~ "*",
+  model_coefs$`p value` < 0.1 ~ ".",
+  TRUE ~ ""
+)
+
+# Display using kable
+knitr::kable(model_coefs, digits = c(0, 4, 4, 3, 6, 0))
+```
