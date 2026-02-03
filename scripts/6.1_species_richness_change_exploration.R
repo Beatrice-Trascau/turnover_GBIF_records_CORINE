@@ -7,15 +7,17 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-# Turnover data
+# Turnover data for plants 
 load(here("data", "derived_data", 
-          "vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+          "vascular_plants_turnover_all_land_cover_climate_15km.rda"))
+
+# Turnover data for birds
 load(here("data", "derived_data", 
-          "birds_all_periods_turnover_all_land_cover_chanegs_15km.rda"))
+          "bird_turnover_all_land_cover_climate_15km.rda"))
 
 # Rename for easier handling
-plants_turnover <- vascular_plants_all_periods_turnover_all_land_cover_chanegs_15km
-birds_turnover <- birds_all_periods_turnover_all_land_cover_chanegs_15km
+plants_turnover <- vascular_plants_turnover_with_climate
+birds_turnover <- birds_turnover_with_climate
 
 # Forest -> TWS raster
 forest_tws_15km <- rast(here("data", "derived_data", 
@@ -80,7 +82,8 @@ plants_all_changes <- plants_turnover |>
          change_type, abs_change, total_spp_before, total_spp_after, recorder_effort,
          forest_no_change, forest_to_tws, has_forest_to_tws,
          tws_no_change, tws_to_forest, has_tws_to_forest,
-         urban_no_change, all_to_urban, has_all_to_urban)
+         urban_no_change, all_to_urban, has_all_to_urban, delta_recorder_effort,
+         temp_change, precip_change)
 
 ## 2.2 Prepare birds data ------------------------------------------------------
 
@@ -130,7 +133,8 @@ birds_all_changes <- birds_turnover |>
          change_type, abs_change, total_spp_before, total_spp_after, recorder_effort,
          forest_no_change, forest_to_tws, has_forest_to_tws,
          tws_no_change, tws_to_forest, has_tws_to_forest,
-         urban_no_change, all_to_urban, has_all_to_urban)
+         urban_no_change, all_to_urban, has_all_to_urban, delta_recorder_effort,
+         temp_change, precip_change)
 
 # Combine dataframes into 1
 all_species_changes <- bind_rows(plants_all_changes, birds_all_changes)
