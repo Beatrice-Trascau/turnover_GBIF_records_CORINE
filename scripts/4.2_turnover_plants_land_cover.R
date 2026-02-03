@@ -180,8 +180,8 @@ cell_2000_2006_summary_wide <- cell_2000_2006_summary |>
   # add time period, recorder effort and delta recorder effort columns
   mutate(lc_time_period = "2000-2006",
          recorder_effort = total_occ_before + total_occ_after,
-         delta_recorder_effort = (total_occ_before - total_occ_after)/(total_occ_before + total_occ_after),
-         abs_delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+         delta_recorder_effort = (total_occ_after - total_occ_before)/(total_occ_before + total_occ_after),
+         abs_delta_recorder_effort = abs((total_occ_after - total_occ_before)/(total_occ_before + total_occ_after)))
 
 # Replace NULL values in the species_list_columns
 cell_2000_2006_summary_wide <- cell_2000_2006_summary_wide |>
@@ -222,8 +222,8 @@ cell_2006_2012_summary_wide <- cell_2006_2012_summary |>
   # add time period, recorder effort and delta recorder effort columns
   mutate(lc_time_period = "2006-2012",
          recorder_effort = total_occ_before + total_occ_after,
-         delta_recorder_effort = (total_occ_before - total_occ_after)/(total_occ_before + total_occ_after),
-         abs_delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+         delta_recorder_effort = (total_occ_after - total_occ_before)/(total_occ_before + total_occ_after),
+         abs_delta_recorder_effort = abs((total_occ_after - total_occ_before)/(total_occ_before + total_occ_after)))
 
 # Replace NULL values in the species_list_columns
 cell_2006_2012_summary_wide <- cell_2006_2012_summary_wide |>
@@ -264,8 +264,8 @@ cell_2012_2018_summary_wide <- cell_2012_2018_summary |>
   # add time period, recorder effort and delta recorder effort columns
   mutate(lc_time_period = "2012-2018",
          recorder_effort = total_occ_before + total_occ_after,
-         delta_recorder_effort = (total_occ_before - total_occ_after)/(total_occ_before + total_occ_after),
-         abs_delta_recorder_effort = abs((total_occ_before - total_occ_after)/(total_occ_before + total_occ_after)))
+         delta_recorder_effort = (total_occ_after - total_occ_before)/(total_occ_before + total_occ_after),
+         abs_delta_recorder_effort = abs((total_occ_after - total_occ_before)/(total_occ_before + total_occ_after)))
 
 # Replace NULL values in the species_list_columns
 cell_2012_2018_summary_wide <- cell_2012_2018_summary_wide |>
