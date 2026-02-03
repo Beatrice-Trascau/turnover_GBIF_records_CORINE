@@ -86,8 +86,8 @@ turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
 summary_by_period <- turnover_forest_tws_15km |>
   group_by(lc_time_period) |>
   summarize(n_observations = n(),
-            mean_JDI = mean(JDI, na.rm = TRUE),
-            sd_JDI = sd(JDI, na.rm = TRUE),
+            mean_JDI = mean(JDI_manual, na.rm = TRUE),
+            sd_JDI = sd(JDI_manual, na.rm = TRUE),
             mean_forest_to_tws = mean(forest_to_tws, na.rm = TRUE),
             sd_forest_to_tws = sd(forest_to_tws, na.rm = TRUE),
             mean_forest_no_change = mean(forest_no_change, na.rm = TRUE),
@@ -125,7 +125,7 @@ Firstly, we look at the distribution of values across each of the response varia
 #| echo: false
 
 # Jaccard's Dissimilarity Index
-jdi_hist <- ggplot(turnover_forest_tws_15km, aes(x = JDI)) +
+jdi_hist <- ggplot(turnover_forest_tws_15km, aes(x = JDI_manual)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
   facet_wrap(~ lc_time_period) +
   labs(x = "Jaccard Dissimilarity Index",
