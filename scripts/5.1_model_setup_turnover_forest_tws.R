@@ -31,6 +31,11 @@ load(here("data", "derived_data",
 # check column names
 colnames(all_periods_turnover_with_climate)
 
+# Total number of 100m x 100m pixels in a 15km x 15km cell
+# 15,000m / 100m = 150 pixels per side
+# 150 x 150 = 22,500 total pixels per cell
+total_pixels_per_cell <- 22500
+
 # Also rename the columns for easier manipulation of df
 turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
@@ -48,6 +53,9 @@ turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(forest_no_change_prop = forest_no_change / total_pixels_per_cell,
+         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
          -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`,
@@ -70,32 +78,32 @@ N <- nrow(turnover_forest_tws_15km)
 
 # Transform JDI values so they do not touch [0,1] anymore
 turnover_forest_tws_15km <- turnover_forest_tws_15km |>
-  mutate(JDI_beta = (JDI * (N - 1) + 0.5) / N)
+  mutate(JDI_beta = (JDI_manual * (N - 1) + 0.5) / N)
 
 # Run model
-FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change +
-                               delta_recorder_effort + recorder_effort + lc_time_period,
-                             data = turnover_forest_tws_15km)
+# FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change +
+#                                delta_recorder_effort + recorder_effort + lc_time_period,
+#                              data = turnover_forest_tws_15km)
 
 # Save model
-save(FTWS_turnover_model1_beta_regression,
-     file = here("data", "models", "exploratory",
-                 "FTWS_turnover_model1_beta_regression.RData"))
+# save(FTWS_turnover_model1_beta_regression,
+#      file = here("data", "models", "exploratory",
+#                  "FTWS_turnover_model1_beta_regression.RData"))
 
 
 ## 2.3. GLMM with SSB ID as random effect --------------------------------------
 
 # Run model
-FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change +
-                            delta_recorder_effort + recorder_effort + lc_time_period +
-                            (1|ssb_id),
-                          family = beta_family(),
-                          data = turnover_forest_tws_15km)
+# FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change +
+#                             delta_recorder_effort + recorder_effort + lc_time_period +
+#                             (1|ssb_id),
+#                           family = beta_family(),
+#                           data = turnover_forest_tws_15km)
 
 # Save model
-save(FTWS_turnover_model2_GLMM,
-     file = here("data", "models", "exploratory",
-                 "FTWS_turnover_model2_GLMM.RData"))
+# save(FTWS_turnover_model2_GLMM,
+#      file = here("data", "models", "exploratory",
+#                  "FTWS_turnover_model2_GLMM.RData"))
 
 ## 2.4. Ordered beta regression ------------------------------------------------
 
@@ -118,16 +126,16 @@ save(FTWS_turnover_model2_GLMM,
 ## 2.5. GLS with raw data and exponential structure ----------------------------
 
 # Fit gls
-FTWS_turnover_model4_gls_raw <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
-                    delta_recorder_effort + recorder_effort + lc_time_period,
-                  correlation = corExp(form = ~ x + y | time_numeric),
-                  data = turnover_forest_tws_15km_coords_time,
-                  method = "REML")
+# FTWS_turnover_model4_gls_raw <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
+#                     delta_recorder_effort + recorder_effort + lc_time_period,
+#                   correlation = corExp(form = ~ x + y | time_numeric),
+#                   data = turnover_forest_tws_15km_coords_time,
+#                   method = "REML")
 
 # Save model output to file
-save(FTWS_turnover_model4_gls_raw,
-     file = here("data", "models", "exploratory",
-                 "FTWS_turnover_model4_gls_raw.RData"))
+# save(FTWS_turnover_model4_gls_raw,
+#      file = here("data", "models", "exploratory",
+#                  "FTWS_turnover_model4_gls_raw.RData"))
 
 
 ## 2.6. GLS with logged recorder effort ----------------------------------------
@@ -146,7 +154,7 @@ summary(turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-FTWS_turnover_model5_gls_log <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
+FTWS_turnover_model5_gls_log <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
                     delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = turnover_forest_tws_15km_coords_time,
@@ -162,9 +170,9 @@ save(FTWS_turnover_model5_gls_log,
 ## 2.7. GLS with logged recorder effort and interaction ------------------------
 
 # Define GLS
-FTWS_turnover_model6_gls_log_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
-                                                  forest_to_tws * precip_change + 
-                                                  forest_no_change +
+FTWS_turnover_model6_gls_log_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
+                                                  forest_to_tws_prop * precip_change + 
+                                                  forest_no_change_prop +
                                                   delta_recorder_effort + 
                                                   log_recorder_effort + 
                                                   lc_time_period,
@@ -239,6 +247,9 @@ plants_turnover_forest_tws_15km <- vascular_plants_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(forest_no_change_prop = forest_no_change / total_pixels_per_cell,
+         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
          -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`,
@@ -270,7 +281,7 @@ summary(plants_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(plants_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-plants_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
+plants_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
                     delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                   correlation = corExp(form = ~ x + y | time_numeric),
                   data = plants_turnover_forest_tws_15km_coords_time,
@@ -287,9 +298,9 @@ save(plants_FTWS_model1_gls,
 ## 3.3. Plant GLS with interaction ---------------------------------------------
 
 # Define GLS
-plants_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
-                                                  forest_to_tws * precip_change + 
-                                                  forest_no_change +
+plants_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
+                                            forest_to_tws_prop * precip_change + 
+                                            forest_no_change_prop +
                                                   delta_recorder_effort + 
                                                   log_recorder_effort + 
                                                   lc_time_period,
@@ -363,6 +374,9 @@ birds_turnover_forest_tws_15km <- birds_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(forest_no_change_prop = forest_no_change / total_pixels_per_cell,
+         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`, 
          -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`, 
@@ -394,7 +408,7 @@ summary(birds_turnover_forest_tws_15km_coords_time$recorder_effort)
 any(!is.finite(birds_turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-birds_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
+birds_FTWS_model1_gls <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
                            delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                          correlation = corExp(form = ~ x + y | time_numeric),
                          data = birds_turnover_forest_tws_15km_coords_time,
@@ -408,9 +422,9 @@ save(birds_FTWS_model1_gls,
 ## 4.3. Bird GLS with interaction ----------------------------------------------
 
 # Define GLS
-birds_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws * temp_change +
-                                            forest_to_tws * precip_change + 
-                                            forest_no_change +
+birds_FTWS_model2_gls_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
+                                           forest_to_tws_prop * precip_change + 
+                                           forest_no_change_prop +
                                             delta_recorder_effort + 
                                             log_recorder_effort + 
                                             lc_time_period,
