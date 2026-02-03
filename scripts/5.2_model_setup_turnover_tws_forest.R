@@ -30,6 +30,11 @@ load(here("data", "derived_data",
 # Check column names
 colnames(all_periods_turnover_with_climate)
 
+# Total number of 100m x 100m pixels in a 15km x 15km cell
+# 15,000m / 100m = 150 pixels per side
+# 150 x 150 = 22,500 total pixels per cell
+total_pixels_per_cell <- 22500
+
 # Also rename the columns for easier manipulation of df
 turnover_tws_forest_15km <- all_periods_turnover_with_climate |>
   select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
@@ -47,6 +52,9 @@ turnover_tws_forest_15km <- all_periods_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(tws_no_change_prop = tws_no_change / total_pixels_per_cell,
+         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`, 
          -`2012-2018_TWS no change`,-`2000-2006_TWS to Forest`, 
@@ -78,7 +86,7 @@ summary(turnover_tws_forest_15km_coords_time$log_recorder_effort)
 any(!is.finite(turnover_tws_forest_15km_coords_time$log_recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-TWSF_turnover_model1 <- gls(beta_jtu ~ tws_to_forest + tws_no_change + 
+TWSF_turnover_model1 <- gls(beta_jtu ~ tws_to_forest_prop + tws_no_change_prop + 
                                       delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                                     correlation = corExp(form = ~ x + y | time_numeric),  
                                     data = turnover_tws_forest_15km_coords_time,
@@ -93,9 +101,9 @@ save(TWSF_turnover_model1,
 ## 2.3. GLS with interaction ---------------------------------------------------
 
 # Define GLS
-TWSF_turnover_model2_interaction <- gls(beta_jtu ~ tws_to_forest * temp_change +
-                                          tws_to_forest * precip_change + 
-                                          tws_no_change +
+TWSF_turnover_model2_interaction <- gls(beta_jtu ~ tws_to_forest_prop * temp_change +
+                                          tws_to_forest_prop * precip_change + 
+                                          tws_no_change_prop +
                                                   delta_recorder_effort + 
                                                   log_recorder_effort + 
                                                   lc_time_period,
@@ -170,6 +178,9 @@ plants_turnover_tws_forest_15km <- vascular_plants_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(tws_no_change_prop = tws_no_change / total_pixels_per_cell,
+         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`, 
          -`2012-2018_TWS no change`,-`2000-2006_TWS to Forest`, 
@@ -192,7 +203,7 @@ plants_turnover_tws_forest_15km_coords_time <- plants_turnover_tws_forest_15km |
 any(!is.finite(plants_turnover_tws_forest_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define model
-plants_TWSF_model1_gls <- gls(beta_jtu ~ tws_to_forest + tws_no_change + 
+plants_TWSF_model1_gls <- gls(beta_jtu ~ tws_to_forest_prop + tws_no_change_prop + 
                                 delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                               correlation = corExp(form = ~ x + y | time_numeric),  
                               data = plants_turnover_tws_forest_15km_coords_time,
@@ -207,9 +218,9 @@ save(plants_TWSF_model1_gls,
 ## 3.3. Plant GLS with interaction ---------------------------------------------
 
 # Define model
-plants_TWSF_model2_gls_interaction <- gls(beta_jtu ~ tws_to_forest * temp_change +
-                                            tws_to_forest * precip_change + 
-                                            tws_no_change +
+plants_TWSF_model2_gls_interaction <- gls(beta_jtu ~ tws_to_forest_prop * temp_change +
+                                            tws_to_forest_prop * precip_change + 
+                                            tws_no_change_prop +
                                             delta_recorder_effort + 
                                             log_recorder_effort + 
                                             lc_time_period,
@@ -284,6 +295,9 @@ birds_turnover_tws_forest_15km <- birds_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(tws_no_change_prop = tws_no_change / total_pixels_per_cell,
+         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`, 
          -`2012-2018_TWS no change`,-`2000-2006_TWS to Forest`, 
@@ -306,7 +320,7 @@ birds_turnover_tws_forest_15km_coords_time <- birds_turnover_tws_forest_15km |>
 any(!is.finite(birds_turnover_tws_forest_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define model
-birds_TWSF_model1_gls <- gls(beta_jtu ~ tws_to_forest + tws_no_change + 
+birds_TWSF_model1_gls <- gls(beta_jtu ~ tws_to_forest_prop + tws_no_change_prop + 
                                 delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                               correlation = corExp(form = ~ x + y | time_numeric),  
                               data = birds_turnover_tws_forest_15km_coords_time,
@@ -320,9 +334,9 @@ save(birds_TWSF_model1_gls,
 ## 4.3. Bird GLS with interaction ----------------------------------------------
 
 # Define model
-birds_TWSF_model2_gls_interaction <- gls(beta_jtu ~ tws_to_forest * temp_change +
-                                           tws_to_forest * precip_change + 
-                                           tws_no_change +
+birds_TWSF_model2_gls_interaction <- gls(beta_jtu ~ tws_to_forest_prop * temp_change +
+                                           tws_to_forest_prop * precip_change + 
+                                           tws_no_change_prop +
                                            delta_recorder_effort + 
                                            log_recorder_effort + 
                                            lc_time_period,
