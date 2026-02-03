@@ -5,6 +5,9 @@
 # Forest -> TWS land cover transition on temporal turnover
 ##----------------------------------------------------------------------------##
 
+library(here)
+source(here("scripts", "0_setup.R"))
+
 # 1. LOAD DATA -----------------------------------------------------------------
 
 # Turnover data for all occurrences
@@ -27,6 +30,11 @@ load(here("data", "derived_data",
 # Check column names
 colnames(all_periods_turnover_with_climate)
 
+# Total number of 100m x 100m pixels in a 15km x 15km cell
+# 15,000m / 100m = 150 pixels per side
+# 150 x 150 = 22,500 total pixels per cell
+total_pixels_per_cell <- 22500
+
 # Also rename the columns for easier manipulation of df
 turnover_all_urban_15km <- all_periods_turnover_with_climate |>
   select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
@@ -44,6 +52,9 @@ turnover_all_urban_15km <- all_periods_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
                                    TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(urban_no_change_prop = urban_no_change / total_pixels_per_cell,
+         all_to_urban_prop = all_to_urban / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
          -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
@@ -75,7 +86,7 @@ summary(turnover_all_urban_15km_coords_time$log_recorder_effort)
 any(!is.finite(turnover_all_urban_15km_coords_time$log_recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define GLS
-AllUrban_turnover_model1_gls <- gls(beta_jtu ~ all_to_urban + urban_no_change + 
+AllUrban_turnover_model1_gls <- gls(beta_jtu ~ all_to_urban_prop + urban_no_change_prop + 
                                       delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                                     correlation = corExp(form = ~ x + y | time_numeric),  
                                     data = turnover_all_urban_15km_coords_time,
@@ -90,9 +101,9 @@ save(AllUrban_turnover_model1_gls,
 ## 2.3. GLS with interaction term ----------------------------------------------
 
 # Define GLS
-AllUrban_turnover_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban * temp_change +
-                                                  all_to_urban * precip_change + 
-                                                  urban_no_change +
+AllUrban_turnover_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban_prop * temp_change +
+                                                  all_to_urban_prop * precip_change + 
+                                                  urban_no_change_prop +
                                                   delta_recorder_effort + 
                                                   log_recorder_effort + 
                                                   lc_time_period,
@@ -167,6 +178,9 @@ plants_turnover_all_urban_15km <- vascular_plants_turnover_with_climate |>
                                   lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
                                   lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
                                   TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(urban_no_change_prop = urban_no_change / total_pixels_per_cell,
+         all_to_urban_prop = all_to_urban / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
          -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
@@ -189,7 +203,7 @@ plants_turnover_all_urban_15km_coords_time <- plants_turnover_all_urban_15km |>
 any(!is.finite(plants_turnover_all_urban_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define model
-plants_AllUrban_model1_gls <- gls(beta_jtu ~ all_to_urban + urban_no_change + 
+plants_AllUrban_model1_gls <- gls(beta_jtu ~ all_to_urban_prop + urban_no_change_prop + 
                                 delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                               correlation = corExp(form = ~ x + y | time_numeric),  
                               data = plants_turnover_all_urban_15km_coords_time,
@@ -204,9 +218,9 @@ save(plants_AllUrban_model1_gls,
 ## 3.3. Plant GLS with interaction ---------------------------------------------
 
 # Define GLS
-plants_AllUrban_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban * temp_change +
-                                                all_to_urban * precip_change + 
-                                                urban_no_change +
+plants_AllUrban_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban_prop * temp_change +
+                                                all_to_urban_prop * precip_change + 
+                                                urban_no_change_prop +
                                             delta_recorder_effort + 
                                             log_recorder_effort + 
                                             lc_time_period,
@@ -280,6 +294,9 @@ birds_turnover_all_urban_15km <- birds_turnover_with_climate |>
                                   lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
                                   lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
                                   TRUE ~ NA_real_)) |>
+  # convert land-cover changes to proportions
+  mutate(urban_no_change_prop = urban_no_change / total_pixels_per_cell,
+         all_to_urban_prop = all_to_urban / total_pixels_per_cell) |>
   # remove columns no longer required
   select(-`2000-2006_Urban_no_change`, -`2006-2012_Urban_no_change`, 
          -`2012-2018_Urban_no_change`,-`2000-2006_all_to_urban`, 
@@ -302,7 +319,7 @@ birds_turnover_all_urban_15km_coords_time <- birds_turnover_all_urban_15km |>
 any(!is.finite(birds_turnover_all_urban_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
 
 # Define model
-birds_AllUrban_model1_gls <- gls(beta_jtu ~ all_to_urban + urban_no_change + 
+birds_AllUrban_model1_gls <- gls(beta_jtu ~ all_to_urban_prop + urban_no_change_prop + 
                                delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
                              correlation = corExp(form = ~ x + y | time_numeric),  
                              data = birds_turnover_all_urban_15km_coords_time,
@@ -317,9 +334,9 @@ save(birds_AllUrban_model1_gls,
 ## 4.3. Bird GLS with interaction ----------------------------------------------
 
 # Define GLS
-birds_AllUrban_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban * temp_change +
-                                               all_to_urban * precip_change + 
-                                               urban_no_change +
+birds_AllUrban_model2_gls_interaction <- gls(beta_jtu ~ all_to_urban_prop * temp_change +
+                                               all_to_urban_prop * precip_change + 
+                                               urban_no_change_prop +
                                            delta_recorder_effort + 
                                            log_recorder_effort + 
                                            lc_time_period,
