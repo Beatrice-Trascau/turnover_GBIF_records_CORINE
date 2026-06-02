@@ -159,10 +159,10 @@ turnover_forest_tws_15km_birds <- birds_turnover_with_climate |>
          forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
 
 # Check to make sure no 0 got logged
-any(!is.finite(turnover_forest_tws_15km_plants$log_recorder_effort)) # FALSE!
+any(!is.finite(turnover_forest_tws_15km_birds$log_recorder_effort)) # FALSE!
 
 # Check if there are any cells with recorder effort = 0
-b <- turnover_forest_tws_15km_plants |>
+b <- turnover_forest_tws_15km_birds |>
   filter(recorder_effort == 0)
 b #0 - Good!
 
@@ -210,7 +210,7 @@ qqnorm(bird_residuals_gls, main = "Normal Q-Q Plot")
 qqline(bird_residuals_gls, col = "red")
 
 # Residuals vs land-cover change
-plot(turnover_forest_tws_15km_birds$forest_to_tws, bird_residuals_gls,
+plot(turnover_forest_tws_15km_birds$forest_to_tws_prop, bird_residuals_gls,
      xlab = "Forest to TWS", ylab = "Normalized Residuals",
      main = "Residuals vs Forest to TWS")
 abline(h = 0, col = "red", lty = 2)
@@ -223,7 +223,99 @@ abline(h = 0, col = "red", lty = 2)
 
 # 3. TWS -> FOREST -------------------------------------------------------------
 
+## 3.1. Vascular Plants --------------------------------------------------------
+
+# Select only TWS -> Forest columns
+turnover_tws_forest_15km_plants <- vascular_plants_turnover_with_climate |>
+  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
+                                   TRUE ~ NA_real_),
+         tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
+                                   TRUE ~ NA_real_)) |>
+  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
+         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
+         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort),
+         tws_no_change_prop = tws_no_change / total_pixels_per_cell,
+         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell)
+
+# Check to make sure no 0 got logged
+any(!is.finite(turnover_tws_forest_15km_plants$log_recorder_effort)) # FALSE!
+
+# Check if there are any cells with recorder effort = 0
+c <- turnover_tws_forest_15km_plants |>
+  filter(recorder_effort == 0)
+c #0 - Good!
+
+# Fit GLS with logged recorder effort and no interaction
+plants_TWSF_turnover_model1 <- gls(beta_jtu ~ tws_to_forest_prop + tws_no_change_prop +
+                                     delta_recorder_effort + log_recorder_effort +
+                                     lc_time_period + temp_change + precip_change,
+                                   correlation = corExp(form = ~ x + y | time_numeric),
+                                   data = turnover_tws_forest_15km_plants,
+                                   method = "REML")
+
+# Fit GLS with logged recorder effort and interaction
+plants_TWSF_turnover_model2_interaction <- gls(beta_jtu ~ tws_to_forest_prop * temp_change +
+                                                 tws_to_forest_prop * precip_change +
+                                                 tws_no_change_prop +
+                                                 delta_recorder_effort +
+                                                 log_recorder_effort +
+                                                 lc_time_period,
+                                               correlation = corExp(form = ~ x + y | time_numeric),
+                                               data = turnover_tws_forest_15km_plants,
+                                               method = "REML")
+
+# Compare models
+AICtab(plants_TWSF_turnover_model1, plants_TWSF_turnover_model2_interaction, base = TRUE)
+
+# Save models
+save(plants_TWSF_turnover_model1,
+     file = here("data", "models", "final", "plants_TWSF_turnover_model1.RData"))
+save(plants_TWSF_turnover_model2_interaction,
+     file = here("data", "models", "exploratory", "plants_TWSF_turnover_model2_interaction.RData"))
+
+# Extract model residuals
+plant_residuals_gls <- residuals(plants_TWSF_turnover_model1, type = "normalized")
+
+# Residuals vs fitted
+plot(fitted(plants_TWSF_turnover_model1), plant_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
+qqline(plant_residuals_gls, col = "red")
+
+# Residuals vs land-cover change
+plot(turnover_tws_forest_15km_plants$tws_to_forest_prop, plant_residuals_gls,
+     xlab = "TWS to Forest", ylab = "Normalized Residuals",
+     main = "Residuals vs TWS to Forest")
+abline(h = 0, col = "red", lty = 2)
+
+# Residuals vs recorder effort
+plot(turnover_tws_forest_15km_plants$log_recorder_effort, plant_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+
+
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
+
 
 ## 3.1. Prepare plant data for analysis ----------------------------------------
 
