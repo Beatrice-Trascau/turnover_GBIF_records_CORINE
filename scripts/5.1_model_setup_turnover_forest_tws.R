@@ -11,10 +11,6 @@ source(here("scripts", "0_setup.R"))
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
-# Turnover data for all occurrences
-load(here("data", "derived_data", 
-          "all_periods_turnover_all_land_cover_climate_15km.rda"))
-
 # Turnover data for plants
 load(here("data", "derived_data", 
           "vascular_plants_turnover_all_land_cover_climate_15km.rda"))
@@ -23,28 +19,27 @@ load(here("data", "derived_data",
 load(here("data", "derived_data", 
           "bird_turnover_all_land_cover_climate_15km.rda"))
 
-# 2. ALL OCCURRENCES -----------------------------------------------------------
+# 2. FOREST -> TWS TURNOVER (BETA_JTU) -----------------------------------------
 
-## 2.1. Prepare data for analysis ----------------------------------------------
-
-# Select only Forest -> TWS columns
-# check column names
-colnames(all_periods_turnover_with_climate)
+# Check column names
+colnames(vascular_plants_turnover_with_climate)
+colnames(birds_turnover_with_climate)
 
 # Total number of 100m x 100m pixels in a 15km x 15km cell
 # 15,000m / 100m = 150 pixels per side
 # 150 x 150 = 22,500 total pixels per cell
 total_pixels_per_cell <- 22500
 
-# Also rename the columns for easier manipulation of df
-turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
+## 2.1. Vascular Plants --------------------------------------------------------
+
+# Select only Forest -> TWS columns 
+turnover_forest_tws_15km_plants <- vascular_plants_turnover_with_climate |>
   select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
             '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
             '2006-2012_TWS no change', '2006-2012_TWS to Forest',
             '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
             '2012-2018_TWS no change', '2012-2018_TWS to Forest',
             '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  # determine which rows belong to which time period
   mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
                                       lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
                                       lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
@@ -53,89 +48,25 @@ turnover_forest_tws_15km <- all_periods_turnover_with_climate |>
                                    lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
                                    lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
                                    TRUE ~ NA_real_)) |>
-  # convert land-cover changes to proportions
-  mutate(forest_no_change_prop = forest_no_change / total_pixels_per_cell,
-         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell) |>
-  # remove columns no longer required
   select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
-         -`2012-2018_Forest no change`,-`2000-2006_Forest to TWS`,
-         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`)
-
-# Check transformation went ok
-head(turnover_forest_tws_15km)
-
-# Prepare data for GLS: remove rows with missing x or y and categorise time periods
-turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km |>
+         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
+  # prepare data for GLS (i.e. remove rows with missing x or y and categorise time periods)
   filter(!is.na(x) & !is.na(y)) |>
   mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
                                   lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3))
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort),
+         forest_no_change_prop = forest_no_change / total_pixels_per_cell,
+         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
 
-## 2.2. Beta regression --------------------------------------------------------
+# Check transformation went ok
+head(turnover_forest_tws_15km_plants)
 
-# Get N
-N <- nrow(turnover_forest_tws_15km)
+# Check to make sure no 0 got logged
+any(!is.finite(turnover_forest_tws_15km_plants$log_recorder_effort)) # FALSE!
 
-# Transform JDI values so they do not touch [0,1] anymore
-turnover_forest_tws_15km <- turnover_forest_tws_15km |>
-  mutate(JDI_beta = (JDI_manual * (N - 1) + 0.5) / N)
-
-# Run model
-# FTWS_turnover_model1_beta_regression <- betareg::betareg(JDI_beta ~ forest_to_tws + forest_no_change +
-#                                delta_recorder_effort + recorder_effort + lc_time_period,
-#                              data = turnover_forest_tws_15km)
-
-# Save model
-# save(FTWS_turnover_model1_beta_regression,
-#      file = here("data", "models", "exploratory",
-#                  "FTWS_turnover_model1_beta_regression.RData"))
-
-
-## 2.3. GLMM with SSB ID as random effect --------------------------------------
-
-# Run model
-# FTWS_turnover_model2_GLMM <- glmmTMB(JDI_beta ~ forest_to_tws + forest_no_change +
-#                             delta_recorder_effort + recorder_effort + lc_time_period +
-#                             (1|ssb_id),
-#                           family = beta_family(),
-#                           data = turnover_forest_tws_15km)
-
-# Save model
-# save(FTWS_turnover_model2_GLMM,
-#      file = here("data", "models", "exploratory",
-#                  "FTWS_turnover_model2_GLMM.RData"))
-
-## 2.4. Ordered beta regression ------------------------------------------------
-
-# Run model
-# FTWS_turnover_model3_ordered_beta <- ordbetareg(JDI ~ forest_to_tws + forest_no_change +
-#                                                   delta_recorder_effort + recorder_effort + lc_time_period +
-#                                                   (1|ssb_id),
-#                                                 data = turnover_forest_tws_15km,
-#                                                 cores = 4,
-#                                                 iter = 4000, # double the iterations
-#                                                 chains = 4,
-#                                                 control = list(adapt_delta = 0.95,  # more conservative sampling
-#                                                                max_treedepth = 12))
-
-# Save model
-# save(FTWS_turnover_model3_ordered_beta,
-#      file = here("data", "models", "exploratory",
-#                  "FTWS_turnover_model3_ordered_beta.RData"))
-
-## 2.5. GLS with raw data and exponential structure ----------------------------
-
-# Fit gls
-# FTWS_turnover_model4_gls_raw <- gls(beta_jtu ~ forest_to_tws + forest_no_change +
-#                     delta_recorder_effort + recorder_effort + lc_time_period,
-#                   correlation = corExp(form = ~ x + y | time_numeric),
-#                   data = turnover_forest_tws_15km_coords_time,
-#                   method = "REML")
-
-# Save model output to file
-# save(FTWS_turnover_model4_gls_raw,
-#      file = here("data", "models", "exploratory",
-#                  "FTWS_turnover_model4_gls_raw.RData"))
+# Fit GLS with logged recorder effort
 
 
 ## 2.6. GLS with logged recorder effort ----------------------------------------
