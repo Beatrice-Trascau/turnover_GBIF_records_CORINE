@@ -129,7 +129,99 @@ plot(turnover_forest_tws_15km_plants$log_recorder_effort, plant_residuals_gls,
      main = "Residuals vs Recorder Effort")
 abline(h = 0, col = "red", lty = 2)
 
+## 2.2. Birds ------------------------------------------------------------------
 
+# Select only Forest -> TWS columns
+turnover_forest_tws_15km_birds <- birds_turnover_with_climate |>
+  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
+            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
+            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
+            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
+            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
+            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
+  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
+                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
+                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
+                                      TRUE ~ NA_real_),
+         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
+                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
+                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
+                                   TRUE ~ NA_real_)) |>
+  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
+         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
+         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
+  filter(!is.na(x) & !is.na(y)) |>
+  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
+                                  lc_time_period == "2006-2012" ~ 2,
+                                  lc_time_period == "2012-2018" ~ 3),
+         log_recorder_effort = log(recorder_effort),
+         forest_no_change_prop = forest_no_change / total_pixels_per_cell,
+         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
+
+# Check to make sure no 0 got logged
+any(!is.finite(turnover_forest_tws_15km_plants$log_recorder_effort)) # FALSE!
+
+# Check if there are any cells with recorder effort = 0
+b <- turnover_forest_tws_15km_plants |>
+  filter(recorder_effort == 0)
+b #0 - Good!
+
+# Fit GLS with logged recorder effort - no interaction
+birds_FTWS_turnover_model1 <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
+                                    delta_recorder_effort + log_recorder_effort +
+                                    lc_time_period + temp_change + precip_change,
+                                  correlation = corExp(form = ~ x + y | time_numeric),
+                                  data = turnover_forest_tws_15km_birds,
+                                  method = "REML")
+
+# Fit GLS with interaction term
+birds_FTWS_turnover_model2_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
+                                                forest_to_tws_prop * precip_change +
+                                                forest_no_change_prop +
+                                                delta_recorder_effort +
+                                                log_recorder_effort +
+                                                lc_time_period,
+                                              correlation = corExp(form = ~ x + y | time_numeric),
+                                              data = turnover_forest_tws_15km_birds,
+                                              method = "REML")
+
+# Compare models based on AIC
+AICtab(birds_FTWS_turnover_model1, birds_FTWS_turnover_model2_interaction, base = TRUE)
+
+# Save models
+save(birds_FTWS_turnover_model1,
+     file = here("data", "models", "final", "birds_FTWS_turnover_model1.RData"))
+save(birds_FTWS_turnover_model2_interaction,
+     file = here("data", "models", "exploratory", "birds_FTWS_turnover_model2_interaction.RData"))
+
+# Extract residuals
+bird_residuals_gls <- residuals(birds_FTWS_turnover_model1, type = "normalized")
+
+par(mfrow = c(2, 2))
+
+# Residuals vs fitted
+plot(fitted(birds_FTWS_turnover_model1), bird_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+# QQ plot
+qqnorm(bird_residuals_gls, main = "Normal Q-Q Plot")
+qqline(bird_residuals_gls, col = "red")
+
+# Residuals vs land-cover change
+plot(turnover_forest_tws_15km_birds$forest_to_tws, bird_residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
+
+# Residuals vs recorder effort
+plot(turnover_forest_tws_15km_birds$log_recorder_effort, bird_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+
+# 3. TWS -> FOREST -------------------------------------------------------------
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
