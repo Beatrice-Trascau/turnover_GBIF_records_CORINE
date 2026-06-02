@@ -66,92 +66,70 @@ head(turnover_forest_tws_15km_plants)
 # Check to make sure no 0 got logged
 any(!is.finite(turnover_forest_tws_15km_plants$log_recorder_effort)) # FALSE!
 
-# Fit GLS with logged recorder effort
-
-
-## 2.6. GLS with logged recorder effort ----------------------------------------
-
 # Check if there are any cells with recorder effort = 0
-a <- turnover_forest_tws_15km_coords_time |>
+a <- turnover_forest_tws_15km_plants |>
   filter(recorder_effort == 0)
-length(a) #0 - Good!
+a #0 - Good!
 
-# Log transform recorder effort values
-turnover_forest_tws_15km_coords_time <- turnover_forest_tws_15km_coords_time |>
-  mutate(log_recorder_effort = log(recorder_effort))
+# Fit GLS with logged recorder effort - no interaction
+plants_FTWS_turnover_model1 <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
+                                     delta_recorder_effort + log_recorder_effort +
+                                     lc_time_period + temp_change + precip_change,
+                                   correlation = corExp(form = ~ x + y | time_numeric),
+                                   data = turnover_forest_tws_15km_plants,
+                                   method = "REML")
 
-# Check log transformed values
-summary(turnover_forest_tws_15km_coords_time$recorder_effort)
-any(!is.finite(turnover_forest_tws_15km_coords_time$recorder_effort)) # FALSE = no infinite values - Good!
-
-# Define GLS
-FTWS_turnover_model5_gls_log <- gls(beta_jtu ~ forest_to_tws_prop + forest_no_change_prop +
-                    delta_recorder_effort + log_recorder_effort + lc_time_period + temp_change + precip_change,
-                  correlation = corExp(form = ~ x + y | time_numeric),
-                  data = turnover_forest_tws_15km_coords_time,
-                  method = "REML")
-
-# Model validation looks ok => THIS IS THE FINAL MODEL WE WILL USE
-
-# Save model output to file
-save(FTWS_turnover_model5_gls_log,
-     file = here("data", "models", "final",
-                 "FTWS_turnover_model5_gls_log.RData"))
-
-## 2.7. GLS with logged recorder effort and interaction ------------------------
-
-# Define GLS
-FTWS_turnover_model6_gls_log_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
-                                                  forest_to_tws_prop * precip_change + 
-                                                  forest_no_change_prop +
-                                                  delta_recorder_effort + 
-                                                  log_recorder_effort + 
-                                                  lc_time_period,
-                                                correlation = corExp(form = ~ x + y | time_numeric),
-                                                data = turnover_forest_tws_15km_coords_time,
-                                                method = "REML")
-# Model validaiton looked ok enough
+# Fit GLS with logged recorder effort and interaction
+plants_FTWS_turnover_model2_interaction <- gls(beta_jtu ~ forest_to_tws_prop * temp_change +
+                                                 forest_to_tws_prop * precip_change +
+                                                 forest_no_change_prop +
+                                                 delta_recorder_effort +
+                                                 log_recorder_effort +
+                                                 lc_time_period,
+                                               correlation = corExp(form = ~ x + y | time_numeric),
+                                               data = turnover_forest_tws_15km_plants,
+                                               method = "REML")
 
 # Compare models based on AIC
-AICtab(FTWS_turnover_model5_gls_log, FTWS_turnover_model6_gls_log_interaction, base = TRUE)
-# model without interaction preferred => save interaction model in exploratory folder
+AICtab(plants_FTWS_turnover_model1, plants_FTWS_turnover_model2_interaction, base = TRUE)
+# AIC     dAIC    df
+# plants_FTWS_turnover_model1             -1939.7     0.0 11
+# plants_FTWS_turnover_model2_interaction -1928.6    11.1 13
 
-# Save model
-save(FTWS_turnover_model6_gls_log_interaction,
-     file = here("data", "models", "exploratory",
-                 "FTWS_turnover_model6_gls_log_interaction.RData"))
+# Save models (higher AIC will go into exploratory, lower AIC will go into final)
+save(plants_FTWS_turnover_model1,
+     file = here("data", "models", "final", "plants_FTWS_turnover_model1.RData"))
+save(plants_FTWS_turnover_model2_interaction,
+     file = here("data", "models", "exploratory", "plants_FTWS_turnover_model2_interaction.RData"))
 
-## 2.8. Get model summary ------------------------------------------------------
+# Extract residuals
+plant_residuals_gls <- residuals(plants_FTWS_turnover_model1, type = "normalized")
 
-# Get summary of final model
-model_summary <- summary(FTWS_turnover_model5_gls_log)
+# Basic residual plots
+par(mfrow = c(2, 2))
 
-# Create dataframe of coefficients
-coef_df <- data.frame(term = names(model_summary$tTable[, "Value"]),
-                      estimate = model_summary$tTable[, "Value"],
-                      std.error = model_summary$tTable[, "Std.Error"],
-                      statistic = model_summary$tTable[, "t-value"],
-                      p.value = model_summary$tTable[, "p-value"])
+# Residuals vs fitted
+plot(fitted(plants_FTWS_turnover_model1), plant_residuals_gls,
+     xlab = "Fitted Values", ylab = "Normalized Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
 
-# Add significance stars
-coef_df <- coef_df |>
-  mutate(significance = case_when( p.value < 0.001 ~ "***",
-                                   p.value < 0.01 ~ "**",
-                                   p.value < 0.05 ~ "*",
-                                   p.value < 0.1 ~ ".",
-                                   TRUE ~ ""))
+# QQ plot
+qqnorm(plant_residuals_gls, main = "Normal Q-Q Plot")
+qqline(plant_residuals_gls, col = "red")
 
-coef_table <- coef_df |>
-  select(term, estimate, std.error, statistic, p.value, significance) |>
-  flextable() |>
-  set_header_labels(term = "Predictor", estimate = "Estimate", std.error = "SE",
-                    statistic = "t-value", p.value = "p-value", significance = "") |>
-  colformat_double(j = c("estimate", "std.error", "statistic"), digits = 3) |>
-  colformat_double(j = "p.value", digits = 4) |>
-  autofit()
+# Residuals vs predictors
+plot(turnover_forest_tws_15km_plants$forest_to_tws_prop, plant_residuals_gls,
+     xlab = "Forest to TWS", ylab = "Normalized Residuals",
+     main = "Residuals vs Forest to TWS")
+abline(h = 0, col = "red", lty = 2)
 
-# Display table
-coef_table
+plot(turnover_forest_tws_15km_plants$log_recorder_effort, plant_residuals_gls,
+     xlab = "Recorder Effort", ylab = "Normalized Residuals",
+     main = "Residuals vs Recorder Effort")
+abline(h = 0, col = "red", lty = 2)
+
+
 
 # 3. PLANT OCCURRENCES ONLY ----------------------------------------------------
 
