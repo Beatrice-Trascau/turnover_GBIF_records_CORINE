@@ -1,6 +1,6 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 4.3_turnover_birds_land_cover
+# 4.2_turnover_birds_land_cover
 # This script contains code which calculates the temporal turnover of GBIF
 # vascular plant records in CORINE land cover pixels
 ##----------------------------------------------------------------------------##
