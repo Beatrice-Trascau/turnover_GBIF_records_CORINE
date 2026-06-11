@@ -193,43 +193,37 @@ analyse_tws_transition <- function(rast_t1, rast_t2) {
 # Function to calculate All -> Urban transitions between two time periods
 analyse_urban_conversion <- function(rast_t1, rast_t2) {
   # Create transition raster
-  # 0 = already urban in t1
+  # 0 = no change (same land cover in t1 and t2, any class)
   # 1 = forest to urban
-  # 2 = shrubland to urban
+  # 2 = TWS to urban
   # 3 = complex agriculture to urban
   # 4 = agriculture & vegetation to urban
   # 5 = moors, heathland & grassland to urban
   # 6 = sparse vegetation to urban
-  # 7 = no conversion to urban
+  # 7 = other change (different non-urban land covers in t1 and t2)
   
   # Create "dummy" raster with matching spatial characteristics
   transition <- rast_t1
   
-  # Give it values = 7 = no conversion to urban
+  # Give all pixels a default value of 7 (other change)
   transition[] <- 7
   
-  # Mark existing urban areas as 0
-  urban_t1 <- rast_t1 == 1
-  transition[urban_t1] <- 0
+  # Mark pixels where land cover did not change (t1 == t2, any class)
+  no_change <- rast_t1 == rast_t2
+  transition[no_change] <- 0
   
   # Identify cells that became urban in t2
+  urban_t1 <- rast_t1 == 1
   urban_t2 <- rast_t2 == 1
   
   # For cells that became urban, categorize their original land cover
   transition[urban_t2 & !urban_t1] <- case_when(
-    # Forest to urban
-    rast_t1[urban_t2 & !urban_t1] == 250 ~ 1,
-    # Shrubland to urban
-    rast_t1[urban_t2 & !urban_t1] == 590 ~ 2,
-    # Complex agriculture to urban
-    rast_t1[urban_t2 & !urban_t1] == 80 ~ 3,
-    # Agriculture & vegetation to urban
-    rast_t1[urban_t2 & !urban_t1] == 103 ~ 4,
-    # Moors, heathland & grassland to urban
-    rast_t1[urban_t2 & !urban_t1] == 380 ~ 5,
-    # Sparse vegetation to urban
-    rast_t1[urban_t2 & !urban_t1] == 711 ~ 6,
-    # This TRUE case should never be reached as we've covered all classes
+    rast_t1[urban_t2 & !urban_t1] == 250 ~ 1,  # Forest to urban
+    rast_t1[urban_t2 & !urban_t1] == 590 ~ 2,  # TWS to urban
+    rast_t1[urban_t2 & !urban_t1] == 80  ~ 3,  # Complex agriculture to urban
+    rast_t1[urban_t2 & !urban_t1] == 103 ~ 4,  # Agriculture & vegetation to urban
+    rast_t1[urban_t2 & !urban_t1] == 380 ~ 5,  # Moors, heathland & grassland to urban
+    rast_t1[urban_t2 & !urban_t1] == 711 ~ 6,  # Sparse vegetation to urban
     TRUE ~ 7
   )
   
