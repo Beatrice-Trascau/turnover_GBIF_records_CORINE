@@ -5,7 +5,11 @@
 # which fall partially outside of the Norway boundary
 ##----------------------------------------------------------------------------##
 
-# 1. LOAD DATA -----------------------------------------------------------------
+# 1. LOAD DATA ----------------------------------------------------------------
+
+# Source libraries
+library(here)
+source(here("scripts", "0_setup.R"))
 
 # Forest -> TWS
 forest_tws_15km <- rast(here("data", "derived_data", 
