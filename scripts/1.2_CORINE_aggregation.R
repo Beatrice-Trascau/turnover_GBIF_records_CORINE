@@ -7,6 +7,10 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
+# Source libraries
+library(here)
+source(here("scripts", "0_setup.R"))
+
 # CORINE Status Layers
 norway_corine_status_modified_stack <- rast(here("data", "derived_data",
                                                  "norway_corine_status_modified_stack.tif"))

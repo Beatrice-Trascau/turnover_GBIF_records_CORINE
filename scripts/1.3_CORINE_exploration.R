@@ -7,6 +7,10 @@
 
 # 1. LOAD DATA -----------------------------------------------------------------
 
+# Source libraries
+library(here)
+source(here("scripts", "0_setup.R"))
+
 # Forest -> TWS
 forest_tws_15km <- rast(here("data", "derived_data", 
                              "clc_status_15km_forest_tws.tif"))
