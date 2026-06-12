@@ -300,5 +300,150 @@ for (this_id in model_specs$id) {
           ggtitle(paste0(this_id, " - proportion of exact 1s")))
 }
 
+# 5. MODEL PREDICTION FIGURE ---------------------------------------------------
+
+# Predicted turnover across each predictor's observed range (holds the other
+# continuous predictors at their mean (0 standardised) and time at the reference
+# period)
+# Axes are back-transformed to original units using thr raw columns
+
+## 5.1. Generate predictions ---------------------------------------------------
+
+# List of the continuous predictors
+cont_preds  <- c("lc_change_prop", "lc_nochange_prop",
+                 "delta_recorder_effort", "log_recorder_effort")
+
+# List of labels for the predictors
+cont_labels <- c(lc_change_prop = "Land-cover change\n(proportion of cell)",
+                 lc_nochange_prop = "Land-cover no change\n(proportion of cell)",
+                 delta_recorder_effort = "\u0394 recorder effort",
+                 log_recorder_effort = "log recorder effort")
+
+# Create empty lists for the predictions
+cont_rows <- list()
+time_rows <- list()
+
+# Loop through predictors
+for (this_id in model_specs$id) {
+  
+  spec <- model_specs[model_specs$id == this_id, ]
+  raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
+  dat <- prep_turnover(raw_df, spec$transition)
+  fit <- load(here("data", "models", "exploratory",
+                         paste0("bayes_", this_id, "_ordbeta_disp_spatial.RData")))
+  
+  # baseline row: all continuous predictors at mean (0), time at reference,
+  # GP at the map centroid
+  base <- tibble::tibble(lc_change_prop = 0, lc_nochange_prop = 0,
+                         delta_recorder_effort = 0, log_recorder_effort = 0,
+                         lc_time_period = factor(time_ref, levels = time_levels),
+                         x = mean(dat$x), y = mean(dat$y))
+  
+  # one curve per continuous predictor
+  for (p in cont_preds) {
+    raw <- dat[[paste0(p, "_raw")]]
+    grid_raw <- seq(min(raw), max(raw), length.out = 100)
+    nd <- base[rep(1, 100), ]
+    nd[[p]] <- (grid_raw - mean(raw)) / sd(raw)   # standardise as in fitting
+    ep <- posterior_epred(fit, newdata = nd)
+    cont_rows[[length(cont_rows) + 1]] <- tibble::tibble(id = this_id, 
+                                                         group = spec$group, 
+                                                         transition = spec$transition,
+                                                         predictor = p, 
+                                                         x_value = grid_raw,
+                                                         est = apply(ep, 2, median),
+                                                         lwr = apply(ep, 2, quantile, 0.025),
+                                                         upr = apply(ep, 2, quantile, 0.975))
+  }
+  
+  # time-period predictions
+  nd_t <- base[rep(1, length(time_levels)), ]
+  nd_t$lc_time_period <- factor(time_levels, levels = time_levels)
+  ep_t <- posterior_epred(fit, newdata = nd_t)
+  time_rows[[length(time_rows) + 1]] <- tibble::tibble(id = this_id, 
+                                                       group = spec$group, 
+                                                       transition = spec$transition,
+                                                       period = factor(time_levels, 
+                                                                       levels = time_levels),
+                                                       est = apply(ep_t, 2, median),
+                                                       lwr = apply(ep_t, 2, quantile, 0.025),
+                                                       upr = apply(ep_t, 2, quantile, 0.975))
+}
+
+# Combine continuous predictions and add display labels (taxon + transition)
+cont_df <- bind_rows(cont_rows) |>
+  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = recode(transition, FTWS = "Forest \u2192 TWS",
+                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         label = factor(cont_labels[predictor], levels = unname(cont_labels)))
+
+# Combine time predictions and add display labels (taxon + transition)
+time_df <- bind_rows(time_rows) |>
+  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = recode(transition, FTWS = "Forest \u2192 TWS",
+                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         period = recode(period, "2000-2006" = "2000\u20132006",
+                         "2006-2012" = "2006\u20132012", "2012-2018" = "2012\u20132018"))
+
+# Define taxon colours
+taxon_cols <- c("Vascular plants" = "#1B7837", "Birds" = "#762A83")
+
+## 5.2. Predictor figure for land-cover and recorder effort --------------------
+
+# Transitions (rows) x predictor (cols), taxa in the same panel
+p_cont <- ggplot(cont_df, aes(x_value, est, color = taxon, fill = taxon)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.7) +
+  facet_grid(transition ~ label, scales = "free_x") +
+  scale_color_manual(values = taxon_cols) +
+  scale_fill_manual(values = taxon_cols) +
+  labs(x = NULL, y = "Predicted turnover (\u03b2_jtu)", color = NULL, fill = NULL) +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_cont)
+
+# Save figure to file
+ggsave(here("figures", "Fig2a_predicted_turnover_continuous.png"),
+       p_cont, width = 11, height = 6.5, dpi = 300, bg = "white")
+
+## 5.3. Time-period predictions ------------------------------------------------
+
+# Transition (columns), taxa as dodge points + intervals
+p_time <- ggplot(time_df, aes(period, est, color = taxon)) +
+  geom_pointrange(aes(ymin = lwr, ymax = upr),
+                  position = position_dodge(width = 0.4), size = 0.45) +
+  facet_wrap(~ transition, nrow = 1) +
+  scale_color_manual(values = taxon_cols) +
+  labs(x = "Time period", y = "Predicted turnover (\u03b2_jtu)", color = NULL) +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_time)
+
+# Save figure to gile
+ggsave(here("figures", "Fig2b_predicted_turnover_time.png"),
+       p_time, width = 9, height = 3.5, dpi = 300, bg = "white")
+
+## 5.4. Combine figure ---------------------------------------------------------
+
+# Combine the two panels
+combined_fig <- p_cont / p_time +
+  plot_layout(heights = c(3, 1.4)) +
+  plot_annotation(tag_levels = "a")
+
+# Save figure
+ggsave(here("figures", "Fig2_predicted_turnover_all_predictors.png"),
+       combined_fig, width = 11, height = 9.5, dpi = 300, bg = "white")
 
 # END OF SCRIPT ----------------------------------------------------------------
