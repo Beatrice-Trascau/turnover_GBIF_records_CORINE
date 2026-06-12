@@ -167,21 +167,138 @@ print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel"))
 # Check loo
 print(loo_compare(loo(C1), loo(C2)))
 
+# 3. GP BASIS DIMENSION (k) SENSITIVITY AND PLATEAU ----------------------------
+
+# Will fit the better model (C2) across a k ladder on the diagnostic group
+# Then check where the spatial term (sdgp) plateaus and loo stops improving
+
+## 3.1. Fit the k ladder -------------------------------------------------------
+
+# Define a list of k values to try
+k_ladder <- c(15, 30, 40, 50)
+
+# Create an empty list in which to store the model outputs
+k_fits <- list()
+
+# Fit C2 for all 4 ks - adapta
+for (K in k_ladder) {
+  
+  # k = gp_k reuses the canonical C2 fit; others get a suffixed filename
+  f_k <- if (K == gp_k) f_C2 else
+    here("data", "models", "exploratory",
+         paste0("bayes_", diagnostic_group, "_ordbeta_disp_spatial_k", K, ".rds"))
+  
+  # fit (or load) this resolution
+  if (file.exists(f_k)) {
+    k_fits[[as.character(K)]] <- readRDS(f_k)
+  } else {
+    message("Fitting k = ", K, " ...")
+    fit_k <- ordbetareg(
+      formula = bf(as.formula(paste0("beta_jtu ~ ", preds,
+                                     " + gp(x, y, k = ", K, ", c = 5/4)")),
+                   as.formula(paste0("phi ~ ", preds))),
+      phi_reg = "only",
+      data    = dat_d,
+      chains  = 4, iter = 2000, cores = 4, seed = 1234,
+      control = list(adapt_delta = 0.99), backend = "cmdstanr")
+    saveRDS(fit_k, f_k)
+    k_fits[[as.character(K)]] <- fit_k
+  }
+}
+
+## 3.2. sdgp and focal coefficient across k ------------------------------------
+
+# Get the spatial process SD at each k to get the plateau diagnostic
+sdgp_vs_k <- bind_rows(lapply(names(k_fits), function(K) {
+  ds <- summarise_draws(k_fits[[K]])
+  r  <- ds[ds$variable == "sdgp_gpxy", ]
+  tibble::tibble(k = as.integer(K), sdgp = r$mean, lwr = r$q5, upr = r$q95)
+}))
+print(sdgp_vs_k)
+
+# Inspect land-cover change coefficient at each k 
+focal_vs_k <- bind_rows(lapply(names(k_fits), function(K) {
+  fx <- fixef(k_fits[[K]], probs = c(0.025, 0.975))
+  tibble::tibble(k = as.integer(K),
+                 lc_change_prop = fx["lc_change_prop", "Estimate"],
+                 lwr = fx["lc_change_prop", "Q2.5"],
+                 upr = fx["lc_change_prop", "Q97.5"])
+}))
+print(focal_vs_k)
+
+# Create plot to check when sdgp vs k plateaus
+p_plateau <- ggplot(sdgp_vs_k, aes(k, sdgp)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, fill = "#2196F3") +
+  geom_line(color = "#2196F3") +
+  geom_point(size = 2.5, color = "#2196F3") +
+  labs(x = "GP basis dimension (k)", y = "sdgp (spatial process SD)") +
+  theme_minimal(base_size = 12)
+print(p_plateau)
+
+# Save figure to file
+ggsave(here("figures", paste0("SupplementaryFigure7_gp_k_plateau_", diagnostic_group, ".png")),
+       p_plateau, width = 7, height = 5, dpi = 300, bg = "white")
+
+# Check predictive power across k
+print(loo_compare(lapply(k_fits, loo)))
 
 
+# 4. FIT FINAL MODELS ACROSS LAND-COVERS AND GROUPS ----------------------------
 
+# The final model = ordered beta + dispersion submodel + spatial GP at k = 40)
 
+## 4.1. Fit models in a loop ---------------------------------------------------
 
+for (this_id in model_specs$id) {
+  
+  spec     <- model_specs[model_specs$id == this_id, ]
+  out_file <- here("data", "models", "exploratory",
+                   paste0("bayes_", this_id, "_ordbeta_disp_spatial.RData"))
+  
+  # skip if already fitted
+  if (file.exists(out_file)) {
+    message("Skipping ", this_id, " (cached)")
+    next
+  }
+  
+  message("=== Fitting ", this_id, " ===")
+  
+  # modelling data for this group
+  raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
+  dat <- prep_turnover(raw_df, spec$transition)
+  
+  # fit the unified specification
+  fit <- ordbetareg(
+    formula = bf(as.formula(paste0("beta_jtu ~ ", preds, " + ", gp_term)),
+                 as.formula(paste0("phi ~ ", preds))),
+    phi_reg = "only",
+    data    = dat,
+    chains  = 4, iter = 2000, cores = 4, seed = 1234,
+    control = list(adapt_delta = 0.99), backend = "cmdstanr")
+  
+  save(fit, out_file)
+}
 
+## 4.2. Check convergence and posterior predictive shape -----------------------
 
-
-
-
-
-
-
-
-
+# Loop over the final models 
+for (this_id in model_specs$id) {
+  
+  fit <- load(here("data", "models", "exploratory",
+                      paste0("bayes_", this_id, "_ordbeta_disp_spatial.RData")))
+  
+  # convergence one-liner
+  ds <- summarise_draws(fit)
+  n_div <- sum(nuts_params(fit) |> filter(Parameter == "divergent__") |> pull(Value))
+  message(sprintf("%-13s  max Rhat %.3f | min ESS %d | divergences %d",
+                  this_id, max(ds$rhat, na.rm = TRUE),
+                  round(min(ds$ess_bulk, na.rm = TRUE)), n_div))
+  
+  # posterior predictive checks
+  print(pp_check(fit, ndraws = 100) + ggtitle(paste0(this_id, " - density")))
+  print(pp_check(fit, type = "stat", stat = function(y) mean(y == 1)) +
+          ggtitle(paste0(this_id, " - proportion of exact 1s")))
+}
 
 
 # END OF SCRIPT ----------------------------------------------------------------
