@@ -113,9 +113,75 @@ prep_turnover <- function(raw_df, transition){
     select(beta_jtu, x, y, lc_time_period,
            lc_change_prop, lc_nochange_prop, delta_recorder_effort, log_recorder_effort,
            ends_with("_raw"))
-  
 }
 
 # 2. MODEL TRIALS --------------------------------------------------------------
+
+# Two model options:
+  # C1 = ordered beta, constant dispersion
+  # C2 = ordered beta, dispersion submodel (phi ~ predictors)
+
+## 2.1. Prepare dignostic group data -------------------------------------------
+
+# Extract the modelling data for the diagnostic group
+dat_d <- prep_turnover(
+  if (model_specs$group[model_specs$id == diagnostic_group] == "plants")
+    vascular_plants_turnover_with_climate else birds_turnover_with_climate,
+  model_specs$transition[model_specs$id == diagnostic_group])
+
+## 2.2. C1: ordered beta, constant dispersion ----------------------------------
+
+# Fit model
+C1 <- ordbetareg(formula = bf(as.formula(paste0("beta_jtu ~ ", preds, " + ", gp_term))),
+                 data = dat_d, chains = 4, iter = 2000, cores = 4, seed = 1234,
+                 control = list(adapt_delta = 0.99), backend = "cmdstanr")
+
+# Write model to file
+save(C1, 
+     file = here("data", "models", "exploratory", 
+                 "bayes_birds_FTWS_C1_ordbeta_const_spatial.RData"))
+
+## 2.3. C2: ordered beta, dispersion submodel ----------------------------------
+
+# Fit model
+C2 <- ordbetareg(formula = bf(as.formula(paste0("beta_jtu ~ ", preds, " + ", gp_term)),
+                              as.formula(paste0("phi ~ ", preds))),
+                 phi_reg = "only", data = dat_d, chains  = 4, iter = 2000, cores = 4, seed = 1234,
+                 control = list(adapt_delta = 0.99), backend = "cmdstanr")
+
+# Write model to file
+save(C1, 
+     file = here("data", "models", "exploratory", 
+                 "bayes_birds_FTWS_C2_ordbeta_disp_spatial.RData"))
+
+## 2.4. Compare moodels --------------------------------------------------------
+
+# Check the convergence
+print(summarise_draws(C1)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
+print(summarise_draws(C2)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
+
+# Check the posterior predictive shape
+print(pp_check(C1, ndraws = 100) + ggtitle("C1: ordered beta, constant phi"))
+print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel"))
+
+# Check loo
+print(loo_compare(loo(C1), loo(C2)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # END OF SCRIPT ----------------------------------------------------------------
