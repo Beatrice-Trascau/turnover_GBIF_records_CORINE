@@ -139,7 +139,7 @@ C1 <- ordbetareg(formula = bf(as.formula(paste0("beta_jtu ~ ", preds, " + ", gp_
 # Write model to file
 save(C1, 
      file = here("data", "models", "exploratory", 
-                 "bayes_birds_FTWS_C1_ordbeta_const_spatial.RData"))
+                 "bayes_birds_FTWS_C1_ordbeta_const_spatial.rda"))
 
 ## 2.3. C2: ordered beta, dispersion submodel ----------------------------------
 
@@ -150,9 +150,9 @@ C2 <- ordbetareg(formula = bf(as.formula(paste0("beta_jtu ~ ", preds, " + ", gp_
                  control = list(adapt_delta = 0.99), backend = "cmdstanr")
 
 # Write model to file
-save(C1, 
+save(C2, 
      file = here("data", "models", "exploratory", 
-                 "bayes_birds_FTWS_C2_ordbeta_disp_spatial.RData"))
+                 "bayes_birds_FTWS_C2_ordbeta_disp_spatial.rda"))
 
 ## 2.4. Compare moodels --------------------------------------------------------
 
@@ -162,7 +162,8 @@ print(summarise_draws(C2)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
 
 # Check the posterior predictive shape
 print(pp_check(C1, ndraws = 100) + ggtitle("C1: ordered beta, constant phi"))
-print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel"))
+print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel")) 
+# C2 much better at approximating where the hump in the data is
 
 # Check loo
 print(loo_compare(loo(C1), loo(C2)))
@@ -180,31 +181,25 @@ k_ladder <- c(15, 30, 40, 50)
 # Create an empty list in which to store the model outputs
 k_fits <- list()
 
-# Fit C2 for all 4 ks - adapta
+# Fit C2 for all 4 ks
 for (K in k_ladder) {
   
-  # k = gp_k reuses the canonical C2 fit; others get a suffixed filename
-  f_k <- if (K == gp_k) f_C2 else
-    here("data", "models", "exploratory",
-         paste0("bayes_", diagnostic_group, "_ordbeta_disp_spatial_k", K, ".rds"))
-  
-  # fit (or load) this resolution
-  if (file.exists(f_k)) {
-    k_fits[[as.character(K)]] <- readRDS(f_k)
-  } else {
-    message("Fitting k = ", K, " ...")
-    fit_k <- ordbetareg(
-      formula = bf(as.formula(paste0("beta_jtu ~ ", preds,
-                                     " + gp(x, y, k = ", K, ", c = 5/4)")),
-                   as.formula(paste0("phi ~ ", preds))),
-      phi_reg = "only",
-      data    = dat_d,
-      chains  = 4, iter = 2000, cores = 4, seed = 1234,
-      control = list(adapt_delta = 0.99), backend = "cmdstanr")
-    saveRDS(fit_k, f_k)
-    k_fits[[as.character(K)]] <- fit_k
-  }
+  # fit C2 at this resolution
+  message("Fitting k = ", K, " ...")
+  fit_k <- ordbetareg(
+    formula = bf(as.formula(paste0("beta_jtu ~ ", preds,
+                                   " + gp(x, y, k = ", K, ", c = 5/4)")),
+                 as.formula(paste0("phi ~ ", preds))),
+    phi_reg = "only",
+    data    = dat_d,
+    chains  = 4, iter = 2000, cores = 4, seed = 1234,
+    control = list(adapt_delta = 0.99), backend = "cmdstanr")
+  save(fit_k, file = here("data", "models", "exploratory",
+                      paste0("bayes_", diagnostic_group,
+                             "_ordbeta_disp_spatial_k", K, ".rda")))
+  k_fits[[as.character(K)]] <- fit_k
 }
+
 
 ## 3.2. sdgp and focal coefficient across k ------------------------------------
 
@@ -251,21 +246,15 @@ print(loo_compare(lapply(k_fits, loo)))
 
 for (this_id in model_specs$id) {
   
-  spec     <- model_specs[model_specs$id == this_id, ]
-  out_file <- here("data", "models", "exploratory",
-                   paste0("bayes_", this_id, "_ordbeta_disp_spatial.RData"))
-  
-  # skip if already fitted
-  if (file.exists(out_file)) {
-    message("Skipping ", this_id, " (cached)")
-    next
-  }
-  
+  # add a progress message
   message("=== Fitting ", this_id, " ===")
+  
+  # define model specifications
+  spec <- model_specs[model_specs$id == this_id, ]
   
   # modelling data for this group
   raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
-  dat <- prep_turnover(raw_df, spec$transition)
+  dat    <- prep_turnover(raw_df, spec$transition)
   
   # fit the unified specification
   fit <- ordbetareg(
@@ -276,7 +265,8 @@ for (this_id in model_specs$id) {
     chains  = 4, iter = 2000, cores = 4, seed = 1234,
     control = list(adapt_delta = 0.99), backend = "cmdstanr")
   
-  save(fit, out_file)
+  save(fit, file = here("data", "models", "exploratory",
+                    paste0("bayes_", this_id, "_ordbeta_disp_spatial.rda")))
 }
 
 ## 4.2. Check convergence and posterior predictive shape -----------------------
@@ -285,7 +275,7 @@ for (this_id in model_specs$id) {
 for (this_id in model_specs$id) {
   
   fit <- load(here("data", "models", "exploratory",
-                      paste0("bayes_", this_id, "_ordbeta_disp_spatial.RData")))
+                      paste0("bayes_", this_id, "_ordbeta_disp_spatial.rda")))
   
   # convergence one-liner
   ds <- summarise_draws(fit)
