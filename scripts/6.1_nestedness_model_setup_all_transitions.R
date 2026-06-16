@@ -1,10 +1,11 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 6.1_nestedness_model_setup_all_transitions
-# This script contains code which sets up GLS models exploring the impact of 
-# land cover transitions on beta_jne for:
-#   - 3 land-cover change types: Forest→TWS, TWS→Forest, All→Urban
-#   - 3 taxonomic groups: All occurrences, Vascular plants, Birds
+# 5.2_model_setup_bayesian_ordebta_beta_jne
+# This script contains code which sets up the ordered beta models for temporal
+# nestedness (beta_jne) across all three land-cover changes and both occurrence
+# groups (vasculat plants and birds)
+# Final model specification: ordered beta + dispersion submodel 
+# (phi ~ predictors) + approximate spatial Gaussian process at k = 40
 ##----------------------------------------------------------------------------##
 
 library(here)
