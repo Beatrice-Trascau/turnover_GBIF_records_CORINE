@@ -8,16 +8,55 @@
 # (phi ~ predictors) + approximate spatial Gaussian process at k = 40
 ##----------------------------------------------------------------------------##
 
+# 1. SETUP ---------------------------------------------------------------------
+
+## 1.1. Load packages ---------------------------------------------------------- 
+
 library(here)
 source(here("scripts", "0_setup.R"))
 
-# 1. LOAD DATA -----------------------------------------------------------------
+# Bayesian-specific packages (not added to 0_setup.R to save load time in other scripts)
+library(ordbetareg)
+library(brms)
+library(posterior)
+library(patchwork)
 
-# Turnover data for all occurrences
-load(here("data", "derived_data", 
-          "all_periods_turnover_all_land_cover_climate_15km.rda"))
+## 1.2. Global model settings --------------------------------------------------
 
-# Turnover data for vascular plants
+# Total number of 100m x 100m pixels in a 15km x 15km cell (150 x 150 = 22,500)
+total_pixels_per_cell <- 22500
+
+# GP basis dimensions (see section # 3.)
+gp_k <- 40
+
+# Diagnostic group
+diagnostic_group <- "birds_FTWS"
+
+# Reference period
+time_ref <- "2000-2006"
+
+# Time factor levels
+time_levels <- c("2000-2006", "2006-2012", "2012-2018")
+
+# Shared predictors
+preds <- paste("lc_change_prop + lc_nochange_prop +",
+               "delta_recorder_effort + log_recorder_effort + lc_time_period")
+gp_term <- paste0("gp(x, y, k = ", gp_k, ", c = 5/4)")
+
+## 1.3. Model specifications ---------------------------------------------------
+
+# One row per land-cover change x taxon combination
+model_specs <- tibble::tribble(~id, ~group, ~transition,
+                               "plants_FTWS", "plants", "FTWS",
+                               "birds_FTWS",    "birds",   "FTWS",
+                               "plants_TWSF",   "plants",  "TWSF",
+                               "birds_TWSF",    "birds",   "TWSF",
+                               "plants_urban",  "plants",  "urban",
+                               "birds_urban",   "birds",   "urban")
+
+## 1.4. Load data --------------------------------------------------------------
+
+# Turnover data for plants
 load(here("data", "derived_data", 
           "vascular_plants_turnover_all_land_cover_climate_15km.rda"))
 
@@ -25,811 +64,374 @@ load(here("data", "derived_data",
 load(here("data", "derived_data", 
           "bird_turnover_all_land_cover_climate_15km.rda"))
 
-
-# 2. FOREST -> TWS NESTEDNESS (BETA_JNE) ---------------------------------------
-
-# Total number of 100m x 100m pixels in a 15km x 15km cell
-# 15,000m / 100m = 150 pixels per side
-# 150 x 150 = 22,500 total pixels per cell
-total_pixels_per_cell <- 22500
-
-## 2.1. All occurrences --------------------------------------------------------
-
-# Select only Forest -> TWS columns
-turnover_forest_tws_15km_all <- all_periods_turnover_with_climate |>
-  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
-                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
-                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
-                                      TRUE ~ NA_real_),
-    forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
-                              lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
-                              lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
-                              TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
-         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
-         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         forest_no_change_prop = forest_no_change / total_pixels_per_cell,
-         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
-
-# Check you didn't accidentally log a 0
-any(!is.finite(turnover_forest_tws_15km_all$log_recorder_effort)) #FALSE!
-
-# Fit GLS with logged recorder effort
-all_FTWS_beta_jne_model1 <- gls(beta_jne ~ forest_to_tws_prop + forest_no_change_prop + delta_recorder_effort + 
-                                 log_recorder_effort + lc_time_period + temp_change + precip_change,
-                               correlation = corExp(form = ~ x + y | time_numeric),
-                               data = turnover_forest_tws_15km_all,
-                               method = "REML")
-
-# Save model
-save(all_FTWS_beta_jne_model1,
-     file = here("data", "models", "final", "all_FTWS_beta_jne_model1.RData"))
-
-# Fit GLS with interaction term
-all_FTWS_beta_jne_model2_interaction <-  gls(beta_jne ~ forest_to_tws_prop * temp_change +
-                                               forest_to_tws_prop * precip_change + 
-                                               forest_no_change_prop +
-                                               delta_recorder_effort + 
-                                               log_recorder_effort + 
-                                               lc_time_period,
-                                             correlation = corExp(form = ~ x + y | time_numeric),
-                                             data = turnover_forest_tws_15km_all,
-                                             method = "REML")
-
-
-# Save model
-save(all_FTWS_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "all_FTWS_beta_jne_model2_interaction.RData"))
-
-# Compare AICs between models
-AICtab(all_FTWS_beta_jne_model1, all_FTWS_beta_jne_model2_interaction, base = TRUE)
-
-## 2.2. Vascular Plants --------------------------------------------------------
-
-# Select only Forest -> TWS columns
-turnover_forest_tws_15km_plants <- vascular_plants_turnover_with_climate |>
-  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
-                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
-                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
-                                      TRUE ~ NA_real_),
-         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
-                                   TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
-         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
-         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         forest_no_change_prop = forest_no_change / total_pixels_per_cell,
-         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
-
-# Fit GLS without interaction
-plants_FTWS_beta_jne_model1 <- gls(beta_jne ~ forest_to_tws_prop + forest_no_change_prop +
-                                    delta_recorder_effort + log_recorder_effort 
-                                  + lc_time_period + temp_change + precip_change,
-                                  correlation = corExp(form = ~ x + y | time_numeric),
-                                  data = turnover_forest_tws_15km_plants,
-                                  method = "REML")
-
-# Save model
-save(plants_FTWS_beta_jne_model1,
-     file = here("data", "models", "final", "plants_FTWS_beta_jne_model1.RData"))
-
-# Fit GLS with interaction term
-plants_FTWS_beta_jne_model2_interaction <-  gls(beta_jne ~ forest_to_tws_prop * temp_change +
-                                                  forest_to_tws_prop * precip_change + 
-                                                  forest_no_change_prop +
-                                               delta_recorder_effort + 
-                                               log_recorder_effort + 
-                                               lc_time_period,
-                                             correlation = corExp(form = ~ x + y | time_numeric),
-                                             data = turnover_forest_tws_15km_plants,
-                                             method = "REML")
-
-# Save model
-save(plants_FTWS_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "plants_FTWS_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(plants_FTWS_beta_jne_model1, plants_FTWS_beta_jne_model2_interaction, base = TRUE)
-
-## 2.3. Birds ------------------------------------------------------------------
-
-# Select only Forest -> TWS columns
-turnover_forest_tws_15km_birds <- birds_turnover_with_climate |>
-  select(-c('2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(forest_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest no change`,
-                                      lc_time_period == "2006-2012" ~ `2006-2012_Forest no change`,
-                                      lc_time_period == "2012-2018" ~ `2012-2018_Forest no change`,
-                                      TRUE ~ NA_real_),
-         forest_to_tws = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Forest to TWS`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_Forest to TWS`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_Forest to TWS`,
-                                   TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Forest no change`, -`2006-2012_Forest no change`,
-         -`2012-2018_Forest no change`, -`2000-2006_Forest to TWS`,
-         -`2006-2012_Forest to TWS`, -`2012-2018_Forest to TWS`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         forest_no_change_prop = forest_no_change / total_pixels_per_cell,
-         forest_to_tws_prop = forest_to_tws / total_pixels_per_cell)
-
-# Fit GLS without interaction
-birds_FTWS_beta_jne_model1 <- gls(beta_jne ~ forest_to_tws_prop + forest_no_change_prop + 
-                                   delta_recorder_effort + log_recorder_effort +
-                                   lc_time_period + temp_change + precip_change,
-                                 correlation = corExp(form = ~ x + y | time_numeric),
-                                 data = turnover_forest_tws_15km_birds,
-                                 method = "REML")
-
-# Save model
-save(birds_FTWS_beta_jne_model1,
-     file = here("data", "models", "final", "birds_FTWS_beta_jne_model1.RData"))
-
-
-# Fit GLS with interaction
-birds_FTWS_beta_jne_model2_interaction <-  gls(beta_jne ~ forest_to_tws_prop * temp_change +
-                                                 forest_to_tws_prop * precip_change + 
-                                                 forest_no_change_prop +
-                                                  delta_recorder_effort + 
-                                                  log_recorder_effort + 
-                                                  lc_time_period,
-                                                correlation = corExp(form = ~ x + y | time_numeric),
-                                                data = turnover_forest_tws_15km_birds,
-                                                method = "REML")
-
-
-# Save model
-save(birds_FTWS_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "birds_FTWS_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(birds_FTWS_beta_jne_model1, birds_FTWS_beta_jne_model2_interaction, base = TRUE)
-
-# 3. TWS -> FOREST NESTEDNESS (BETA_JNE) ---------------------------------------
-
-## 3.1. All occurrences --------------------------------------------------------
-
-# Select only TWS -> Forest columns
-turnover_tws_forest_15km_all <- all_periods_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
-                                   TRUE ~ NA_real_),
-    tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
-                              lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
-                              lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
-                              TRUE ~ NA_real_)) |>
-  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
-         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
-         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         tws_no_change_prop = tws_no_change / total_pixels_per_cell,
-         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell)
-
-# Fit GLS without interaction 
-all_TWSF_beta_jne_model1 <- gls(beta_jne ~ tws_to_forest_prop + tws_no_change_prop + 
-                                  delta_recorder_effort + log_recorder_effort + 
-                                  lc_time_period + temp_change + precip_change,
-                                correlation = corExp(form = ~ x + y | time_numeric),
-                                data = turnover_tws_forest_15km_all,
-                                method = "REML")
-
-# Save model
-save(all_TWSF_beta_jne_model1,
-     file = here("data", "models", "final", "all_TWSF_beta_jne_model1.RData"))
-
-# Fit GLS with interaction term
-all_TWSF_beta_jne_model2_interaction <-  gls(beta_jne ~ tws_to_forest_prop * temp_change +
-                                               tws_to_forest_prop * precip_change + 
-                                               tws_no_change_prop +
-                                               delta_recorder_effort + 
-                                               log_recorder_effort + 
-                                               lc_time_period,
-                                             correlation = corExp(form = ~ x + y | time_numeric),
-                                             data = turnover_tws_forest_15km_all,
-                                             method = "REML")
-
-
-# Save model
-save(all_TWSF_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "all_TWSF_beta_jne_model2_interaction.RData"))
-
-# Compare AICs between models
-AICtab(all_TWSF_beta_jne_model1, all_TWSF_beta_jne_model2_interaction, base = TRUE)
-
-## 3.2. Vascular Plants --------------------------------------------------------
-
-# Select only TWS -> Forest columns
-turnover_tws_forest_15km_plants <- vascular_plants_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
-                                   TRUE ~ NA_real_),
-         tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
-                                   TRUE ~ NA_real_)) |>
-  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
-         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
-         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         tws_no_change_prop = tws_no_change / total_pixels_per_cell,
-         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell)
-
-
-# Fit GLS without interaction
-plants_TWSF_beta_jne_model1 <- gls(beta_jne ~ tws_to_forest_prop + tws_no_change_prop + 
-                                    delta_recorder_effort + log_recorder_effort +
-                                    lc_time_period + temp_change + precip_change,
-                                  correlation = corExp(form = ~ x + y | time_numeric),
-                                  data = turnover_tws_forest_15km_plants,
-                                  method = "REML")
-
-# Save model output
-save(plants_TWSF_beta_jne_model1,
-     file = here("data", "models", "final", "plants_TWSF_beta_jne_model1.RData"))
-
-# Fit GLS with interaction term
-plants_TWSF_beta_jne_model2_interaction <-  gls(beta_jne ~ tws_to_forest_prop * temp_change +
-                                                  tws_to_forest_prop * precip_change + 
-                                                  tws_no_change_prop +
-                                                  delta_recorder_effort + 
-                                                  log_recorder_effort + 
-                                                  lc_time_period,
-                                                correlation = corExp(form = ~ x + y | time_numeric),
-                                                data = turnover_tws_forest_15km_plants,
-                                                method = "REML")
-
-# Save model
-save(plants_TWSF_beta_jne_model2_interaction,
-     file = here("data", "models", "final", "plants_TWSF_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(plants_TWSF_beta_jne_model1, plants_TWSF_beta_jne_model2_interaction, base = TRUE)
-
-## 3.3. Birds ------------------------------------------------------------------
-
-# Select only TWS -> Forest columns
-turnover_tws_forest_15km_birds <- birds_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_Urban_no_change', '2000-2006_all_to_urban',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_Urban_no_change', '2006-2012_all_to_urban',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_Urban_no_change', '2012-2018_all_to_urban')) |>
-  mutate(tws_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS no change`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS no change`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS no change`,
-                                   TRUE ~ NA_real_),
-         tws_to_forest = case_when(lc_time_period == "2000-2006" ~ `2000-2006_TWS to Forest`,
-                                   lc_time_period == "2006-2012" ~ `2006-2012_TWS to Forest`,
-                                   lc_time_period == "2012-2018" ~ `2012-2018_TWS to Forest`,
-                                   TRUE ~ NA_real_)) |>
-  select(-`2000-2006_TWS no change`, -`2006-2012_TWS no change`,
-         -`2012-2018_TWS no change`, -`2000-2006_TWS to Forest`,
-         -`2006-2012_TWS to Forest`, -`2012-2018_TWS to Forest`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         tws_no_change_prop = tws_no_change / total_pixels_per_cell,
-         tws_to_forest_prop = tws_to_forest / total_pixels_per_cell)
-
-
-# Fit GLS without interaction
-birds_TWSF_beta_jne_model1 <- gls(beta_jne ~ tws_to_forest_prop + tws_no_change_prop + 
-                                    delta_recorder_effort + log_recorder_effort +
-                                    lc_time_period + temp_change + precip_change,
-                                  correlation = corExp(form = ~ x + y | time_numeric),
-                                  data = turnover_tws_forest_15km_birds,
-                                  method = "REML")
-
-# Save model output
-save(birds_TWSF_beta_jne_model1,
-     file = here("data", "models", "final", "birds_TWSF_beta_jne_model1.RData"))
-
-# Fit GLS with interaction
-birds_TWSF_beta_jne_model2_interaction <-  gls(beta_jne ~ tws_to_forest_prop * temp_change +
-                                                 tws_to_forest_prop * precip_change + 
-                                                 tws_no_change_prop +
-                                                 delta_recorder_effort + 
-                                                 log_recorder_effort + 
-                                                 lc_time_period,
-                                               correlation = corExp(form = ~ x + y | time_numeric),
-                                               data = turnover_tws_forest_15km_birds,
-                                               method = "REML")
-
-
-# Save model
-save(birds_TWSF_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "birds_TWSF_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(birds_TWSF_beta_jne_model1, birds_TWSF_beta_jne_model2_interaction, base = TRUE)
-
-# 4. ALL -> URBAN NESTEDNESS (BETA_JNE) ----------------------------------------
-
-## 4.1. All occurrences --------------------------------------------------------
-
-# Select only All -> Urban columns
-turnover_all_urban_15km_all <- all_periods_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
-  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
-                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
-                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
-                                     TRUE ~ NA_real_),
-    all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
-                             lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
-                             lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
-                             TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
-         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
-         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         urban_no_change_prop = urban_no_change / total_pixels_per_cell,
-         all_to_urban_prop = all_to_urban / total_pixels_per_cell)
-
-# Fit GLS without interaction
-all_urban_beta_jne_model1 <- gls(beta_jne ~ all_to_urban_prop + urban_no_change_prop +
-                                   delta_recorder_effort + log_recorder_effort + 
-                                   lc_time_period + temp_change + precip_change,
-                                 correlation = corExp(form = ~ x + y | time_numeric),
-                                 data = turnover_all_urban_15km_all,
-                                 method = "REML")
-
-# Save model
-save(all_urban_beta_jne_model1,
-     file = here("data", "models", "final", "all_urban_beta_jne_model1.RData"))
-
-# Fit GLS with interaction 
-all_urban_beta_jne_model2_interaction <-  gls(beta_jne ~ all_to_urban_prop * temp_change +
-                                                all_to_urban_prop * precip_change + 
-                                                urban_no_change_prop +
-                                               delta_recorder_effort + 
-                                               log_recorder_effort + 
-                                               lc_time_period,
-                                             correlation = corExp(form = ~ x + y | time_numeric),
-                                             data = turnover_all_urban_15km_all,
-                                             method = "REML")
-
-
-# Save model
-save(all_urban_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "all_urban_beta_jne_model2_interaction.RData"))
-
-# Compare AICs between models
-AICtab(all_urban_beta_jne_model1, all_urban_beta_jne_model2_interaction, base = TRUE)
-
-## 4.2. Vascular Plants --------------------------------------------------------
-
-# Select only All -> Urban columns
-turnover_all_urban_15km_plants <- vascular_plants_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
-  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
-                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
-                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
-                                     TRUE ~ NA_real_),
-         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
-                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
-                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
-                                  TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
-         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
-         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         urban_no_change_prop = urban_no_change / total_pixels_per_cell,
-         all_to_urban_prop = all_to_urban / total_pixels_per_cell)
-
-# Fit GLS without interaction
-plants_urban_beta_jne_model1 <- gls(beta_jne ~ all_to_urban_prop + urban_no_change_prop +
-                                     delta_recorder_effort + log_recorder_effort + 
-                                     lc_time_period + temp_change + precip_change,
-                                   correlation = corExp(form = ~ x + y | time_numeric),
-                                   data = turnover_all_urban_15km_plants,
-                                   method = "REML")
-
-# Save model 
-save(plants_urban_beta_jne_model1,
-     file = here("data", "models", "final", "plants_urban_beta_jne_model1.RData"))
-
-# Fit GLS with interaction term
-plants_urban_beta_jne_model2_interaction <-  gls(beta_jne ~ all_to_urban_prop * temp_change +
-                                                   all_to_urban_prop * precip_change + 
-                                                   urban_no_change_prop +
-                                                  delta_recorder_effort + 
-                                                  log_recorder_effort + 
-                                                  lc_time_period,
-                                                correlation = corExp(form = ~ x + y | time_numeric),
-                                                data = turnover_all_urban_15km_plants,
-                                                method = "REML")
-
-# Save model
-save(plants_urban_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "plants_urban_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(plants_urban_beta_jne_model1, plants_urban_beta_jne_model2_interaction, base = TRUE)
-
-## 4.3. Birds ------------------------------------------------------------------
-
-# Select only All -> Urban columns
-turnover_all_urban_15km_birds <- birds_turnover_with_climate |>
-  select(-c('2000-2006_Forest no change', '2000-2006_Forest to TWS',
-            '2000-2006_TWS no change', '2000-2006_TWS to Forest',
-            '2006-2012_Forest no change', '2006-2012_Forest to TWS',
-            '2006-2012_TWS no change', '2006-2012_TWS to Forest',
-            '2012-2018_Forest no change', '2012-2018_Forest to TWS',
-            '2012-2018_TWS no change', '2012-2018_TWS to Forest')) |>
-  mutate(urban_no_change = case_when(lc_time_period == "2000-2006" ~ `2000-2006_Urban_no_change`,
-                                     lc_time_period == "2006-2012" ~ `2006-2012_Urban_no_change`,
-                                     lc_time_period == "2012-2018" ~ `2012-2018_Urban_no_change`,
-                                     TRUE ~ NA_real_),
-         all_to_urban = case_when(lc_time_period == "2000-2006" ~ `2000-2006_all_to_urban`,
-                                  lc_time_period == "2006-2012" ~ `2006-2012_all_to_urban`,
-                                  lc_time_period == "2012-2018" ~ `2012-2018_all_to_urban`,
-                                  TRUE ~ NA_real_)) |>
-  select(-`2000-2006_Urban_no_change`, -`2000-2006_all_to_urban`,
-         -`2006-2012_Urban_no_change`, -`2006-2012_all_to_urban`,
-         -`2012-2018_Urban_no_change`, -`2012-2018_all_to_urban`) |>
-  filter(!is.na(x) & !is.na(y)) |>
-  mutate(time_numeric = case_when(lc_time_period == "2000-2006" ~ 1,
-                                  lc_time_period == "2006-2012" ~ 2,
-                                  lc_time_period == "2012-2018" ~ 3),
-         log_recorder_effort = log(recorder_effort),
-         urban_no_change_prop = urban_no_change / total_pixels_per_cell,
-         all_to_urban_prop = all_to_urban / total_pixels_per_cell)
-
-# Fit GLS model without interaction
-birds_urban_beta_jne_model1 <- gls(beta_jne ~ all_to_urban_prop + urban_no_change_prop + 
-                                    delta_recorder_effort + log_recorder_effort + 
-                                    lc_time_period + temp_change + precip_change,
-                                  correlation = corExp(form = ~ x + y | time_numeric),
-                                  data = turnover_all_urban_15km_birds,
-                                  method = "REML")
-
-# Save model
-save(birds_urban_beta_jne_model1,
-     file = here("data", "models", "final", "birds_urban_beta_jne_model1.RData"))
-
-# Fit GLS with interaction
-birds_urban_beta_jne_model2_interaction <-  gls(beta_jne ~ all_to_urban_prop * temp_change +
-                                                  all_to_urban_prop * precip_change + 
-                                                  urban_no_change_prop +
-                                                 delta_recorder_effort + 
-                                                 log_recorder_effort + 
-                                                 lc_time_period,
-                                               correlation = corExp(form = ~ x + y | time_numeric),
-                                               data = turnover_all_urban_15km_birds,
-                                               method = "REML")
-
-
-# Save model
-save(birds_urban_beta_jne_model2_interaction,
-     file = here("data", "models", "exploratory", "birds_urban_beta_jne_model2_interaction.RData"))
-
-# Compare models based on AIC
-AICtab(birds_urban_beta_jne_model1, birds_urban_beta_jne_model2_interaction, base = TRUE)
-
-
-# 5. CREATE COMBINED COEFFICIENT PLOT ------------------------------------------
-
-# Function to create coefficient plot for a single model
-create_coef_plot_beta_jne <- function(model, land_cover_type, show_y_axis = TRUE) {
+## 1.5. Helper function -------------------------------------------------------
+
+# Build the modelling data for one group/transition. Selects the relevant land-
+# cover columns, computes proportions and log recorder effort, and standardises
+# the four continuous predictors. Also keeps the raw (un-standardised) predictor
+# values (suffix _raw) so the prediction-figure axes can be back-transformed.
+prep_turnover <- function(raw_df, transition){
   
-  # Get model summary
-  model_summary <- summary(model)
+  # pick the no-change and chnage columns for this transition
+  cols <- switch(transition,
+                 FTWS  = c(nochange = "Forest no change", change = "Forest to TWS"),
+                 TWSF  = c(nochange = "TWS no change",    change = "TWS to Forest"),
+                 urban = c(nochange = "Urban_no_change",  change = "all_to_urban"),
+                 stop("Unknown transition: ", transition))
+  nochange_col <- cols[["nochange"]]
+  change_col   <- cols[["change"]]
   
-  # Create a dataframe of the coefficients
-  coef_df <- data.frame(
-    term = names(model_summary$tTable[, "Value"]),
-    estimate = model_summary$tTable[, "Value"],
-    std.error = model_summary$tTable[, "Std.Error"],
-    statistic = model_summary$tTable[, "t-value"],
-    p.value = model_summary$tTable[, "p-value"]
-  ) |>
+  raw_df |>
+    # pull the period-specific land-cover values into single columns
     mutate(
-      conf.low = estimate - 1.96 * std.error,
-      conf.high = estimate + 1.96 * std.error,
-      significance = case_when(
-        p.value < 0.001 ~ "***",
-        p.value < 0.01 ~ "**",
-        p.value < 0.05 ~ "*",
-        p.value < 0.1 ~ ".",
-        TRUE ~ ""
-      ),
-      effect_type = case_when(
-        term == "(Intercept)" ~ "Intercept",
-        p.value < 0.05 & estimate < 0 ~ "Negative (sig.)",
-        p.value < 0.05 & estimate > 0 ~ "Positive (sig.)",
-        TRUE ~ "Non-significant"
-      )
-    )
-  
-  # Clean term names based on land cover type
-  if (land_cover_type == "ftws") {
-    coef_df <- coef_df |>
-      mutate(term_clean = case_when(
-        term == "(Intercept)" ~ "Intercept",
-        term == "forest_to_tws_prop" ~ "Forest → TWS",
-        term == "forest_no_change_prop" ~ "Forest (no change)",
-        term == "delta_recorder_effort" ~ "ΔRecorder effort",
-        term == "log_recorder_effort" ~ "log(Recorder effort)",
-        term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
-        term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
-        term == "temp_change" ~ "Temperature change",
-        term == "precip_change" ~ "Precipitation change",
-        TRUE ~ term
-      ))
-    level_order <- rev(c("Forest → TWS", "Forest (no change)", "Temperature change",
-                         "Precipitation change", "ΔRecorder effort", "log(Recorder effort)",
-                         "Period: 2006-2012", "Period: 2012-2018"))
-  } else if (land_cover_type == "twsf") {
-    coef_df <- coef_df |>
-      mutate(term_clean = case_when(
-        term == "(Intercept)" ~ "Intercept",
-        term == "tws_to_forest_prop" ~ "TWS → Forest",
-        term == "tws_no_change_prop" ~ "TWS (no change)",
-        term == "delta_recorder_effort" ~ "ΔRecorder effort",
-        term == "log_recorder_effort" ~ "log(Recorder effort)",
-        term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
-        term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
-        term == "temp_change" ~ "Temperature change",
-        term == "precip_change" ~ "Precipitation change",
-        TRUE ~ term
-      ))
-    level_order <- rev(c("TWS → Forest", "TWS (no change)", "Temperature change",
-                         "Precipitation change", "ΔRecorder effort", "log(Recorder effort)",
-                         "Period: 2006-2012", "Period: 2012-2018"))
-  } else {  # urban
-    coef_df <- coef_df |>
-      mutate(term_clean = case_when(
-        term == "(Intercept)" ~ "Intercept",
-        term == "all_to_urban_prop" ~ "All → Urban",
-        term == "urban_no_change_prop" ~ "Urban (no change)",
-        term == "delta_recorder_effort" ~ "ΔRecorder effort",
-        term == "log_recorder_effort" ~ "log(Recorder effort)",
-        term == "lc_time_period2006-2012" ~ "Period: 2006-2012",
-        term == "lc_time_period2012-2018" ~ "Period: 2012-2018",
-        term == "temp_change" ~ "Temperature change",
-        term == "precip_change" ~ "Precipitation change",
-        TRUE ~ term
-      ))
-    level_order <- rev(c("All → Urban", "Urban (no change)", "Temperature change",
-                         "Precipitation change", "ΔRecorder effort", "log(Recorder effort)",
-                         "Period: 2006-2012", "Period: 2012-2018"))
-  }
-  
-  # Split into intercept and effects
-  intercept_df <- coef_df |> filter(term == "(Intercept)")
-  effects_df <- coef_df |>
-    filter(term != "(Intercept)") |>
-    mutate(term_clean = factor(term_clean, levels = level_order))
-  
-  # Define colors - ensure proper factor levels
-  effect_colors <- c(
-    "Positive (sig.)" = "#FF9800",
-    "Negative (sig.)" = "#9C27B0",
-    "Non-significant" = "grey60",
-    "Intercept" = "grey30"
-  )
-  
-  # Create intercept plot (top)
-  plot_intercept <- ggplot(intercept_df, aes(x = estimate, y = term_clean)) +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
-    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
-                   height = 0.2, linewidth = 0.7, color = "grey30") +
-    geom_point(aes(color = effect_type), size = 3, shape = 15) +
-    geom_text(aes(x = conf.high, label = significance),
-              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
-    scale_color_manual(values = effect_colors, guide = "none") +
-    labs(x = NULL, y = NULL) +
-    theme_classic() +
-    theme(
-      axis.text.y = element_text(size = 10, color = "black", face = "bold"),
-      axis.text.x = element_text(size = 9, color = "black"),
-      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
-      panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
-      plot.margin = margin(t = 5, r = 10, b = 2, l = 5)
-    ) +
-    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
-  
-  # Create effects plot (bottom)
-  plot_effects <- ggplot(effects_df, aes(x = estimate, y = term_clean)) +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.5) +
-    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
-                   height = 0.2, linewidth = 0.7, color = "grey30") +
-    geom_point(aes(color = effect_type), size = 3) +
-    geom_text(aes(x = conf.high, label = significance),
-              hjust = -0.3, vjust = 0.5, size = 3.5, fontface = "bold") +
-    scale_color_manual(
-      values = effect_colors,
-      name = "Effect type",
-      breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
-      labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")
-    ) +
-    labs(x = NULL, y = NULL) +
-    theme_classic() +
-    theme(
-      axis.text.x = element_text(size = 9, color = "black"),
-      legend.position = "bottom",
-      legend.title = element_text(size = 11, face = "bold"),
-      legend.text = element_text(size = 10),
-      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.5),
-      panel.grid.major.x = element_line(color = "grey90", linewidth = 0.3),
-      plot.margin = margin(t = 2, r = 10, b = 5, l = 5)
-    ) +
-    scale_x_continuous(expand = expansion(mult = c(0.1, 0.2)))
-  
-  # Show or hide y-axis labels
-  if (!show_y_axis) {
-    plot_intercept <- plot_intercept +
-      theme(
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank()
-      )
-    plot_effects <- plot_effects +
-      theme(
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank()
-      )
-  }
-  
-  # Combine intercept and effects for this model
-  combined <- plot_intercept / plot_effects +
-    plot_layout(heights = c(1, 4))
-  
-  return(combined)
+      lc_nochange = case_when(
+        lc_time_period == "2000-2006" ~ .data[[paste0("2000-2006_", nochange_col)]],
+        lc_time_period == "2006-2012" ~ .data[[paste0("2006-2012_", nochange_col)]],
+        lc_time_period == "2012-2018" ~ .data[[paste0("2012-2018_", nochange_col)]],
+        TRUE ~ NA_real_),
+      lc_change = case_when(
+        lc_time_period == "2000-2006" ~ .data[[paste0("2000-2006_", change_col)]],
+        lc_time_period == "2006-2012" ~ .data[[paste0("2006-2012_", change_col)]],
+        lc_time_period == "2012-2018" ~ .data[[paste0("2012-2018_", change_col)]],
+        TRUE ~ NA_real_)) |>
+    # keep only cells with coordinates
+    filter(!is.na(x) & !is.na(y)) |>
+    # derive predictors and their proportions
+    mutate(lc_time_period = factor(lc_time_period, levels = time_levels),
+           log_recorder_effort = log(recorder_effort),
+           lc_nochange_prop    = lc_nochange / total_pixels_per_cell,
+           lc_change_prop      = lc_change / total_pixels_per_cell,
+           # raw copies for back-transformation in Section 5
+           lc_change_prop_raw        = lc_change_prop,
+           lc_nochange_prop_raw      = lc_nochange_prop,
+           delta_recorder_effort_raw = delta_recorder_effort,
+           log_recorder_effort_raw   = log_recorder_effort) |>
+    # standardise the continuous predictors used in the models (1SD)
+    mutate(across(c(lc_change_prop, lc_nochange_prop,
+                    delta_recorder_effort, log_recorder_effort),
+                  ~ as.numeric(scale(.)))) |>
+    select(beta_jne, x, y, lc_time_period,
+           lc_change_prop, lc_nochange_prop, delta_recorder_effort, log_recorder_effort,
+           ends_with("_raw"))
 }
 
-# Create individual plots for each model
-# Row 1: Forest → TWS
-ftws_all_plot <- create_coef_plot_beta_jne(all_FTWS_beta_jne_model1, "ftws", show_y_axis = TRUE)
-ftws_plants_plot <- create_coef_plot_beta_jne(plants_FTWS_beta_jne_model1, "ftws", show_y_axis = FALSE)
-ftws_birds_plot <- create_coef_plot_beta_jne(birds_FTWS_beta_jne_model1, "ftws", show_y_axis = FALSE)
+# 2. MODEL TRIALS --------------------------------------------------------------
 
-# Row 2: TWS → Forest
-twsf_all_plot <- create_coef_plot_beta_jne(all_TWSF_beta_jne_model1, "twsf", show_y_axis = TRUE)
-twsf_plants_plot <- create_coef_plot_beta_jne(plants_TWSF_beta_jne_model1, "twsf", show_y_axis = FALSE)
-twsf_birds_plot <- create_coef_plot_beta_jne(birds_TWSF_beta_jne_model1, "twsf", show_y_axis = FALSE)
+# Two model options:
+# C1 = ordered beta, constant dispersion
+# C2 = ordered beta, dispersion submodel (phi ~ predictors)
 
-# Row 3: All → Urban
-urban_all_plot <- create_coef_plot_beta_jne(all_urban_beta_jne_model1, "urban", show_y_axis = TRUE)
-urban_plants_plot <- create_coef_plot_beta_jne(plants_urban_beta_jne_model1, "urban", show_y_axis = FALSE)
-urban_birds_plot <- create_coef_plot_beta_jne(birds_urban_beta_jne_model1, "urban", show_y_axis = FALSE)
+## 2.1. Prepare dignostic group data -------------------------------------------
 
-# Extract legend from the effects plot (which has the legend configured)
-legend <- get_legend(
-  ggplot(data.frame(
-    x = c(1, 2, 3),
-    y = c(1, 2, 3),
-    effect_type = factor(c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
-                         levels = c("Positive (sig.)", "Negative (sig.)", "Non-significant"))
-  ), aes(x = x, y = y, color = effect_type)) +
-    geom_point(size = 3) +
-    scale_color_manual(
-      values = c(
-        "Positive (sig.)" = "#FF9800",
-        "Negative (sig.)" = "#9C27B0",
-        "Non-significant" = "grey60"
-      ),
-      name = "Effect type",
-      breaks = c("Positive (sig.)", "Negative (sig.)", "Non-significant"),
-      labels = c("Positive (p < 0.05)", "Negative (p < 0.05)", "Non-significant")
-    ) +
-    theme(
-      legend.position = "bottom",
-      legend.title = element_text(size = 11, face = "bold"),
-      legend.text = element_text(size = 10)
-    )
-)
+# Extract the modelling data for the diagnostic group
+dat_d <- prep_turnover(
+  if (model_specs$group[model_specs$id == diagnostic_group] == "plants")
+    vascular_plants_turnover_with_climate else birds_turnover_with_climate,
+  model_specs$transition[model_specs$id == diagnostic_group])
 
-# Remove legends from individual plots
-ftws_all_plot <- ftws_all_plot & theme(legend.position = "none")
-ftws_plants_plot <- ftws_plants_plot & theme(legend.position = "none")
-ftws_birds_plot <- ftws_birds_plot & theme(legend.position = "none")
-twsf_all_plot <- twsf_all_plot & theme(legend.position = "none")
-twsf_plants_plot <- twsf_plants_plot & theme(legend.position = "none")
-twsf_birds_plot <- twsf_birds_plot & theme(legend.position = "none")
-urban_all_plot <- urban_all_plot & theme(legend.position = "none")
-urban_plants_plot <- urban_plants_plot & theme(legend.position = "none")
-urban_birds_plot <- urban_birds_plot & theme(legend.position = "none")
+## 2.2. C1: ordered beta, constant dispersion ----------------------------------
 
-# Create column headers using wrap_elements with grid
-col1_header <- wrap_elements(grid::textGrob("All Occurrences", 
-                                            gp = grid::gpar(fontsize = 12, fontface = "bold")))
-col2_header <- wrap_elements(grid::textGrob("Vascular Plants", 
-                                            gp = grid::gpar(fontsize = 12, fontface = "bold")))
-col3_header <- wrap_elements(grid::textGrob("Birds", 
-                                            gp = grid::gpar(fontsize = 12, fontface = "bold")))
+# Fit model
+C1 <- ordbetareg(formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_term))),
+                 data = dat_d, chains = 4, iter = 2000, cores = 4, seed = 1234,
+                 control = list(adapt_delta = 0.99), backend = "cmdstanr")
 
-# Combine all plots into a 3x3 grid with headers
-combined_plot <- (
-  (col1_header | col2_header | col3_header) /
-    (ftws_all_plot | ftws_plants_plot | ftws_birds_plot) /
-    (twsf_all_plot | twsf_plants_plot | twsf_birds_plot) /
-    (urban_all_plot | urban_plants_plot | urban_birds_plot) /
-    legend
-) +
-  plot_layout(heights = c(0.05, 1, 1, 1, 0.08)) +
-  plot_annotation(theme = theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
-  )
+# Write model to file
+save(C1, 
+     file = here("data", "models", "exploratory", 
+                 "bayes_nestedness_birds_FTWS_C1_ordbeta_const_spatial.rda"))
 
-# Save the plot
-ggsave(
-  filename = here("figures", "beta_jne_combined_coefficients.png"),
-  plot = combined_plot,
-  width = 18,
-  height = 16,
-  dpi = 600,
-  bg = "white"
-)
+## 2.3. C2: ordered beta, dispersion submodel ----------------------------------
+
+# Fit model
+C2 <- ordbetareg(formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_term)),
+                              as.formula(paste0("phi ~ ", preds))),
+                 phi_reg = "only", data = dat_d, chains  = 4, iter = 2000, cores = 4, seed = 1234,
+                 control = list(adapt_delta = 0.99), backend = "cmdstanr")
+
+# Write model to file
+save(C2, 
+     file = here("data", "models", "exploratory", 
+                 "bayes_nestedness_birds_FTWS_C2_ordbeta_disp_spatial.rda"))
+
+## 2.4. Compare moodels --------------------------------------------------------
+
+# Check the convergence
+print(summarise_draws(C1)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
+print(summarise_draws(C2)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
+
+# Check the posterior predictive shape
+print(pp_check(C1, ndraws = 100) + ggtitle("C1: ordered beta, constant phi"))
+print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel")) 
+# C2 much better at approximating where the hump in the data is
+
+# Check loo
+print(loo_compare(loo(C1), loo(C2)))
+
+# 3. GP BASIS DIMENSION (k) SENSITIVITY AND PLATEAU ----------------------------
+
+# Will fit the better model (C2) across a k ladder on the diagnostic group
+# Then check where the spatial term (sdgp) plateaus and loo stops improving
+
+## 3.1. Fit the k ladder -------------------------------------------------------
+
+# Define a list of k values to try
+k_ladder <- c(15, 30, 40, 50)
+
+# Create an empty list in which to store the model outputs
+k_fits <- list()
+
+# Fit C2 for all 4 ks
+for (K in k_ladder) {
+  
+  # fit C2 at this resolution
+  message("Fitting k = ", K, " ...")
+  fit_k <- ordbetareg(
+    formula = bf(as.formula(paste0("beta_jne ~ ", preds,
+                                   " + gp(x, y, k = ", K, ", c = 5/4)")),
+                 as.formula(paste0("phi ~ ", preds))),
+    phi_reg = "only",
+    data    = dat_d,
+    chains  = 4, iter = 2000, cores = 4, seed = 1234,
+    control = list(adapt_delta = 0.99), backend = "cmdstanr")
+  save(fit_k, file = here("data", "models", "exploratory",
+                          paste0("bayes_nestedness_", diagnostic_group,
+                                 "_ordbeta_disp_spatial_k", K, ".rda")))
+  k_fits[[as.character(K)]] <- fit_k
+}
+
+## 3.2. sdgp and focal coefficient across k ------------------------------------
+
+# Get the spatial process SD at each k to get the plateau diagnostic
+sdgp_vs_k <- bind_rows(lapply(names(k_fits), function(K) {
+  ds <- summarise_draws(k_fits[[K]])
+  r  <- ds[ds$variable == "sdgp_gpxy", ]
+  tibble::tibble(k = as.integer(K), sdgp = r$mean, lwr = r$q5, upr = r$q95)
+}))
+print(sdgp_vs_k)
+
+# Inspect land-cover change coefficient at each k 
+focal_vs_k <- bind_rows(lapply(names(k_fits), function(K) {
+  fx <- fixef(k_fits[[K]], probs = c(0.025, 0.975))
+  tibble::tibble(k = as.integer(K),
+                 lc_change_prop = fx["lc_change_prop", "Estimate"],
+                 lwr = fx["lc_change_prop", "Q2.5"],
+                 upr = fx["lc_change_prop", "Q97.5"])
+}))
+print(focal_vs_k)
+
+# Create plot to check when sdgp vs k plateaus
+p_plateau <- ggplot(sdgp_vs_k, aes(k, sdgp)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.15, fill = "#2196F3") +
+  geom_line(color = "#2196F3") +
+  geom_point(size = 2.5, color = "#2196F3") +
+  labs(x = "GP basis dimension (k)", y = "sdgp (spatial process SD)") +
+  theme_minimal(base_size = 12)
+print(p_plateau)
+
+# Save figure to file
+ggsave(here("figures", paste0("SupplementaryFigure8_nestedness_gp_k_plateau_", diagnostic_group, ".png")),
+       p_plateau, width = 7, height = 5, dpi = 300, bg = "white")
+
+# Check predictive power across k
+print(loo_compare(lapply(k_fits, loo)))
+
+# 4. FIT FINAL MODELS ACROSS LAND-COVERS AND GROUPS ----------------------------
+
+# The final model = ordered beta + dispersion submodel + spatial GP at k = 40)
+
+## 4.1. Fit models in a loop ---------------------------------------------------
+
+for (this_id in model_specs$id) {
+  
+  # add a progress message
+  message("=== Fitting ", this_id, " ===")
+  
+  # define model specifications
+  spec <- model_specs[model_specs$id == this_id, ]
+  
+  # modelling data for this group
+  raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
+  dat    <- prep_turnover(raw_df, spec$transition)
+  
+  # fit the unified specification
+  fit <- ordbetareg(
+    formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_term)),
+                 as.formula(paste0("phi ~ ", preds))),
+    phi_reg = "only",
+    data    = dat,
+    chains  = 4, iter = 2000, cores = 4, seed = 1234,
+    control = list(adapt_delta = 0.99), backend = "cmdstanr")
+  
+  save(fit, file = here("data", "models", "final",
+                        paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rda")))
+}
+
+## 4.2. Check convergence and posterior predictive shape -----------------------
+
+# Loop over the final models 
+for (this_id in model_specs$id) {
+  
+  fit <- load(here("data", "models", "final",
+                   paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rda")))
+  
+  # convergence one-liner
+  ds <- summarise_draws(fit)
+  n_div <- sum(nuts_params(fit) |> filter(Parameter == "divergent__") |> pull(Value))
+  message(sprintf("%-13s  max Rhat %.3f | min ESS %d | divergences %d",
+                  this_id, max(ds$rhat, na.rm = TRUE),
+                  round(min(ds$ess_bulk, na.rm = TRUE)), n_div))
+  
+  # posterior predictive checks
+  print(pp_check(fit, ndraws = 100) + ggtitle(paste0(this_id, " - density")))
+  print(pp_check(fit, type = "stat", stat = function(y) mean(y == 1)) +
+          ggtitle(paste0(this_id, " - proportion of exact 1s")))
+}
+
+# 5. MODEL PREDICTION FIGURE ---------------------------------------------------
+
+# Predicted turnover across each predictor's observed range (holds the other
+# continuous predictors at their mean (0 standardised) and time at the reference
+# period)
+# Axes are back-transformed to original units using thr raw columns
+
+## 5.1. Generate predictions ---------------------------------------------------
+
+# List of the continuous predictors
+cont_preds  <- c("lc_change_prop", "lc_nochange_prop",
+                 "delta_recorder_effort", "log_recorder_effort")
+
+# List of labels for the predictors
+cont_labels <- c(lc_change_prop = "Land-cover change\n(proportion of cell)",
+                 lc_nochange_prop = "Land-cover no change\n(proportion of cell)",
+                 delta_recorder_effort = "\u0394 recorder effort",
+                 log_recorder_effort = "log recorder effort")
+
+# Create empty lists for the predictions
+cont_rows <- list()
+time_rows <- list()
+
+# Loop through predictors
+for (this_id in model_specs$id) {
+  
+  spec <- model_specs[model_specs$id == this_id, ]
+  raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
+  dat <- prep_turnover(raw_df, spec$transition)
+  fit <- load(here("data", "models", "final",
+                   paste0("bayes_nestedness", this_id, "_ordbeta_disp_spatial.rda")))
+  
+  # baseline row: all continuous predictors at mean (0), time at reference,
+  # GP at the map centroid
+  base <- tibble::tibble(lc_change_prop = 0, lc_nochange_prop = 0,
+                         delta_recorder_effort = 0, log_recorder_effort = 0,
+                         lc_time_period = factor(time_ref, levels = time_levels),
+                         x = mean(dat$x), y = mean(dat$y))
+  
+  # one curve per continuous predictor
+  for (p in cont_preds) {
+    raw <- dat[[paste0(p, "_raw")]]
+    grid_raw <- seq(min(raw), max(raw), length.out = 100)
+    nd <- base[rep(1, 100), ]
+    nd[[p]] <- (grid_raw - mean(raw)) / sd(raw)   # standardise as in fitting
+    ep <- posterior_epred(fit, newdata = nd)
+    cont_rows[[length(cont_rows) + 1]] <- tibble::tibble(id = this_id, 
+                                                         group = spec$group, 
+                                                         transition = spec$transition,
+                                                         predictor = p, 
+                                                         x_value = grid_raw,
+                                                         est = apply(ep, 2, median),
+                                                         lwr = apply(ep, 2, quantile, 0.025),
+                                                         upr = apply(ep, 2, quantile, 0.975))
+  }
+  
+  # time-period predictions
+  nd_t <- base[rep(1, length(time_levels)), ]
+  nd_t$lc_time_period <- factor(time_levels, levels = time_levels)
+  ep_t <- posterior_epred(fit, newdata = nd_t)
+  time_rows[[length(time_rows) + 1]] <- tibble::tibble(id = this_id, 
+                                                       group = spec$group, 
+                                                       transition = spec$transition,
+                                                       period = factor(time_levels, 
+                                                                       levels = time_levels),
+                                                       est = apply(ep_t, 2, median),
+                                                       lwr = apply(ep_t, 2, quantile, 0.025),
+                                                       upr = apply(ep_t, 2, quantile, 0.975))
+}
+
+# Combine continuous predictions and add display labels (taxon + transition)
+cont_df <- bind_rows(cont_rows) |>
+  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = recode(transition, FTWS = "Forest \u2192 TWS",
+                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         label = factor(cont_labels[predictor], levels = unname(cont_labels)))
+
+# Combine time predictions and add display labels (taxon + transition)
+time_df <- bind_rows(time_rows) |>
+  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = recode(transition, FTWS = "Forest \u2192 TWS",
+                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         period = recode(period, "2000-2006" = "2000\u20132006",
+                         "2006-2012" = "2006\u20132012", "2012-2018" = "2012\u20132018"))
+
+# Define taxon colours
+taxon_cols <- c("Vascular plants" = "#1B7837", "Birds" = "#762A83")
+
+## 5.2. Predictor figure for land-cover and recorder effort --------------------
+
+# Transitions (rows) x predictor (cols), taxa in the same panel
+p_cont <- ggplot(cont_df, aes(x_value, est, color = taxon, fill = taxon)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.7) +
+  facet_grid(transition ~ label, scales = "free_x") +
+  scale_color_manual(values = taxon_cols) +
+  scale_fill_manual(values = taxon_cols) +
+  labs(x = NULL, y = "Predicted nestedness (\u03b2_jtu)", color = NULL, fill = NULL) +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_cont)
+
+# Save figure to file
+ggsave(here("figures", "Fig3a_predicted_nestedness_continuous.png"),
+       p_cont, width = 11, height = 6.5, dpi = 300, bg = "white")
+
+## 5.3. Time-period predictions ------------------------------------------------
+
+# Transition (columns), taxa as dodge points + intervals
+p_time <- ggplot(time_df, aes(period, est, color = taxon)) +
+  geom_pointrange(aes(ymin = lwr, ymax = upr),
+                  position = position_dodge(width = 0.4), size = 0.45) +
+  facet_wrap(~ transition, nrow = 1) +
+  scale_color_manual(values = taxon_cols) +
+  labs(x = "Time period", y = "Predicted turnover (\u03b2_jtu)", color = NULL) +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_time)
+
+# Save figure to gile
+ggsave(here("figures", "Fig3b_predicted_nestedness_time.png"),
+       p_time, width = 9, height = 3.5, dpi = 300, bg = "white")
+
+## 5.4. Combine figure ---------------------------------------------------------
+
+# Combine the two panels
+combined_fig <- p_cont / p_time +
+  plot_layout(heights = c(3, 1.4)) +
+  plot_annotation(tag_levels = "a")
+
+# Save figure
+ggsave(here("figures", "Fig3_predicted_nestedness_all_predictors.png"),
+       combined_fig, width = 11, height = 9.5, dpi = 300, bg = "white")
+
 # END OF SCRIPT ----------------------------------------------------------------
