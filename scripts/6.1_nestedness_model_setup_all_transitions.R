@@ -1,9 +1,9 @@
 ##----------------------------------------------------------------------------##
 # PAPER 2: CORINE LAND COVER CHANGES AND TURNOVER OF GBIF BIODIVERSITY RECORDS
-# 5.2_model_setup_bayesian_ordebta_beta_jne
+# 6.1_model_setup_bayesian_ordebta_beta_jne
 # This script contains code which sets up the ordered beta models for temporal
 # nestedness (beta_jne) across all three land-cover changes and both occurrence
-# groups (vasculat plants and birds)
+# groups (vascular plants and birds)
 # Final model specification: ordered beta + dispersion submodel 
 # (phi ~ predictors) + approximate spatial Gaussian process at k = 40
 ##----------------------------------------------------------------------------##
@@ -121,10 +121,10 @@ prep_turnover <- function(raw_df, transition){
 # C1 = ordered beta, constant dispersion
 # C2 = ordered beta, dispersion submodel (phi ~ predictors)
 
-## 2.1. Prepare dignostic group data -------------------------------------------
+## 2.1. Prepare diagnostic group data -------------------------------------------
 
 # Extract the modelling data for the diagnostic group
-dat_d <- prep_turnover(
+dat_d <- prep_nestedness(
   if (model_specs$group[model_specs$id == diagnostic_group] == "plants")
     vascular_plants_turnover_with_climate else birds_turnover_with_climate,
   model_specs$transition[model_specs$id == diagnostic_group])
@@ -137,9 +137,9 @@ C1 <- ordbetareg(formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_
                  control = list(adapt_delta = 0.99), backend = "cmdstanr")
 
 # Write model to file
-save(C1, 
-     file = here("data", "models", "exploratory", 
-                 "bayes_nestedness_birds_FTWS_C1_ordbeta_const_spatial.rda"))
+saveRDS(C1, 
+        here("data", "models", "exploratory", 
+             paste0("bayes_nestedness_", diagnostic_group, "_C1_ordbeta_const_spatial.rds")))
 
 ## 2.3. C2: ordered beta, dispersion submodel ----------------------------------
 
@@ -150,9 +150,9 @@ C2 <- ordbetareg(formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_
                  control = list(adapt_delta = 0.99), backend = "cmdstanr")
 
 # Write model to file
-save(C2, 
-     file = here("data", "models", "exploratory", 
-                 "bayes_nestedness_birds_FTWS_C2_ordbeta_disp_spatial.rda"))
+saveRDS(C2, 
+        here("data", "models", "exploratory", 
+             paste0("bayes_nestedness_", diagnostic_group, "_C2_ordbeta_disp_spatial.rds")))
 
 ## 2.4. Compare moodels --------------------------------------------------------
 
@@ -164,6 +164,12 @@ print(summarise_draws(C2)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
 print(pp_check(C1, ndraws = 100) + ggtitle("C1: ordered beta, constant phi"))
 print(pp_check(C2, ndraws = 100) + ggtitle("C2: ordered beta, phi submodel")) 
 # C2 much better at approximating where the hump in the data is
+
+# Check the boundary: proportion of exact 0s (the zero-inflation in nestedness)
+print(pp_check(C1, type = "stat", stat = function(y) mean(y == 0)) +
+        ggtitle("C1: proportion of exact 0s"))
+print(pp_check(C2, type = "stat", stat = function(y) mean(y == 0)) +
+        ggtitle("C2: proportion of exact 0s"))
 
 # Check loo
 print(loo_compare(loo(C1), loo(C2)))
@@ -194,9 +200,9 @@ for (K in k_ladder) {
     data    = dat_d,
     chains  = 4, iter = 2000, cores = 4, seed = 1234,
     control = list(adapt_delta = 0.99), backend = "cmdstanr")
-  save(fit_k, file = here("data", "models", "exploratory",
-                          paste0("bayes_nestedness_", diagnostic_group,
-                                 "_ordbeta_disp_spatial_k", K, ".rda")))
+  saveRDS(fit_k, here("data", "models", "exploratory",
+                      paste0("bayes_nestedness_", diagnostic_group,
+                             "_ordbeta_disp_spatial_k", K, ".rds")))
   k_fits[[as.character(K)]] <- fit_k
 }
 
@@ -252,7 +258,7 @@ for (this_id in model_specs$id) {
   
   # modelling data for this group
   raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
-  dat    <- prep_turnover(raw_df, spec$transition)
+  dat    <- prep_nestedness(raw_df, spec$transition)
   
   # fit the unified specification
   fit <- ordbetareg(
@@ -263,8 +269,8 @@ for (this_id in model_specs$id) {
     chains  = 4, iter = 2000, cores = 4, seed = 1234,
     control = list(adapt_delta = 0.99), backend = "cmdstanr")
   
-  save(fit, file = here("data", "models", "final",
-                        paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rda")))
+  saveRDS(fit, here("data", "models", "final",
+                    paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rds")))
 }
 
 ## 4.2. Check convergence and posterior predictive shape -----------------------
@@ -272,8 +278,8 @@ for (this_id in model_specs$id) {
 # Loop over the final models 
 for (this_id in model_specs$id) {
   
-  fit <- load(here("data", "models", "final",
-                   paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rda")))
+  fit <- readRDS(here("data", "models", "final",
+                      paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rds")))
   
   # convergence one-liner
   ds <- summarise_draws(fit)
@@ -310,15 +316,17 @@ cont_labels <- c(lc_change_prop = "Land-cover change\n(proportion of cell)",
 # Create empty lists for the predictions
 cont_rows <- list()
 time_rows <- list()
+point_rows <- list() 
+presid_rows <- list() 
 
 # Loop through predictors
 for (this_id in model_specs$id) {
   
   spec <- model_specs[model_specs$id == this_id, ]
   raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
-  dat <- prep_turnover(raw_df, spec$transition)
-  fit <- load(here("data", "models", "final",
-                   paste0("bayes_nestedness", this_id, "_ordbeta_disp_spatial.rda")))
+  dat <- prep_nestedness(raw_df, spec$transition)
+  fit <- readRDS(here("data", "models", "final",
+                      paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rds")))
   
   # baseline row: all continuous predictors at mean (0), time at reference,
   # GP at the map centroid
@@ -326,6 +334,10 @@ for (this_id in model_specs$id) {
                          delta_recorder_effort = 0, log_recorder_effort = 0,
                          lc_time_period = factor(time_ref, levels = time_levels),
                          x = mean(dat$x), y = mean(dat$y))
+  
+  # full fitted values (all observed predictors incl GP) - for partial residuals
+  yhat_full  <- colMeans(posterior_epred(fit, newdata = dat))
+  resid_full <- dat$beta_jne - yhat_full
   
   # one curve per continuous predictor
   for (p in cont_preds) {
@@ -342,6 +354,20 @@ for (this_id in model_specs$id) {
                                                          est = apply(ep, 2, median),
                                                          lwr = apply(ep, 2, quantile, 0.025),
                                                          upr = apply(ep, 2, quantile, 0.975))
+    
+    # overlay A: raw observed points (raw predictor vs observed nestedness)
+    point_rows[[length(point_rows) + 1]] <- tibble::tibble(
+      id = this_id, group = spec$group, transition = spec$transition,
+      predictor = p, x_value = raw, value = dat$beta_jne)
+    
+    # overlay B: partial residuals (partial prediction at each observed value of
+    # p, with this observation's full-model residual added back)
+    nd_obs       <- base[rep(1, nrow(dat)), ]
+    nd_obs[[p]]  <- dat[[p]]
+    pred_partial <- colMeans(posterior_epred(fit, newdata = nd_obs))
+    presid_rows[[length(presid_rows) + 1]] <- tibble::tibble(
+      id = this_id, group = spec$group, transition = spec$transition,
+      predictor = p, x_value = raw, value = pred_partial + resid_full)
   }
   
   # time-period predictions
@@ -360,22 +386,40 @@ for (this_id in model_specs$id) {
 
 # Combine continuous predictions and add display labels (taxon + transition)
 cont_df <- bind_rows(cont_rows) |>
-  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
-         transition = recode(transition, FTWS = "Forest \u2192 TWS",
-                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+  mutate(taxon = dplyr::recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = dplyr::recode(transition, FTWS = "Forest \u2192 TWS",
+                                    TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
          transition = factor(transition,
                              levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
          label = factor(cont_labels[predictor], levels = unname(cont_labels)))
 
 # Combine time predictions and add display labels (taxon + transition)
 time_df <- bind_rows(time_rows) |>
-  mutate(taxon = recode(group, plants = "Vascular plants", birds = "Birds"),
-         transition = recode(transition, FTWS = "Forest \u2192 TWS",
-                             TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+  mutate(taxon = dplyr::recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = dplyr::recode(transition, FTWS = "Forest \u2192 TWS",
+                                    TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
          transition = factor(transition,
                              levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
-         period = recode(period, "2000-2006" = "2000\u20132006",
-                         "2006-2012" = "2006\u20132012", "2012-2018" = "2012\u20132018"))
+         period = dplyr::recode(period, "2000-2006" = "2000\u20132006",
+                                "2006-2012" = "2006\u20132012", "2012-2018" = "2012\u20132018"))
+
+# Combine raw points and add display labels (taxon + transition)
+points_df <- bind_rows(point_rows) |>
+  mutate(taxon = dplyr::recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = dplyr::recode(transition, FTWS = "Forest \u2192 TWS",
+                                    TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         label = factor(cont_labels[predictor], levels = unname(cont_labels)))
+
+# Combine partial residuals and add display labels (taxon + transition)
+presid_df <- bind_rows(presid_rows) |>
+  mutate(taxon = dplyr::recode(group, plants = "Vascular plants", birds = "Birds"),
+         transition = dplyr::recode(transition, FTWS = "Forest \u2192 TWS",
+                                    TWSF = "TWS \u2192 Forest", urban = "All \u2192 Urban"),
+         transition = factor(transition,
+                             levels = c("Forest \u2192 TWS", "TWS \u2192 Forest", "All \u2192 Urban")),
+         label = factor(cont_labels[predictor], levels = unname(cont_labels)))
 
 # Define taxon colours
 taxon_cols <- c("Vascular plants" = "#1B7837", "Birds" = "#762A83")
@@ -389,8 +433,8 @@ p_cont <- ggplot(cont_df, aes(x_value, est, color = taxon, fill = taxon)) +
   facet_grid(transition ~ label, scales = "free_x") +
   scale_color_manual(values = taxon_cols) +
   scale_fill_manual(values = taxon_cols) +
-  labs(x = NULL, y = "Predicted nestedness (\u03b2_jtu)", color = NULL, fill = NULL) +
-  theme_bw(base_size = 11) +
+  labs(x = NULL, y = "Predicted nestedness (\u03b2_jne)", color = NULL, fill = NULL) +
+  theme_bw(base_size = 14, base_family = "Helvetica") +
   theme(panel.grid.minor = element_blank(),
         strip.background = element_rect(fill = "grey95"),
         legend.position = "top")
@@ -402,6 +446,49 @@ print(p_cont)
 ggsave(here("figures", "Fig3a_predicted_nestedness_continuous.png"),
        p_cont, width = 11, height = 6.5, dpi = 300, bg = "white")
 
+### 5.2.1. Overlay A: raw observed points --------------------------------------
+
+# Plot the same figure with raw data points added
+p_cont_raw <- ggplot(cont_df, aes(x_value, est, color = taxon, fill = taxon)) +
+  geom_point(data = points_df, aes(x = x_value, y = value, color = taxon),
+             inherit.aes = FALSE, alpha = 0.08, size = 0.4) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.7) +
+  facet_grid(transition ~ label, scales = "free_x") +
+  scale_color_manual(values = taxon_cols) +
+  scale_fill_manual(values = taxon_cols) +
+  labs(x = NULL, y = "Predicted nestedness (\u03b2_jne)", color = NULL, fill = NULL) +
+  theme_bw(base_size = 14, base_family = "Helvetica") +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_cont_raw)
+
+### 5.2.2. Overlay B: partial residuals ----------------------------------------
+
+# Plot the same figure as above with partial residuals: each observation's full-model residual is
+# added to the partial-effect prediction, which strips out the other predictors
+# and the spatial term so the points scatter around the curve by unexplained
+# variation only.
+p_cont_presid <- ggplot(cont_df, aes(x_value, est, color = taxon, fill = taxon)) +
+  geom_point(data = presid_df, aes(x = x_value, y = value, color = taxon),
+             inherit.aes = FALSE, alpha = 0.08, size = 0.4) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.18, color = NA) +
+  geom_line(linewidth = 0.7) +
+  facet_grid(transition ~ label, scales = "free_x") +
+  scale_color_manual(values = taxon_cols) +
+  scale_fill_manual(values = taxon_cols) +
+  labs(x = NULL, y = "Predicted nestedness (\u03b2_jne)", color = NULL, fill = NULL) +
+  theme_bw(base_size = 14, base_family = "Helvetica") +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        legend.position = "top")
+
+# Inspect figure
+print(p_cont_presid)
+
 ## 5.3. Time-period predictions ------------------------------------------------
 
 # Transition (columns), taxa as dodge points + intervals
@@ -410,8 +497,8 @@ p_time <- ggplot(time_df, aes(period, est, color = taxon)) +
                   position = position_dodge(width = 0.4), size = 0.45) +
   facet_wrap(~ transition, nrow = 1) +
   scale_color_manual(values = taxon_cols) +
-  labs(x = "Time period", y = "Predicted turnover (\u03b2_jtu)", color = NULL) +
-  theme_bw(base_size = 11) +
+  labs(x = "Time period", y = "Predicted nestedness (\u03b2_jne)", color = NULL) +
+  theme_bw(base_size = 14, base_family = "Helvetica") +
   theme(panel.grid.minor = element_blank(),
         strip.background = element_rect(fill = "grey95"),
         legend.position = "top")
@@ -419,19 +506,33 @@ p_time <- ggplot(time_df, aes(period, est, color = taxon)) +
 # Inspect figure
 print(p_time)
 
-# Save figure to gile
+# Save figure to file
 ggsave(here("figures", "Fig3b_predicted_nestedness_time.png"),
        p_time, width = 9, height = 3.5, dpi = 300, bg = "white")
 
-## 5.4. Combine figure ---------------------------------------------------------
+## 5.4. Combine figure (raw points) --------------------------------------------
 
 # Combine the two panels
-combined_fig <- p_cont / p_time +
+combined_fig_raw <- p_cont_raw / p_time +
   plot_layout(heights = c(3, 1.4)) +
   plot_annotation(tag_levels = "a")
 
 # Save figure
 ggsave(here("figures", "Fig3_predicted_nestedness_all_predictors.png"),
-       combined_fig, width = 11, height = 9.5, dpi = 300, bg = "white")
+       combined_fig_raw, width = 11, height = 9.5, dpi = 300, bg = "white")
+ggsave(here("figures", "Fig2_predicted_turnover_all_predictors.pdf"),
+       combined_fig_raw, width = 11, height = 9.5, dpi = 300, bg = "white")
+
+## 5.5. Combine figure (partial residuals) -------------------------------------
+
+# Combine the two panels
+combined_fig_residuals <- p_cont_presid / p_time +
+  plot_layout(heights = c(3, 1.4)) +
+  plot_annotation(tag_levels = "a")
+
+# Save figure
+ggsave(here("figures", "SupplementaryFigure8_predicted_nestedness_all_predictors_partial_residuals.png"),
+       combined_fig_residuals, width = 11, height = 9.5, dpi = 300, bg = "white")
+
 
 # END OF SCRIPT ----------------------------------------------------------------
