@@ -527,4 +527,5 @@ combined_fig_residuals <- p_cont_presid / p_time +
 # Save figure
 ggsave(here("figures", "SupplementaryFigure7_predicted_turnover_all_predictors_partial_residuals.png"),
        combined_fig_residuals, width = 11, height = 9.5, dpi = 300, bg = "white")
+
 # END OF SCRIPT ----------------------------------------------------------------
