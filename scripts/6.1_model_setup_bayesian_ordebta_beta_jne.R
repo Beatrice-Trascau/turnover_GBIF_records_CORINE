@@ -70,7 +70,7 @@ load(here("data", "derived_data",
 # cover columns, computes proportions and log recorder effort, and standardises
 # the four continuous predictors. Also keeps the raw (un-standardised) predictor
 # values (suffix _raw) so the prediction-figure axes can be back-transformed.
-prep_turnover <- function(raw_df, transition){
+prep_nestedness <- function(raw_df, transition){
   
   # pick the no-change and chnage columns for this transition
   cols <- switch(transition,
@@ -154,7 +154,7 @@ saveRDS(C2,
         here("data", "models", "exploratory", 
              paste0("bayes_nestedness_", diagnostic_group, "_C2_ordbeta_disp_spatial.rds")))
 
-## 2.4. Compare moodels --------------------------------------------------------
+## 2.4. Compare models ---------------------------------------------------------
 
 # Check the convergence
 print(summarise_draws(C1)[, c("variable", "rhat", "ess_bulk", "ess_tail")])
@@ -292,6 +292,55 @@ for (this_id in model_specs$id) {
   print(pp_check(fit, ndraws = 100) + ggtitle(paste0(this_id, " - density")))
   print(pp_check(fit, type = "stat", stat = function(y) mean(y == 1)) +
           ggtitle(paste0(this_id, " - proportion of exact 1s")))
+}
+
+## Check revealed that both urban models have max Rhat = 1.011 with 0 divergences
+## max Rhat = 1.01 is usually the threshold so will run again the urban models with
+## a larger number of draws
+
+## 4.3. Refit urban models with more iterations --------------------------------
+
+# Get the urban model ids
+urban_ids <- c("plants_urban", "birds_urban")
+
+# Refit models with more iterations
+for (this_id in urban_ids) {
+  
+  message("=== Re-fitting ", this_id, " ===")
+  
+  spec   <- model_specs[model_specs$id == this_id, ]
+  raw_df <- if (spec$group == "plants") vascular_plants_turnover_with_climate else birds_turnover_with_climate
+  dat    <- prep_nestedness(raw_df, spec$transition)
+  
+  fit <- ordbetareg(
+    formula = bf(as.formula(paste0("beta_jne ~ ", preds, " + ", gp_term)),
+                 as.formula(paste0("phi ~ ", preds))),
+    phi_reg = "only",
+    data    = dat,
+    chains  = 4, iter = 4000, cores = 4, seed = 1234,
+    control = list(adapt_delta = 0.99), backend = "cmdstanr")
+  
+  saveRDS(fit, here("data", "models", "final",
+                    paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rds")))
+}
+
+# Check convergence and posterior predictive shape
+for (this_id in urban_ids) {
+  
+  fit <- readRDS(here("data", "models", "final",
+                      paste0("bayes_nestedness_", this_id, "_ordbeta_disp_spatial.rds")))
+  
+  # convergence one-liner
+  ds <- summarise_draws(fit)
+  n_div <- sum(nuts_params(fit) |> filter(Parameter == "divergent__") |> pull(Value))
+  message(sprintf("%-13s  max Rhat %.3f | min ESS %d | divergences %d",
+                  this_id, max(ds$rhat, na.rm = TRUE),
+                  round(min(ds$ess_bulk, na.rm = TRUE)), n_div))
+  
+  # posterior predictive checks (proportion of exact 0s is the informative boundary)
+  print(pp_check(fit, ndraws = 100) + ggtitle(paste0(this_id, " - density")))
+  print(pp_check(fit, type = "stat", stat = function(y) mean(y == 0)) +
+          ggtitle(paste0(this_id, " - proportion of exact 0s")))
 }
 
 # 5. MODEL PREDICTION FIGURE ---------------------------------------------------
